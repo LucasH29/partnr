@@ -115,7 +115,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 
 <script>
 var S={name:'',email:'',school:'',country:'',zip:'',grade:'',languages:[],track:'',role:'',status:'',skillLevels:{},availability:'',github:'',stage:'',comps:[],idea:'',commit:'',location:''};
-var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],modalTarget=null,selComps=[],exploreOpen=false,activeCat='all';
+var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],modalTarget=null,selComps=[],exploreOpen=false,activeCat='all',activeCats=[];
 
 var TR={
   research:{n:'Research & Science',c:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'},
@@ -266,9 +266,11 @@ function renderSignup(){
     '<div class="fi"><label>Grade / Year</label><select id="i-grade">'+gradeOpts()+'</select></div>'+
     '<div class="slabel" style="margin-top:0;">Languages spoken</div>'+
     chipGroup('lang',['English','Spanish','Mandarin','Hindi','French','German','Arabic','Portuguese','Japanese','Korean'],S.languages,false)+
-    '<button class="bp" id="s2-btn">Continue →</button>'
+    '<button class="bp" id="s2-btn">Continue →</button>'+
+    '<button id="back-welcome" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
   );
   document.getElementById('s2-btn').addEventListener('click',step2);
+  document.getElementById('back-welcome').addEventListener('click',function(){goTo('welcome');});
 }
 
 function renderTrack(){
@@ -296,11 +298,13 @@ function renderTrack(){
     '</div>'+
     '<div class="slabel">Status</div>'+
     chipGroup('status',['I have a project — need partners','I have skills — open to joining','I have an idea — need co-founders','Just exploring'],[S.status],true)+
-    '<button class="bp" id="s3-btn" style="opacity:'+(S.track&&S.role?'1':'0.4')+'"  >Continue →</button>'
+    '<button class="bp" id="s3-btn" style="opacity:'+(S.track&&S.role?'1':'0.4')+'"  >Continue →</button>'+
+    '<button id="back-signup" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
   );
   if(S.track){var el=document.querySelector('[data-val="'+S.track+'"]');if(el){el.classList.add('on');el.style.background=TR[S.track].bg;}}
   if(S.role){var el2=document.querySelector('[data-role="'+S.role+'"]');if(el2)el2.classList.add('on');}
   document.getElementById('s3-btn').addEventListener('click',step3);
+  document.getElementById('back-signup').addEventListener('click',function(){goTo('signup');});
   document.querySelectorAll('.track-card').forEach(function(el){
     el.addEventListener('click',function(){
       S.track=this.dataset.val;
@@ -356,7 +360,8 @@ function renderSkills(){
     chipGroup('avail',['1-3 hrs/week','4-8 hrs/week','10+ hrs/week','Weekends only'],[S.availability],true)+
     '<div class="slabel">Portfolio / GitHub (optional)</div>'+
     '<div class="fi"><input id="i-github" placeholder="github.com/yourname or portfolio URL" value="'+esc(S.github)+'"/></div>'+
-    '<button class="bp" id="s4-btn">Continue →</button>'
+    '<button class="bp" id="s4-btn">Continue →</button>'+
+    '<button id="back-track" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
   );
 
   document.querySelectorAll('.skill-chip').forEach(function(chip){
@@ -409,6 +414,7 @@ function renderSkills(){
     el.addEventListener('click',function(){document.querySelectorAll('#avail .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.availability=this.textContent;});
   });
   document.getElementById('s4-btn').addEventListener('click',step4);
+  document.getElementById('back-track').addEventListener('click',function(){goTo('track');});
   updateSkillSummary();
 }
 
@@ -465,7 +471,8 @@ function renderGoals(){
     chipGroup('commit',['Casual','Serious','All in'],[S.commit],true)+
     '<div class="slabel">Partner location</div>'+
     chipGroup('loc',['Near me','Remote / global','Either'],[S.location],true)+
-    '<button class="bp" id="gf-btn">Find my partners →</button>'
+    '<button class="bp" id="gf-btn">Find my partners →</button>'+
+    '<button id="back-skills" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
   );
 
   document.querySelectorAll('#sg .sb').forEach(function(el){
@@ -494,6 +501,7 @@ function renderGoals(){
     el.addEventListener('click',function(){document.querySelectorAll('#loc .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.location=this.textContent;});
   });
   document.getElementById('gf-btn').addEventListener('click',goFind);
+  document.getElementById('back-skills').addEventListener('click',function(){goTo('skills');});
   document.addEventListener('click',function(e){
     var d=document.getElementById('cdd');if(d&&!e.target.closest('#ci')&&!e.target.closest('#cdd'))d.style.display='none';
   });
@@ -505,7 +513,6 @@ function onCompSearch(v){
   if(!v||v.length<2){dd.style.display='none';return;}
   var q=v.toLowerCase();
   var res=ALL_COMPS.filter(function(c){return c.n.toLowerCase().includes(q)||c.cat.includes(q)||c.desc.toLowerCase().includes(q);}).slice(0,8);
-  if(!res.length){dd.style.display='none';return;}
   dd.innerHTML='';
   res.forEach(function(c){
     var cm=CATS_META[c.cat]||{c:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'};
@@ -515,17 +522,47 @@ function onCompSearch(v){
     div.addEventListener('click',function(){addComp(c);document.getElementById('ci').value='';dd.style.display='none';});
     dd.appendChild(div);
   });
+  var exact=res.find(function(c){return c.n.toLowerCase()===q;});
+  if(!exact){
+    var addDiv=document.createElement('div');addDiv.className='cdo';
+    addDiv.style.borderTop=res.length?'1px solid #f0f0ec':'none';
+    addDiv.innerHTML='<div style="flex:1;min-width:0;"><div class="cdo-name" style="color:#7F77DD;">+ Add "'+v+'" as custom competition</div><div class="cdo-sub">Regional, state, or local competition</div></div>';
+    addDiv.addEventListener('click',function(){
+      addComp({n:v,cat:'custom',team:'Varies',eli:'Local / Regional',tier:3,desc:'Custom competition',why:'Find a partner for your specific competition'});
+      document.getElementById('ci').value='';dd.style.display='none';
+    });
+    dd.appendChild(addDiv);
+  }
   dd.style.display='block';
 }
 
 function renderCompCat(cat){
+  var tabEl=document.querySelector('.ctab[data-cat="'+cat+'"]');
+  if(cat==='all'){
+    activeCats=[];
+    document.querySelectorAll('.ctab').forEach(function(t){t.classList.remove('on');t.style.color='';});
+    if(tabEl){tabEl.classList.add('on');tabEl.style.color='#7F77DD';}
+  } else {
+    var allTab=document.querySelector('.ctab[data-cat="all"]');
+    if(allTab){allTab.classList.remove('on');allTab.style.color='';}
+    if(tabEl){
+      var isOn=tabEl.classList.contains('on');
+      if(isOn){
+        tabEl.classList.remove('on');tabEl.style.color='';
+        activeCats=activeCats.filter(function(c){return c!==cat;});
+      } else {
+        var cm2=CATS_META[cat];
+        tabEl.classList.add('on');tabEl.style.color=cm2?cm2.c:'#7F77DD';
+        activeCats.push(cat);
+      }
+    }
+    if(!activeCats.length){
+      var allTab2=document.querySelector('.ctab[data-cat="all"]');
+      if(allTab2){allTab2.classList.add('on');allTab2.style.color='#7F77DD';}
+    }
+  }
   activeCat=cat;
-  document.querySelectorAll('.ctab').forEach(function(t){
-    var cm=CATS_META[t.dataset.cat];
-    if(t.dataset.cat===cat){t.classList.add('on');t.style.color=cat==='all'?'#7F77DD':(cm?cm.c:'#7F77DD');}
-    else{t.classList.remove('on');t.style.color='';}
-  });
-  var list=ALL_COMPS.filter(function(c){return cat==='all'||c.cat===cat;});
+  var list=ALL_COMPS.filter(function(c){return activeCats.length===0||activeCats.indexOf(c.cat)>=0;});
   var el=document.getElementById('comp-list');if(!el)return;
   el.innerHTML='';
   list.forEach(function(c){
@@ -958,7 +995,7 @@ function fallback(){
 
 function resetAll(){
   S={name:'',email:'',school:'',country:'',zip:'',grade:'',languages:[],track:'',role:'',status:'',skillLevels:{},availability:'',github:'',stage:'',comps:[],idea:'',commit:'',location:''};
-  MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCat='all';
+  MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCat='all';activeCats=[];
   goTo('welcome');
 }
 
