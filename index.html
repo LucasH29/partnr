@@ -121,7 +121,7 @@ var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
 // ── Countries without zip codes ────────────
-var NO_ZIP=["Afghanistan","Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Cape Verde","Central African Republic","Chad","Comoros","Congo","Congo (DRC)","Congo (Republic)","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Fiji","Gabon","Gambia","Ghana","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong","Ireland","Ivory Coast","Jamaica","Kenya","Kiribati","Laos","Lesotho","Liberia","Libya","Macau","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Nigeria","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Saudi Arabia","Seychelles","Sierra Leone","Solomon Islands","Somalia","South Africa","South Sudan","Sudan","Suriname","Syria","Tanzania","Togo","Tonga","Trinidad and Tobago","Tuvalu","Uganda","United Arab Emirates","Vanuatu","Venezuela","Yemen","Zambia","Zimbabwe"];
+var NO_ZIP=["Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Cape Verde","Central African Republic","Chad","Comoros","Congo","Congo (DRC)","Congo (Republic)","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Fiji","Gabon","Gambia","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Ivory Coast","Jamaica","Kiribati","Laos","Lesotho","Liberia","Libya","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Seychelles","Sierra Leone","Solomon Islands","Somalia","South Sudan","Sudan","Suriname","Syria","Togo","Tonga","Trinidad and Tobago","Tuvalu","United Arab Emirates","Vanuatu","Yemen","Zambia","Zimbabwe"];
 function hasZip(co){return NO_ZIP.indexOf(co)<0;}
 
 // ── Country language mapping ────────────────
@@ -314,42 +314,9 @@ var LEVELS=["Beginner","Intermediate","Advanced","Expert"];
 
 // ── Helpers ────────────────────────────────
 function R(h){document.getElementById("ROOT").innerHTML=h;}
-// ── localStorage persistence ─────────────────
-var SAVE_KEY="partnr_state_v1";
-var PAGE_KEY="partnr_page_v1";
-var MATCHES_KEY="partnr_matches_v1";
-
-function saveState(page){
-  try{
-    localStorage.setItem(SAVE_KEY,JSON.stringify(S));
-    localStorage.setItem(PAGE_KEY,page||"welcome");
-    if(MATCHES.length) localStorage.setItem(MATCHES_KEY,JSON.stringify({matches:MATCHES,projects:PROJECTS,comps:COMPS_DATA,conns:CONNS,selComps:selComps}));
-  } catch(e){}
-}
-
-function loadState(){
-  try{
-    var raw=localStorage.getItem(SAVE_KEY);
-    if(raw){
-      var parsed=JSON.parse(raw);
-      Object.keys(parsed).forEach(function(k){S[k]=parsed[k];});
-    }
-    var mraw=localStorage.getItem(MATCHES_KEY);
-    if(mraw){
-      var md=JSON.parse(mraw);
-      MATCHES=md.matches||[];PROJECTS=md.projects||[];COMPS_DATA=md.comps||[];CONNS=md.conns||[];selComps=md.selComps||[];
-    }
-    return localStorage.getItem(PAGE_KEY)||"welcome";
-  } catch(e){return "welcome";}
-}
-
-function clearSave(){
-  try{localStorage.removeItem(SAVE_KEY);localStorage.removeItem(PAGE_KEY);localStorage.removeItem(MATCHES_KEY);}catch(e){}
-}
-
+// ── Navigation ──────────────────────────────
 function goTo(p){
   window.scrollTo(0,0);
-  saveState(p);
   if(p==="welcome")rWelcome();
   else if(p==="signup")rSignup();
   else if(p==="track")rTrack();
@@ -458,7 +425,7 @@ function rSignup(){
     "<div class=\"fi\"><label>High school name</label><input id=\"ischool\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/></div>"+
     "<div class=\"fi\"><label>Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
     "<div class=\"fi\"><label>City</label><input id=\"icity\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\" /></div>"+
-    "<div id=\"zipwrap\" style=\""+(hasZip(co)?"":"display:none;")+"\">"+
+    "<div id=\"zipwrap\" style=\""+(co&&hasZip(co)?"":"display:none;")+"\">"+
       "<div class=\"fi\"><label>Zip / Postal code</label>"+
       "<input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\" /></div>"+
     "</div>"+
@@ -1440,15 +1407,10 @@ function fallback(){
 function resetAll(){
   S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
-  clearSave();
   goTo("welcome");
 }
 
-// Restore session on page load — never drop the user back to welcome if they were mid-flow
-var _startPage=loadState();
-// Don't restore to "loading" — that means the API call was mid-flight; send to goals instead
-if(_startPage==="loading") _startPage="goals";
-goTo(_startPage);
+goTo("welcome");
 </script>
 </body>
 </html>
