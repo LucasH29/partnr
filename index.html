@@ -123,7 +123,161 @@ var CM2={science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},math:{n:"Ma
 var TRC={1:{bg:"#EAF3DE",tc:"#3B6D11",lbl:"Tier 1"},2:{bg:"#EEEDFE",tc:"#3C3489",lbl:"Tier 2"},3:{bg:"#F1EFE8",tc:"#5F5E5A",lbl:"Local"}};
 var SKS=["Biology","Chemistry","Physics","Math / Stats","Coding / CS","Machine Learning","Writing / Research","Design / UX","Engineering","Business / Finance","Marketing","Visual Arts"];
 var EXTRA_SKS=["Public Speaking","Video / Media","Environmental Sci","Neuroscience","Social Science","Robotics / Hardware","Philosophy","Economics","Law","Architecture","Music","Data Analysis"];
-var LANGS=["English","Spanish","Mandarin ","Hindi","Arabic","Bengali","Portuguese","Russian","Urdu","Amharic","French","Swahili","Hausa","Yoruba","Japanese","German","Korean","Turkish","Italian","Vietnamese","Tagalog","Thai","Polish","Dutch"];
+var LANGS=["Amharic","Arabic","Bengali","French","German","Hebrew","Hindi","Igbo","Japanese","Korean","Mandarin","Portuguese","Russian","Spanish","Swahili","Yoruba","English"];
+
+// Country -> primary languages (first = most dominant, determines chip order)
+var COUNTRY_LANGS={
+  "Ethiopia":["Amharic"],
+  "Nigeria":["Yoruba","Igbo","Hausa","English"],
+  "Ghana":["English","Twi"],
+  "Kenya":["Swahili","English"],
+  "Tanzania":["Swahili","English"],
+  "Uganda":["English","Swahili"],
+  "Senegal":["French","Wolof"],
+  "Cameroon":["French","English"],
+  "Congo":["French"],
+  "Morocco":["Arabic","French"],
+  "Algeria":["Arabic","French"],
+  "Tunisia":["Arabic","French"],
+  "Egypt":["Arabic"],
+  "Libya":["Arabic"],
+  "Sudan":["Arabic"],
+  "Saudi Arabia":["Arabic"],
+  "United Arab Emirates":["Arabic","English"],
+  "Iraq":["Arabic"],
+  "Jordan":["Arabic"],
+  "Lebanon":["Arabic","French"],
+  "Syria":["Arabic"],
+  "Yemen":["Arabic"],
+  "Oman":["Arabic"],
+  "Qatar":["Arabic"],
+  "Kuwait":["Arabic"],
+  "Bahrain":["Arabic"],
+  "Palestine":["Arabic"],
+  "Israel":["Hebrew","Arabic","English"],
+  "China":["Mandarin"],
+  "Taiwan":["Mandarin"],
+  "Hong Kong":["Mandarin","English"],
+  "Macau":["Mandarin","Portuguese"],
+  "Singapore":["English","Mandarin"],
+  "India":["Hindi","Bengali","English"],
+  "Bangladesh":["Bengali"],
+  "Pakistan":["Urdu","English"],
+  "Japan":["Japanese"],
+  "South Korea":["Korean"],
+  "Brazil":["Portuguese"],
+  "Portugal":["Portuguese"],
+  "Mozambique":["Portuguese"],
+  "Angola":["Portuguese"],
+  "Russia":["Russian"],
+  "Ukraine":["Russian"],
+  "Belarus":["Russian"],
+  "Kazakhstan":["Russian"],
+  "Germany":["German"],
+  "Austria":["German"],
+  "Switzerland":["German","French","Italian"],
+  "France":["French"],
+  "Belgium":["French","Dutch"],
+  "Netherlands":["Dutch"],
+  "Luxembourg":["French","German"],
+  "Spain":["Spanish"],
+  "Mexico":["Spanish"],
+  "Colombia":["Spanish"],
+  "Argentina":["Spanish"],
+  "Chile":["Spanish"],
+  "Peru":["Spanish"],
+  "Venezuela":["Spanish"],
+  "Ecuador":["Spanish"],
+  "Bolivia":["Spanish"],
+  "Paraguay":["Spanish"],
+  "Uruguay":["Spanish"],
+  "Cuba":["Spanish"],
+  "Dominican Republic":["Spanish"],
+  "Guatemala":["Spanish"],
+  "Honduras":["Spanish"],
+  "El Salvador":["Spanish"],
+  "Nicaragua":["Spanish"],
+  "Costa Rica":["Spanish"],
+  "Panama":["Spanish"],
+  "South Africa":["English","Zulu","Xhosa"],
+  "Namibia":["English","Afrikaans"],
+  "Botswana":["English","Setswana"],
+  "Zimbabwe":["English"],
+  "Zambia":["English"],
+  "Malawi":["English","Chichewa"],
+  "Rwanda":["French","English","Kinyarwanda"],
+  "Burundi":["French","Kirundi"],
+  "United States":["English"],
+  "United Kingdom":["English"],
+  "Canada":["English","French"],
+  "Australia":["English"],
+  "New Zealand":["English"],
+  "Ireland":["English"],
+  "Philippines":["English","Filipino"],
+  "Malaysia":["Malay","English"],
+  "Indonesia":["Indonesian"],
+  "Vietnam":["Vietnamese"],
+  "Thailand":["Thai"],
+  "Cambodia":["Khmer"],
+  "Myanmar":["Burmese"],
+  "Sri Lanka":["Sinhala","Tamil","English"],
+  "Nepal":["Nepali"],
+  "Afghanistan":["Pashto","Dari"],
+  "Iran":["Persian"],
+  "Turkey":["Turkish"],
+  "Poland":["Polish"],
+  "Czech Republic":["Czech"],
+  "Slovakia":["Slovak"],
+  "Hungary":["Hungarian"],
+  "Romania":["Romanian"],
+  "Bulgaria":["Bulgarian"],
+  "Greece":["Greek"],
+  "Serbia":["Serbian"],
+  "Croatia":["Croatian"],
+  "Bosnia":["Bosnian"],
+  "Albania":["Albanian"],
+  "North Macedonia":["Macedonian"],
+  "Kosovo":["Albanian"],
+  "Montenegro":["Montenegrin"],
+  "Moldova":["Romanian"],
+  "Georgia":["Georgian"],
+  "Armenia":["Armenian"],
+  "Azerbaijan":["Azerbaijani"],
+  "Uzbekistan":["Uzbek"],
+  "Kyrgyzstan":["Kyrgyz"],
+  "Tajikistan":["Tajik"],
+  "Turkmenistan":["Turkmen"],
+  "Mongolia":["Mongolian"],
+  "Sweden":["Swedish"],
+  "Norway":["Norwegian"],
+  "Denmark":["Danish"],
+  "Finland":["Finnish"],
+  "Iceland":["Icelandic"],
+  "Estonia":["Estonian"],
+  "Latvia":["Latvian"],
+  "Lithuania":["Lithuanian"],
+  "Italy":["Italian"],
+  "Malta":["Maltese","English"],
+  "Cyprus":["Greek","English"],
+  "Israel":["Hebrew","Arabic"],
+  "Jordan":["Arabic"]
+};
+
+function getLangsForCountry(country) {
+  var primary = COUNTRY_LANGS[country] || [];
+  // Build ordered list: primary languages first, then rest of LANGS alphabetically
+  var allLangs = LANGS.slice(); // copy
+  var ordered = [];
+  // Add primary languages first (even if not in LANGS — we add them dynamically)
+  primary.forEach(function(l) {
+    if(ordered.indexOf(l) < 0) ordered.push(l);
+  });
+  // Then add remaining LANGS in their original alpha order
+  allLangs.forEach(function(l) {
+    if(ordered.indexOf(l) < 0) ordered.push(l);
+  });
+  return ordered;
+}
 var COUNTRIES=["","Afghanistan","Albania","Algeria","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Bolivia","Bosnia","Botswana","Brazil","Bulgaria","Cambodia","Cameroon","Canada","Chile","China","Colombia","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Dominican Republic","Ecuador","Egypt","El Salvador","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Guatemala","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Libya","Lithuania","Luxembourg","Macau","Malaysia","Malta","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
 var COMPS=[
   {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer"},
@@ -172,6 +326,58 @@ function goTo(p){
 function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
 function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+function getAllSelectedLangs() {
+  var primary = Array.from(document.querySelectorAll("#lang-primary .chip.on")).map(function(c){return c.textContent;});
+  var other = Array.from(document.querySelectorAll("#lang-other .chip.on")).map(function(c){return c.textContent;});
+  return primary.concat(other);
+}
+
+function renderLangSections(country, selected) {
+  selected = selected || [];
+  var primary = COUNTRY_LANGS[country] || [];
+  // Other = all LANGS not in primary, alphabetical
+  var other = LANGS.filter(function(l){ return primary.indexOf(l) < 0 && l !== "English"; });
+
+  var suggestedDiv = document.getElementById("lang-suggested");
+  var primaryDiv = document.getElementById("lang-primary");
+  var otherDiv = document.getElementById("lang-other");
+  var otherLabel = document.getElementById("lang-other-label");
+  if(!primaryDiv || !otherDiv) return;
+
+  // Always include English in suggested (all competitions are in English)
+  if(primary.indexOf("English") < 0) primary = primary.concat(["English"]);
+
+  if(primary.length > 0) {
+    suggestedDiv.style.display = "";
+    primaryDiv.innerHTML = "";
+    primary.forEach(function(lang) {
+      var c = document.createElement("div");
+      c.className = "chip";
+      c.textContent = lang;
+      if(selected.indexOf(lang) >= 0) c.classList.add("on");
+      // Style primary chips slightly differently to show they're suggested
+      c.style.borderColor = "#AFA9EC";
+      c.addEventListener("click", function(){ c.classList.toggle("on"); });
+      primaryDiv.appendChild(c);
+    });
+    otherLabel.textContent = "Other languages";
+  } else {
+    suggestedDiv.style.display = "none";
+    otherLabel.textContent = "Languages";
+  }
+
+  // Render other chips
+  otherDiv.innerHTML = "";
+  other.forEach(function(lang) {
+    var c = document.createElement("div");
+    c.className = "chip";
+    c.textContent = lang;
+    if(selected.indexOf(lang) >= 0) c.classList.add("on");
+    c.addEventListener("click", function(){ c.classList.toggle("on"); });
+    otherDiv.appendChild(c);
+  });
+}
 
 function mkChips(containerId, items, selected, single) {
   var div = document.getElementById(containerId);
@@ -240,30 +446,35 @@ function rSignup() {
     "</div>"+
     "<div class=\"fi\"><label>Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken</div>"+
-    "<div style=\"font-size:13px;color:#888;margin-bottom:8px;\">Select all that apply — this helps match you with partners who share a language.</div>"+
-    "<div class=\"cgrow\" id=\"lang\"></div>"+
-    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\"><input id=\"langother\" placeholder=\"Add another language (e.g. Igbo, Somali, Zulu...)\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/><button id=\"langaddbtn\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:10px;\">Select all that apply. Updates when you change your country.</div>"+
+    "<div id=\"lang-suggested\" style=\"margin-bottom:12px;display:none;\">"+
+      "<div style=\"font-size:11px;font-weight:600;color:#534AB7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;\">Suggested for your country</div>"+
+      "<div class=\"cgrow\" id=\"lang-primary\" style=\"margin-bottom:0;\"></div>"+
+    "</div>"+
+    "<div id=\"lang-other-wrap\">"+
+      "<div id=\"lang-other-label\" style=\"font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;\">Other languages</div>"+
+      "<div class=\"cgrow\" id=\"lang-other\" style=\"margin-bottom:10px;\"></div>"+
+    "</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\"><input id=\"langother\" placeholder=\"Add a language (e.g. Somali, Wolof, Tigrinya...)\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/><button id=\"langaddbtn\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
     "<button class=\"bp\" id=\"s2\">Continue \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
-  mkChips("lang", LANGS, S.languages, false);
-  // Add custom language button
+  renderLangSections(S.country || "", S.languages);
   document.getElementById("langaddbtn").addEventListener("click", function(){
     var inp = document.getElementById("langother");
     var val = inp.value.trim();
     if(!val) return;
-    // Capitalize first letter
     val = val.charAt(0).toUpperCase() + val.slice(1);
-    // Add as a chip in the lang group
-    var langDiv = document.getElementById("lang");
-    var existing = Array.from(langDiv.querySelectorAll(".chip")).find(function(c){return c.textContent.toLowerCase()===val.toLowerCase();});
+    // Check if already exists in either section
+    var allChips = document.querySelectorAll("#lang-primary .chip, #lang-other .chip");
+    var existing = Array.from(allChips).find(function(c){return c.textContent.toLowerCase()===val.toLowerCase();});
     if(existing){existing.classList.add("on");inp.value="";return;}
+    // Add to the "other" section as a custom chip
     var chip = document.createElement("div");
     chip.className = "chip on";
     chip.textContent = val;
-    chip.style.background="#EEEDFE"; chip.style.borderColor="#AFA9EC"; chip.style.color="#3C3489"; chip.style.fontWeight="500";
     chip.addEventListener("click", function(){chip.classList.toggle("on");});
-    langDiv.appendChild(chip);
+    document.getElementById("lang-other").appendChild(chip);
     inp.value = "";
   });
   document.getElementById("langother").addEventListener("keydown", function(e){
@@ -272,6 +483,9 @@ function rSignup() {
   document.getElementById("icountry").addEventListener("change", function(){
     S.country = this.value;
     document.getElementById("zipwrap").style.display = hasZip(this.value) ? "" : "none";
+    // Collect currently selected languages before re-rendering
+    var current = getAllSelectedLangs();
+    renderLangSections(this.value, current);
   });
   document.getElementById("s2").addEventListener("click", step2);
   document.getElementById("bk").addEventListener("click", function(){goTo("welcome");});
@@ -621,7 +835,7 @@ function step2(){
   if(!n||!e||!sc||!g||!co){alert("Please fill in all required fields");return;}
   S.name=n; S.email=e; S.school=sc; S.grade=g; S.country=co;
   var ze=document.getElementById("izip"); S.zip=ze?ze.value.trim():"";
-  S.languages=getChips("lang");
+  S.languages=getAllSelectedLangs();
   goTo("track");
 }
 function step3(){
