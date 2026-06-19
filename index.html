@@ -117,30 +117,42 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
 // ── Countries without zip codes ────────────
-var NO_ZIP=["Afghanistan","Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Central African Republic","Chad","Comoros","Congo","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Fiji","Gambia","Ghana","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong","Ireland","Jamaica","Kenya","Kiribati","Laos","Libya","Macau","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Nigeria","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Saudi Arabia","Sierra Leone","Solomon Islands","Somalia","South Africa","South Sudan","Sudan","Suriname","Syria","Tanzania","Togo","Tonga","Trinidad and Tobago","Tuvalu","Uganda","United Arab Emirates","Vanuatu","Venezuela","Yemen","Zambia","Zimbabwe"];
+var NO_ZIP=["Afghanistan","Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Cape Verde","Central African Republic","Chad","Comoros","Congo","Congo (DRC)","Congo (Republic)","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Fiji","Gabon","Gambia","Ghana","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong","Ireland","Ivory Coast","Jamaica","Kenya","Kiribati","Laos","Lesotho","Liberia","Libya","Macau","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Nigeria","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Saudi Arabia","Seychelles","Sierra Leone","Solomon Islands","Somalia","South Africa","South Sudan","Sudan","Suriname","Syria","Tanzania","Togo","Tonga","Trinidad and Tobago","Tuvalu","Uganda","United Arab Emirates","Vanuatu","Venezuela","Yemen","Zambia","Zimbabwe"];
 function hasZip(co){return NO_ZIP.indexOf(co)<0;}
 
 // ── Country language mapping ────────────────
 var COUNTRY_LANGS={
-  // Africa — official language(s) only
-  "Algeria":["Arabic"],"Angola":["Portuguese"],"Botswana":["English"],
-  "Burkina Faso":["French"],"Burundi":["French"],"Cameroon":["French","English"],
-  "Central African Republic":["French"],"Chad":["French","Arabic"],
-  "Congo":["French"],"Djibouti":["French","Arabic"],"Egypt":["Arabic"],
-  "Eritrea":["Arabic"],"Ethiopia":["Amharic"],"Gambia":["English"],
-  "Ghana":["English"],"Guinea":["French"],"Guinea-Bissau":["Portuguese"],
-  "Kenya":["English","Swahili"],"Libya":["Arabic"],"Madagascar":["French"],
-  "Malawi":["English"],"Mali":["French"],"Mauritania":["Arabic"],
-  "Morocco":["Arabic","French"],"Mozambique":["Portuguese"],"Namibia":["English"],
-  "Niger":["French"],"Nigeria":["English"],"Rwanda":["English","French"],
-  "Senegal":["French"],"Sierra Leone":["English"],"Somalia":["Arabic"],
-  "South Africa":["English"],"South Sudan":["English"],"Sudan":["Arabic"],
-  "Tanzania":["English","Swahili"],"Togo":["French"],"Tunisia":["Arabic"],
-  "Uganda":["English"],"Zambia":["English"],"Zimbabwe":["English"],
+  // Africa — official language + most widely spoken indigenous language
+  "Algeria":["Arabic"],"Angola":["Portuguese","Umbundu"],
+  "Benin":["French","Fon"],"Botswana":["English","Setswana"],
+  "Burkina Faso":["French","Moore"],"Burundi":["French","Kirundi"],
+  "Cameroon":["French","English"],"Cape Verde":["Portuguese"],
+  "Central African Republic":["French","Sango"],"Chad":["French","Arabic"],
+  "Comoros":["Arabic","French"],"Congo (DRC)":["French","Lingala"],
+  "Congo (Republic)":["French","Lingala"],"Djibouti":["French","Somali"],
+  "Egypt":["Arabic"],"Equatorial Guinea":["Spanish","French"],
+  "Eritrea":["Tigrinya","Arabic"],"Eswatini":["English","Swati"],
+  "Ethiopia":["Amharic"],"Gabon":["French"],"Gambia":["English","Mandinka"],
+  "Ghana":["English","Twi"],"Guinea":["French","Pular"],
+  "Guinea-Bissau":["Portuguese","Creole"],"Ivory Coast":["French","Dioula"],
+  "Kenya":["English","Swahili"],"Lesotho":["English","Sesotho"],
+  "Liberia":["English"],"Libya":["Arabic"],"Madagascar":["French","Malagasy"],
+  "Malawi":["English","Chichewa"],"Mali":["French","Bambara"],
+  "Mauritania":["Arabic"],"Mauritius":["English","French"],
+  "Morocco":["Arabic","French"],"Mozambique":["Portuguese","Emakhuwa"],
+  "Namibia":["English","Oshiwambo"],"Niger":["French","Hausa"],
+  "Nigeria":["English","Hausa"],"Rwanda":["English","Kinyarwanda"],
+  "Sao Tome and Principe":["Portuguese"],"Senegal":["French","Wolof"],
+  "Seychelles":["English","French"],"Sierra Leone":["English","Krio"],
+  "Somalia":["Somali","Arabic"],"South Africa":["English","Zulu"],
+  "South Sudan":["English","Dinka"],"Sudan":["Arabic"],
+  "Tanzania":["English","Swahili"],"Togo":["French","Ewe"],
+  "Tunisia":["Arabic"],"Uganda":["English","Luganda"],
+  "Zambia":["English","Bemba"],"Zimbabwe":["English","Shona"],
   // Middle East
   "Bahrain":["Arabic"],"Iraq":["Arabic"],"Israel":["Hebrew","Arabic"],
   "Jordan":["Arabic"],"Kuwait":["Arabic"],"Lebanon":["Arabic"],
@@ -243,7 +255,7 @@ var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D1
 var CM2={science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},math:{n:"Math",c:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},business:{n:"Business",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},tech:{n:"Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},writing:{n:"Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},arts:{n:"Arts",c:"#D85A30",bg:"#FAECE7",tc:"#712B13"},custom:{n:"Custom",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"}};
 var TRC={1:{bg:"#EAF3DE",tc:"#3B6D11",lbl:"Tier 1"},2:{bg:"#EEEDFE",tc:"#3C3489",lbl:"Tier 2"},3:{bg:"#F1EFE8",tc:"#5F5E5A",lbl:"Local"}};
 
-var COUNTRIES=["","Afghanistan","Albania","Algeria","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Bolivia","Bosnia","Botswana","Brazil","Bulgaria","Cambodia","Cameroon","Canada","Chile","China","Colombia","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Dominican Republic","Ecuador","Egypt","El Salvador","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Guatemala","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Libya","Lithuania","Luxembourg","Macau","Malaysia","Malta","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
+var COUNTRIES=["","Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia","Botswana","Brazil","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (DRC)","Congo (Republic)","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Estonia","Ethiopia","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala","Guinea","Guinea-Bissau","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lesotho","Liberia","Libya","Lithuania","Luxembourg","Macau","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritania","Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
 
 var COMPS=[
   {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,cross:true,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer from any school"},
@@ -445,9 +457,10 @@ function rSignup(){
     "<div class=\"fi\"><label>School email</label><input id=\"iemail\" type=\"email\" placeholder=\"alex@school.edu\" value=\""+esc(S.email)+"\"/></div>"+
     "<div class=\"fi\"><label>High school name</label><input id=\"ischool\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/></div>"+
     "<div class=\"fi\"><label>Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
+    "<div class=\"fi\"><label>City</label><input id=\"icity\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\" /></div>"+
     "<div id=\"zipwrap\" style=\""+(hasZip(co)?"":"display:none;")+"\">"+
-      "<div class=\"fi\"><label>Zip / Postal code <span style=\"font-weight:400;color:#aaa;\">(optional — helps with regional matching)</span></label>"+
-      "<input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
+      "<div class=\"fi\"><label>Zip / Postal code</label>"+
+      "<input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\" /></div>"+
     "</div>"+
     "<div class=\"fi\"><label>Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken</div>"+
@@ -471,6 +484,8 @@ function rSignup(){
   document.getElementById("icountry").addEventListener("change",function(){
     S.country=this.value;
     document.getElementById("zipwrap").style.display=hasZip(this.value)?"":"none";
+    var zipEl=document.getElementById("izip");
+    if(zipEl&&!hasZip(this.value)) zipEl.value="";
     renderLangSections(this.value,getAllSelectedLangs());
   });
   document.getElementById("langaddbtn").addEventListener("click",function(){
@@ -925,10 +940,18 @@ function step2(){
   if(!sc){showErr("ischool","Please enter your school name");valid=false;}
   if(!g){showErr("igrade","Please select your grade");valid=false;}
   if(!co){showErr("icountry","Please select your country");valid=false;}
+  var langs=getAllSelectedLangs();
+  if(!langs.length){showSecErr("lang-other-wrap","Please select at least one language you speak");valid=false;}
+  var city=document.getElementById("icity").value.trim();
+  if(!city){showErr("icity","Please enter your city");valid=false;}
+  var zipVal="";
+  if(hasZip(co)){
+    zipVal=document.getElementById("izip").value.trim();
+    if(!zipVal){showErr("izip","Please enter your zip / postal code");valid=false;}
+  }
   if(!valid){scrollToFirstErr();return;}
-  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;
-  var ze=document.getElementById("izip");S.zip=ze?ze.value.trim():"";
-  S.languages=getAllSelectedLangs();
+  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;
+  S.languages=langs;
   goTo("track");
 }
 function step3(){
@@ -939,8 +962,12 @@ function step3(){
   if(!S.role){
     showSecErr("rg","Please choose your role");valid=false;
   }
+  var statusSel=getChips("status")[0]||"";
+  if(!statusSel){
+    showSecErr("status","Please select your current status");valid=false;
+  }
   if(!valid){scrollToFirstErr();return;}
-  // Save secondary interest if selected
+  S.status=statusSel;
   var secSel=getChips("secondary");
   S.secondary=secSel[0]||"";
   goTo("skills");
@@ -959,15 +986,38 @@ function step4(){
     showSecErr("ssum",""+needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level — tap Beginner, Intermediate, Advanced, or Expert");
     scrollToFirstErr();return;
   }
-  S.availability=getChips("avail")[0]||"";
+  var avail=getChips("avail")[0]||"";
+  if(!avail){
+    showSecErr("avail","Please select your weekly availability");
+    scrollToFirstErr();return;
+  }
+  S.availability=avail;
   S.github=document.getElementById("igh").value.trim();
   goTo("goals");
 }
 function goFind(){
+  var valid=true;
+  var stage=S.stage;
+  if(!stage){
+    showSecErr("stg","Please select your project stage");valid=false;
+  }
+  var idea=document.getElementById("iidea").value.trim();
+  if(!idea&&!selComps.length){
+    showSecErr("iidea","Please describe your project or add at least one competition");valid=false;
+  }
+  var commit=getChips("commit")[0]||"";
+  if(!commit){
+    showSecErr("commit","Please select your commitment level");valid=false;
+  }
+  var loc=getChips("loc")[0]||"";
+  if(!loc){
+    showSecErr("loc","Please select your partner location preference");valid=false;
+  }
+  if(!valid){scrollToFirstErr();return;}
   S.comps=selComps.map(function(c){return c.n;});
-  S.idea=document.getElementById("iidea").value.trim();
-  S.commit=getChips("commit")[0]||"";
-  S.location=getChips("loc")[0]||"";
+  S.idea=idea;
+  S.commit=commit;
+  S.location=loc;
   goTo("loading");doFetch();
 }
 
@@ -984,7 +1034,7 @@ async function doFetch(){
     var crossNote=c.cross===true?"(cross-school ok)":c.cross==="prep"?"(prep partner only)":"(same school required)";
     return c.n+" "+crossNote;
   }).join(", ")||"open";
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.country+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+compInfo+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- At least 1 match from a different continent\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+compInfo+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- At least 1 match from a different continent\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
     if(!res.ok) throw new Error("status "+res.status);
