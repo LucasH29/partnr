@@ -98,6 +98,21 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .pit{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0ec;}
 .pit:last-child{border-bottom:none;}
 .hint{font-size:12px;color:#888;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-bottom:8px;line-height:1.5;}
+
+.skill-cat{border:1px solid #e8e8e4;border-radius:12px;margin-bottom:10px;overflow:hidden;background:white;}
+.skill-cat-header{display:flex;align-items:center;justify-content:space-between;padding:14px;cursor:pointer;user-select:none;}
+.skill-cat-header:hover{background:#f8f8f6;}
+.skill-items-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.skill-item{border:1px solid #e8e8e4;border-radius:8px;padding:10px;cursor:pointer;user-select:none;background:white;}
+.skill-item:hover{background:#f8f8f6;}
+.skill-item.on{border-color:#AFA9EC;background:#EEEDFE;}
+.skill-item-top{display:flex;align-items:center;gap:8px;}
+.skill-item-check{width:16px;height:16px;border-radius:50%;border:1px solid #ddd;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.skill-item-check.on{background:#7F77DD;border-color:#7F77DD;}
+.skill-item-name{font-size:12px;font-weight:500;color:#666;line-height:1.3;}
+.skill-item.on .skill-item-name{color:#3C3489;}
+.lv-inline{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+.lv-inline .lv{font-size:10px;padding:3px 8px;}
 </style>
 </head>
 <body>
@@ -556,27 +571,115 @@ function rTrack() {
 }
 
 // ── Screen: Skills ─────────────────────────
+// Skill categories with specific sub-skills
+// Math: course-based (the course IS the level)
+// Coding: language-based + level
+// Others: sub-field based + level
+
+var SKILL_CATS = [
+  {
+    id: "math",
+    label: "Math",
+    icon: "ti-math-function",
+    color: "#534AB7",
+    bg: "#EEEDFE",
+    tc: "#3C3489",
+    type: "course",  // no level — course name is the signal
+    hint: "Select every math course or topic you have studied",
+    items: ["Pre-Algebra","Algebra 1","Algebra 2","Geometry","Trigonometry","Pre-Calculus","Statistics & Probability","Calculus (AB/BC)","Linear Algebra","Multivariable Calculus","Differential Equations","Number Theory","Combinatorics & Discrete Math","Real Analysis"]
+  },
+  {
+    id: "coding",
+    label: "Coding & CS",
+    icon: "ti-code",
+    color: "#185FA5",
+    bg: "#E6F1FB",
+    tc: "#0C447C",
+    type: "level",  // level matters for languages
+    hint: "Select languages and tools you know, then tap your level for each",
+    items: ["Python","JavaScript","Java","C++","C","Swift","Kotlin","Go","Rust","R","MATLAB","SQL","HTML / CSS","React / Next.js","Node.js","TensorFlow / PyTorch","Arduino / Hardware","Raspberry Pi","Unity / Game Dev","Bash / Linux"]
+  },
+  {
+    id: "science",
+    label: "Science & Research",
+    icon: "ti-microscope",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    tc: "#085041",
+    type: "level",
+    hint: "Select fields you work in, then tap your level",
+    items: ["Molecular Biology","Genetics / Genomics","Neuroscience","Ecology / Environmental","Chemistry (Organic)","Chemistry (Inorganic)","Physics (Classical)","Physics (Quantum)","Astrophysics","Materials Science","Biochemistry","Immunology","Synthetic Biology","Data Science / ML","Scientific Writing","Lab Techniques"]
+  },
+  {
+    id: "engineering",
+    label: "Engineering",
+    icon: "ti-cpu",
+    color: "#185FA5",
+    bg: "#E6F1FB",
+    tc: "#0C447C",
+    type: "level",
+    hint: "Select engineering disciplines you work in",
+    items: ["Mechanical Engineering","Electrical Engineering","Civil Engineering","Chemical Engineering","Aerospace Engineering","Robotics","CAD / 3D Modeling","PCB Design","Embedded Systems","Structural Design","Fluid Dynamics","Biomedical Engineering"]
+  },
+  {
+    id: "business",
+    label: "Business & Finance",
+    icon: "ti-chart-line",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    tc: "#085041",
+    type: "level",
+    hint: "Select business skills you have",
+    items: ["Business Strategy","Financial Modeling","Accounting","Market Research","Sales","Fundraising / Pitching","Operations","Supply Chain","Economics","Investing / Portfolio","Product Management","Growth / Marketing"]
+  },
+  {
+    id: "design",
+    label: "Design & Creative",
+    icon: "ti-palette",
+    color: "#993C1D",
+    bg: "#FAECE7",
+    tc: "#712B13",
+    type: "level",
+    hint: "Select design tools and disciplines you work in",
+    items: ["Figma / UI Design","Photoshop","Illustrator","After Effects / Motion","Video Editing","Photography","3D Modeling (Blender)","Architecture / CAD","Brand Identity","Illustration","Animation","Game Art"]
+  },
+  {
+    id: "writing",
+    label: "Writing & Communication",
+    icon: "ti-pencil",
+    color: "#993C1D",
+    bg: "#FAECE7",
+    tc: "#712B13",
+    type: "level",
+    hint: "Select writing and communication skills",
+    items: ["Research Writing","Essay Writing","Journalism","Creative Writing","Technical Writing","Public Speaking","Debate","Grant Writing","Screenwriting / Scripts","Poetry","Social Media / Content"]
+  },
+  {
+    id: "social",
+    label: "Social Impact & Leadership",
+    icon: "ti-world",
+    color: "#1D9E75",
+    bg: "#E1F5EE",
+    tc: "#085041",
+    type: "level",
+    hint: "Select social impact skills and experience",
+    items: ["Community Organizing","Nonprofit Management","Policy Research","Advocacy / Lobbying","Event Planning","Volunteer Coordination","Fundraising","International Development","Civic Engagement","Education / Tutoring"]
+  }
+];
+
+var LEVELS = ["Beginner","Intermediate","Advanced","Expert"];
+
 function rSkills() {
-  var html = SKS.map(function(sk){
-    var on = !!S.skillLevels[sk];
-    var lv = S.skillLevels[sk]||null;
-    return "<div class=\"sc"+(on?" on":"")+"\" data-skill=\""+esc(sk)+"\">"+
-      "<div class=\"sct\"><span class=\"scn\">"+sk+"</span>"+
-      "<div class=\"scc\">"+(on?"<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>":"")+"</div></div>"+
-      "<div class=\"shint\">Tap a level below</div>"+
-      "<div class=\"lvrow\">"+
-        ["Beginner","Intermediate","Advanced","Expert"].map(function(l){
-          return "<div class=\"lv"+(lv===l?" on":"")+"\" data-lv=\""+l+"\">"+l+"</div>";
-        }).join("")+
-      "</div></div>";
+  // Build the skills UI — one expandable section per category
+  var html = SKILL_CATS.map(function(cat) {
+    return buildCatSection(cat);
   }).join("");
+
   R(logo()+sb(3)+
     "<h2>Your skills</h2>"+
-    "<div class=\"sub\">Select skills you have, then tap your level. Skip anything that does not apply.</div>"+
-    "<div id=\"sgrid\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+html+"</div>"+
-    "<div id=\"ssum\" style=\"font-size:13px;color:#888;margin-bottom:1rem;\"></div>"+
-    "<div class=\"slabel\">Add more skills</div>"+
-    "<div class=\"cgrow\" id=\"ex\"></div>"+
+    "<div class=\"sub\">Select the specific skills, courses, and tools you know. The more specific, the better your matches.</div>"+
+    "<div id=\"skill-cats\">"+html+"</div>"+
+    "<div id=\"ssum\" style=\"font-size:13px;color:#888;margin:1rem 0;\"></div>"+
     "<div class=\"slabel\">Weekly availability</div>"+
     "<div class=\"cgrow\" id=\"avail\"></div>"+
     "<div class=\"slabel\">Portfolio / GitHub (optional)</div>"+
@@ -584,91 +687,174 @@ function rSkills() {
     "<button class=\"bp\" id=\"s4\">Continue \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
-  mkChips("ex", EXTRA_SKS, Object.keys(S.skillLevels).filter(function(k){return EXTRA_SKS.indexOf(k)>=0;}), false);
-  mkChips("avail", ["1-3 hrs/week","4-8 hrs/week","10+ hrs/week","Weekends only"], [S.availability], true);
-  bindSkillChips();
-  document.querySelectorAll("#ex .chip").forEach(function(chip){
-    chip.addEventListener("click", function(){
-      var sk = chip.textContent;
-      if(S.skillLevels[sk]!==undefined) return;
-      S.skillLevels[sk] = null;
-      addSkillCard(sk);
-      updSS();
-    });
-  });
+
+  mkChips("avail",["1-3 hrs/week","4-8 hrs/week","10+ hrs/week","Weekends only"],[S.availability],true);
+  bindAllSkillCats();
   document.getElementById("s4").addEventListener("click", step4);
   document.getElementById("bk").addEventListener("click", function(){goTo("track");});
   updSS();
 }
 
-function bindSkillChips() {
-  document.querySelectorAll(".sc").forEach(function(chip){
-    chip.addEventListener("click", function(e){
+function buildCatSection(cat) {
+  // Count how many items from this category are selected
+  var selected = cat.items.filter(function(item){
+    return S.skillLevels[cat.id+":"+item] !== undefined;
+  });
+  var isOpen = selected.length > 0;
+
+  var itemsHtml = cat.items.map(function(item){
+    var key = cat.id+":"+item;
+    var on = S.skillLevels[key] !== undefined;
+    var lv = S.skillLevels[key] || null;
+    var lvHtml = "";
+    if(cat.type === "level") {
+      lvHtml = "<div class=\"lv-inline\" style=\"display:"+(on?"flex":"none")+";gap:5px;flex-wrap:wrap;margin-top:5px;\">"+
+        LEVELS.map(function(l){
+          return "<div class=\"lv"+(lv===l?" on":"")+"\" data-lv=\""+l+"\" data-key=\""+key+"\">"+l+"</div>";
+        }).join("")+
+      "</div>";
+    }
+    return "<div class=\"skill-item"+(on?" on":"")+"\" data-key=\""+key+"\" data-type=\""+cat.type+"\">"+
+      "<div class=\"skill-item-top\">"+
+        "<div class=\"skill-item-check"+(on?" on":"")+"\">"+
+          (on?"<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>":"")+
+        "</div>"+
+        "<span class=\"skill-item-name\">"+item+"</span>"+
+        (cat.type==="course"?"<span class=\"skill-item-badge\" style=\"display:"+(on?"inline":"none")+";font-size:10px;padding:2px 7px;border-radius:20px;background:"+cat.bg+";color:"+cat.tc+";margin-left:auto;font-weight:600;\">Selected</span>":"")+
+      "</div>"+
+      lvHtml+
+    "</div>";
+  }).join("");
+
+  return "<div class=\"skill-cat\" data-cat=\""+cat.id+"\">"+
+    "<div class=\"skill-cat-header\" data-cat=\""+cat.id+"\">"+
+      "<div style=\"display:flex;align-items:center;gap:10px;\">"+
+        "<div style=\"width:32px;height:32px;border-radius:8px;background:"+cat.bg+";display:flex;align-items:center;justify-content:center;flex-shrink:0;\">"+
+          "<i class=\"ti "+cat.icon+"\" style=\"font-size:16px;color:"+cat.color+";\"></i>"+
+        "</div>"+
+        "<div>"+
+          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cat.label+"</div>"+
+          "<div style=\"font-size:12px;color:#888;\">"+cat.hint+"</div>"+
+        "</div>"+
+      "</div>"+
+      "<div style=\"display:flex;align-items:center;gap:8px;flex-shrink:0;\">"+
+        (selected.length?"<span style=\"font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:"+cat.bg+";color:"+cat.tc+"\">"+selected.length+" selected</span>":"")+
+        "<i class=\"ti "+(isOpen?"ti-chevron-up":"ti-chevron-down")+"\" style=\"font-size:16px;color:#888;\" id=\"chevron-"+cat.id+"\"></i>"+
+      "</div>"+
+    "</div>"+
+    "<div class=\"skill-cat-body\" id=\"body-"+cat.id+"\" style=\"display:"+(isOpen?"block":"none")+";padding:12px 14px;border-top:1px solid #f0f0ec;\">"+
+      "<div class=\"skill-items-grid\" id=\"items-"+cat.id+"\">"+itemsHtml+"</div>"+
+    "</div>"+
+  "</div>";
+}
+
+function bindAllSkillCats() {
+  // Bind category header toggles
+  document.querySelectorAll(".skill-cat-header").forEach(function(header){
+    header.addEventListener("click", function(){
+      var catId = this.dataset.cat;
+      var body = document.getElementById("body-"+catId);
+      var chevron = document.getElementById("chevron-"+catId);
+      var isOpen = body.style.display !== "none";
+      body.style.display = isOpen ? "none" : "block";
+      chevron.className = "ti " + (isOpen ? "ti-chevron-down" : "ti-chevron-up");
+      chevron.style.fontSize = "16px";
+      chevron.style.color = "#888";
+    });
+  });
+
+  // Bind skill item clicks
+  document.querySelectorAll(".skill-item").forEach(function(item){
+    item.addEventListener("click", function(e){
       if(e.target.classList.contains("lv")) return;
-      var sk = this.dataset.skill;
-      if(this.classList.contains("on")){
+      var key = this.dataset.key;
+      var type = this.dataset.type;
+      var isOn = this.classList.contains("on");
+      var check = this.querySelector(".skill-item-check");
+      var badge = this.querySelector(".skill-item-badge");
+      var lvRow = this.querySelector(".lv-inline");
+
+      if(isOn) {
         this.classList.remove("on");
-        delete S.skillLevels[sk];
-        this.querySelector(".scc").innerHTML = "";
+        delete S.skillLevels[key];
+        check.classList.remove("on");
+        check.innerHTML = "";
+        if(badge) badge.style.display = "none";
+        if(lvRow) lvRow.style.display = "none";
       } else {
         this.classList.add("on");
-        S.skillLevels[sk] = null;
-        this.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
+        S.skillLevels[key] = (type === "course") ? "studied" : null;
+        check.classList.add("on");
+        check.innerHTML = "<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>";
+        if(badge) badge.style.display = "inline";
+        if(lvRow) lvRow.style.display = "flex";
       }
+      updCatBadge(key.split(":")[0]);
       updSS();
     });
-    chip.querySelectorAll(".lv").forEach(function(lv){
+
+    // Bind level buttons within each item
+    item.querySelectorAll(".lv").forEach(function(lv){
       lv.addEventListener("click", function(e){
         e.stopPropagation();
-        var sk = chip.dataset.skill;
-        chip.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
+        var key = this.dataset.key;
+        var parent = this.closest(".skill-item");
+        parent.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
         this.classList.add("on");
-        S.skillLevels[sk] = this.dataset.lv;
-        chip.classList.add("on");
-        chip.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
+        S.skillLevels[key] = this.dataset.lv;
+        // Make sure parent is marked on
+        if(!parent.classList.contains("on")){
+          parent.classList.add("on");
+          var check = parent.querySelector(".skill-item-check");
+          check.classList.add("on");
+          check.innerHTML = "<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>";
+          var lvRow = parent.querySelector(".lv-inline");
+          if(lvRow) lvRow.style.display = "flex";
+        }
+        updCatBadge(key.split(":")[0]);
         updSS();
       });
     });
   });
 }
 
-function addSkillCard(sk) {
-  var grid = document.getElementById("sgrid");
-  if(!grid) return;
-  var d = document.createElement("div");
-  d.className = "sc on";
-  d.dataset.skill = sk;
-  d.innerHTML = "<div class=\"sct\"><span class=\"scn\">"+sk+"</span>"+
-    "<div class=\"scc\"><i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i></div></div>"+
-    "<div class=\"shint\">Tap a level below</div>"+
-    "<div class=\"lvrow\">"+["Beginner","Intermediate","Advanced","Expert"].map(function(l){return "<div class=\"lv\" data-lv=\""+l+"\">"+l+"</div>";}).join("")+"</div>";
-  grid.appendChild(d);
-  d.addEventListener("click", function(e){
-    if(e.target.classList.contains("lv")) return;
-    if(d.classList.contains("on")){d.classList.remove("on");delete S.skillLevels[sk];d.querySelector(".scc").innerHTML="";}
-    else{d.classList.add("on");S.skillLevels[sk]=null;d.querySelector(".scc").innerHTML="<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";}
-    updSS();
+function updCatBadge(catId) {
+  var cat = SKILL_CATS.find(function(c){return c.id===catId;});
+  if(!cat) return;
+  var selected = cat.items.filter(function(item){
+    return S.skillLevels[catId+":"+item] !== undefined;
   });
-  d.querySelectorAll(".lv").forEach(function(lv){
-    lv.addEventListener("click", function(e){
-      e.stopPropagation();
-      d.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
-      this.classList.add("on");
-      S.skillLevels[sk] = this.dataset.lv;
-      d.classList.add("on");
-      d.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
-      updSS();
-    });
-  });
+  var header = document.querySelector(".skill-cat-header[data-cat=\""+catId+"\"]");
+  if(!header) return;
+  var badgeArea = header.querySelector("span");
+  if(selected.length) {
+    if(badgeArea && badgeArea.style.borderRadius) {
+      badgeArea.textContent = selected.length+" selected";
+      badgeArea.style.display = "";
+    } else {
+      // Create badge
+      var chevronEl = header.querySelector("i");
+      var badge = document.createElement("span");
+      badge.style.cssText = "font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:"+cat.bg+";color:"+cat.tc+";";
+      badge.textContent = selected.length+" selected";
+      header.querySelector("div:last-child").insertBefore(badge, chevronEl);
+    }
+  }
 }
 
 function updSS(){
   var el=document.getElementById("ssum"); if(!el) return;
-  var sel=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k]!==undefined;});
-  var rated=sel.filter(function(k){return S.skillLevels[k];});
-  var un=sel.filter(function(k){return !S.skillLevels[k];});
-  if(!sel.length){el.textContent="No skills selected yet \u2014 tap any skill to add it.";return;}
-  el.innerHTML=(rated.length?rated.length+" skill"+(rated.length>1?"s":"")+" rated":"")+(un.length?(rated.length?" \u00b7 ":"")+un.length+" need a level <span style=\"color:#854F0B;\">\u2190 tap a level</span>":"<span style=\"color:#3B6D11;font-weight:600;\"> \u2713 All set</span>");
+  var allKeys = Object.keys(S.skillLevels);
+  var total = allKeys.length;
+  var needLevel = allKeys.filter(function(k){
+    // course type doesn't need a level
+    var cat = SKILL_CATS.find(function(c){return k.indexOf(c.id+":")=== 0;});
+    return cat && cat.type === "level" && !S.skillLevels[k];
+  });
+  if(!total){el.textContent="No skills selected yet \u2014 open a category above to add skills.";return;}
+  el.innerHTML = total+" skill"+(total>1?"s":"")+" selected"+
+    (needLevel.length?" \u00b7 <span style=\"color:#854F0B;\">"+needLevel.length+" still need a level \u2190</span>":
+    " <span style=\"color:#3B6D11;font-weight:600;\">\u2713 All set</span>");
 }
 
 // ── Screen: Goals ──────────────────────────
@@ -844,7 +1030,7 @@ function step3(){
 }
 function step4(){
   var rated=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];});
-  if(!rated.length){alert("Please select and rate at least one skill");return;}
+  if(!rated.length){alert("Please select at least one skill");return;}
   S.availability=getChips("avail")[0]||"";
   S.github=document.getElementById("igh").value.trim();
   goTo("goals");
@@ -863,7 +1049,14 @@ function rLoading(){
   var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skill levels...","Building your results..."];
   var i=0; var iv=setInterval(function(){i++;var el=document.getElementById("lmsg");if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
 }
-function skStr(){return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){return k+" ("+S.skillLevels[k]+")";}).join(", ");}
+function skStr(){
+  return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){
+    var parts = k.split(":");
+    var skill = parts.length > 1 ? parts[1] : k;
+    var level = S.skillLevels[k];
+    return level === "studied" ? skill : skill+" ("+level+")";
+  }).join(", ");
+}
 
 // ── API fetch ──────────────────────────────
 async function doFetch(){
