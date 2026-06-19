@@ -6,7 +6,7 @@ Partnr matches high school students across schools and countries by skills, role
 
 ## The problem
 
-Most ambitious students have the drive to build something real. What they're missing is the right partner. Google Classroom and Discord help you work with people you already know. Paying for a mentor or joining an accelerator costs money most students don't have. No platform exists to find the *right person* — matched by skill level, role, and what you're actually trying to build — across schools, cities, and countries.
+Most ambitious students have the drive to build something real. What they're missing is the right partner. Google Classroom and Discord help you work with people you already know. Paying for a mentor or joining an accelerator costs money most students don't have. No platform exists to find the *right student partner* — matched by skill level, role, and what you're actually trying to build — across schools, cities, and countries.
 
 Partnr is that platform.
 
