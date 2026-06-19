@@ -7,999 +7,1083 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a1a;min-height:100vh;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f8f6;color:#1a1a1a;min-height:100vh;}
 .app{max-width:680px;margin:0 auto;padding:1.5rem 1rem 3rem;}
 .logo{font-size:26px;font-weight:600;color:#1a1a1a;letter-spacing:-0.5px;margin-bottom:1.5rem;}
 .logo span{color:#7F77DD;}
 h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .sub{font-size:14px;color:#666;line-height:1.6;margin-bottom:1.25rem;}
-.step-bar{display:flex;gap:6px;margin-bottom:1.75rem;}
-.step-dot{height:4px;border-radius:2px;flex:1;background:#e0e0dc;}
-.step-dot.done{background:#7F77DD;}
+.sbar{display:flex;gap:6px;margin-bottom:1.75rem;}
+.sd{height:4px;border-radius:2px;flex:1;background:#e0e0dc;}
+.sd.done{background:#7F77DD;}
 .slabel{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:1rem 0 0.5rem;}
-.chip-group{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:1rem;}
-.chip{padding:6px 14px;border-radius:20px;border:1px solid #ddd;font-size:13px;cursor:pointer;color:#666;background:white;transition:all 0.1s;}
+.cgrow{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:1rem;}
+.chip{padding:6px 14px;border-radius:20px;border:1px solid #ddd;font-size:13px;cursor:pointer;color:#666;background:white;user-select:none;}
 .chip.on{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;font-weight:500;}
 .fi{margin-bottom:1rem;}
 .fi label{display:block;font-size:13px;color:#666;margin-bottom:5px;font-weight:500;}
 .fi input,.fi select,.fi textarea{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;}
-.fi input:focus,.fi select:focus,.fi textarea:focus{outline:none;border-color:#7F77DD;}
 .fi textarea{height:80px;resize:none;}
-.bp{width:100%;padding:12px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:0.5rem;}
+.bp{width:100%;padding:12px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:0.5rem;font-family:inherit;}
 .bp:hover{background:#534AB7;}
+.bkbtn{width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;}
 .card{background:white;border:1px solid #e8e8e4;border-radius:12px;padding:1.1rem;margin-bottom:0.9rem;}
 .av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0;}
 .tag{font-size:11px;padding:3px 9px;border-radius:20px;background:#f4f4f0;color:#666;border:1px solid #e8e8e4;}
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .why{background:#f8f8f6;border-radius:8px;padding:10px 12px;font-size:13px;color:#666;line-height:1.55;margin-bottom:10px;}
 .why strong{color:#1a1a1a;font-weight:600;}
-.bc{padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:white;}
-.bo{padding:9px 14px;background:white;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;color:#666;}
-.bo:hover{background:#f8f8f6;}
-.bg{padding:9px 10px;background:none;border:none;font-size:13px;cursor:pointer;color:#999;}
+.bc{padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:white;font-family:inherit;}
+.bo{padding:9px 14px;background:white;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;color:#666;font-family:inherit;}
+.bg2{padding:9px 10px;background:none;border:none;font-size:13px;cursor:pointer;color:#999;font-family:inherit;}
 .nav{display:flex;border-bottom:1px solid #e8e8e4;margin-bottom:1.5rem;overflow-x:auto;}
 .nb{padding:9px 11px;font-size:12px;cursor:pointer;color:#888;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:inherit;}
 .nb.on{color:#534AB7;border-bottom-color:#7F77DD;font-weight:600;}
 .spin{width:30px;height:30px;border:2px solid #e0e0dc;border-top-color:#7F77DD;border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 1rem;}
 @keyframes sp{to{transform:rotate(360deg);}}
-.track-card{padding:14px;border-radius:12px;border:1px solid #ddd;cursor:pointer;transition:all 0.1s;}
-.track-card.on{border-width:2px;}
-.role-card{padding:12px;border-radius:12px;border:1px solid #ddd;cursor:pointer;transition:all 0.1s;}
-.role-card.on{border-color:#AFA9EC;background:#EEEDFE;}
-.role-card.on .rname{color:#3C3489;}
-.rname{font-size:13px;font-weight:600;color:#1a1a1a;margin-top:4px;}
-.rdesc{font-size:11px;color:#888;margin-top:2px;line-height:1.3;}
-.stage-bar{display:flex;gap:6px;margin-bottom:1rem;}
-.sb{flex:1;padding:9px 4px;border:1px solid #ddd;border-radius:8px;font-size:10px;text-align:center;cursor:pointer;color:#888;line-height:1.3;font-family:inherit;}
-.sb.on{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;font-weight:600;}
-.skill-chip{border-radius:12px;border:1px solid #ddd;overflow:hidden;cursor:pointer;background:white;}
-.skill-chip.on{border-color:#AFA9EC;border-width:1.5px;}
-.skill-chip-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:8px;}
-.skill-chip-name{font-size:13px;font-weight:500;color:#666;}
-.skill-chip.on .skill-chip-name{color:#3C3489;}
-.skill-chip-check{width:18px;height:18px;border-radius:50%;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.skill-chip.on .skill-chip-check{background:#7F77DD;border-color:#7F77DD;}
-.lv-row{display:none;padding:0 14px 12px;gap:6px;flex-wrap:wrap;}
-.skill-chip.on .lv-row{display:flex;}
-.lv{padding:5px 11px;border-radius:20px;border:1px solid #ddd;font-size:11px;cursor:pointer;color:#888;background:white;}
-.lv.on{font-weight:600;}
-.lv[data-lv="Beginner"].on{background:#F1EFE8;border-color:#B4B2A9;color:#444;}
-.lv[data-lv="Intermediate"].on{background:#E6F1FB;border-color:#85B7EB;color:#0C447C;}
-.lv[data-lv="Advanced"].on{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;}
-.lv[data-lv="Expert"].on{background:#EAF3DE;border-color:#97C459;color:#3B6D11;}
-.skill-hint{font-size:11px;color:#999;padding:0 14px 10px;display:none;font-style:italic;}
-.skill-chip.on .skill-hint{display:block;}
-.cdd{background:white;border:1px solid #ddd;border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;position:absolute;width:100%;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.08);}
-.cdo{padding:10px 14px;font-size:13px;cursor:pointer;color:#1a1a1a;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0f0ec;}
-.cdo:last-child{border-bottom:none;}
-.cdo:hover{background:#f8f8f6;}
-.cdo-name{font-size:13px;font-weight:500;}
-.cdo-sub{font-size:11px;color:#888;margin-top:1px;}
-.cpill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;margin:0 5px 5px 0;}
-.cpill button{background:none;border:none;cursor:pointer;font-size:15px;padding:0;opacity:0.6;line-height:1;}
+.tc{padding:14px;border-radius:12px;border:1px solid #ddd;cursor:pointer;user-select:none;}
+.tc.on{border-width:2px;}
+.rc{padding:12px;border-radius:12px;border:1px solid #ddd;cursor:pointer;user-select:none;}
+.rc.on{border-color:#AFA9EC;background:#EEEDFE;}
+.rc.on .rn{color:#3C3489;}
+.rn{font-size:13px;font-weight:600;color:#1a1a1a;margin-top:4px;}
+.rd{font-size:11px;color:#888;margin-top:2px;line-height:1.3;}
+.stbar{display:flex;gap:6px;margin-bottom:1rem;}
+.stb{flex:1;padding:9px 4px;border:1px solid #ddd;border-radius:8px;font-size:10px;text-align:center;cursor:pointer;color:#888;line-height:1.3;font-family:inherit;user-select:none;}
+.stb.on{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;font-weight:600;}
+.sc{border-radius:12px;border:1px solid #ddd;overflow:hidden;cursor:pointer;background:white;user-select:none;}
+.sc.on{border-color:#AFA9EC;border-width:1.5px;}
+.sct{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:8px;}
+.scn{font-size:13px;font-weight:500;color:#666;pointer-events:none;}
+.sc.on .scn{color:#3C3489;}
+.scc{width:18px;height:18px;border-radius:50%;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;flex-shrink:0;pointer-events:none;}
+.sc.on .scc{background:#7F77DD;border-color:#7F77DD;}
+.lvrow{display:none;padding:0 14px 12px;gap:6px;flex-wrap:wrap;}
+.sc.on .lvrow{display:flex;}
+.lv{padding:5px 11px;border-radius:20px;border:1px solid #ddd;font-size:11px;cursor:pointer;color:#888;background:white;user-select:none;}
+.lv[data-lv="Beginner"].on{background:#F1EFE8;border-color:#B4B2A9;color:#444;font-weight:600;}
+.lv[data-lv="Intermediate"].on{background:#E6F1FB;border-color:#85B7EB;color:#0C447C;font-weight:600;}
+.lv[data-lv="Advanced"].on{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;font-weight:600;}
+.lv[data-lv="Expert"].on{background:#EAF3DE;border-color:#97C459;color:#3B6D11;font-weight:600;}
+.shint{font-size:11px;color:#999;padding:0 14px 10px;display:none;font-style:italic;}
+.sc.on .shint{display:block;}
+.swrap{position:relative;margin-bottom:10px;}
+.swrap input{width:100%;padding:10px 12px 10px 38px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;}
+.sico{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:#aaa;pointer-events:none;}
+.cdd{background:white;border:1px solid #ddd;border-radius:8px;margin-top:4px;max-height:260px;overflow-y:auto;position:absolute;width:100%;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,0.1);}
+.cddo{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0f0ec;}
+.cddo:last-child{border-bottom:none;}
+.cddo:hover{background:#f8f8f6;}
+.exbtn{display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px dashed #ccc;border-radius:8px;cursor:pointer;color:#888;font-size:13px;background:white;width:100%;margin-bottom:10px;font-family:inherit;user-select:none;}
+.exbtn:hover{background:#f8f8f6;}
+.expp{display:none;border:1px solid #e8e8e4;border-radius:12px;overflow:hidden;margin-bottom:10px;}
+.expp.open{display:block;}
+.ctabs{display:flex;overflow-x:auto;border-bottom:1px solid #e8e8e4;background:#f8f8f6;}
+.ctab{padding:9px 13px;font-size:12px;cursor:pointer;color:#888;background:none;border:none;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;font-weight:500;user-select:none;}
+.ctab.on{border-bottom-color:currentColor;font-weight:600;}
+.citem{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid #f0f0ec;background:white;}
+.citem:last-child{border-bottom:none;}
+.citem:hover{background:#f8f8f6;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;margin:0 5px 5px 0;}
+.pill button{background:none;border:none;cursor:pointer;font-size:15px;padding:0;opacity:0.7;line-height:1;}
 .ps{margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #f0f0ec;}
 .ps:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
 .ag{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .ac{background:#f8f8f6;border-radius:8px;padding:10px 12px;}
-.al{font-size:11px;color:#888;margin-bottom:3px;}
+.al2{font-size:11px;color:#888;margin-bottom:3px;}
 .av2{font-size:13px;font-weight:600;color:#1a1a1a;}
 .ei{padding:8px 0;border-bottom:1px solid #f0f0ec;}
 .ei:last-child{border-bottom:none;}
 .dl{display:flex;gap:12px;background:white;border:1px solid #e8e8e4;border-radius:12px;padding:1rem;margin-bottom:0.75rem;align-items:flex-start;}
-.pi-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0ec;}
-.pi-item:last-child{border-bottom:none;}
-.explore-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px dashed #ccc;border-radius:8px;cursor:pointer;color:#888;font-size:13px;background:white;width:100%;margin-bottom:1rem;font-family:inherit;}
-.explore-btn:hover{background:#f8f8f6;}
-.explore-panel{display:none;border:1px solid #e8e8e4;border-radius:12px;overflow:hidden;margin-bottom:1rem;}
-.explore-panel.open{display:block;}
-.cat-tabs{display:flex;overflow-x:auto;border-bottom:1px solid #e8e8e4;background:#f8f8f6;}
-.ctab{padding:9px 13px;font-size:12px;cursor:pointer;color:#888;background:none;border:none;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;font-weight:500;}
-.ctab.on{border-bottom-color:currentColor;}
-.cl-item{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid #f0f0ec;background:white;}
-.cl-item:last-child{border-bottom:none;}
-.cl-item:hover{background:#f8f8f6;}
-.cl-left{flex:1;min-width:0;}
-.cl-name{font-size:13px;font-weight:600;color:#1a1a1a;}
-.cl-desc{font-size:12px;color:#666;margin-top:2px;line-height:1.4;}
-.cl-meta{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
-.cl-tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;}
-.cl-why{font-size:11px;margin-top:4px;font-style:italic;}
-.cl-add{flex-shrink:0;padding:6px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:white;margin-top:2px;}
-.pills-row{display:flex;flex-wrap:wrap;gap:6px;min-height:28px;margin-bottom:1rem;}
-.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem;}
-.modal-box{background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);}
+.pit{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0ec;}
+.pit:last-child{border-bottom:none;}
+.hint{font-size:12px;color:#888;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-bottom:8px;line-height:1.5;}
 </style>
 </head>
 <body>
 <div id="ROOT" class="app"></div>
-
 <script>
-var S={name:'',email:'',school:'',country:'',zip:'',grade:'',languages:[],track:'',role:'',status:'',skillLevels:{},availability:'',github:'',stage:'',comps:[],idea:'',commit:'',location:''};
-var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],modalTarget=null,selComps=[],exploreOpen=false,activeCat='all',activeCats=[];
 
-var TR={
-  research:{n:'Research & Science',c:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'},
-  business:{n:'Build a Business',c:'#0F6E56',bg:'#E1F5EE',tc:'#085041'},
-  impact:{n:'Social Impact',c:'#1D9E75',bg:'#E1F5EE',tc:'#085041'},
-  arts:{n:'Arts & Writing',c:'#993C1D',bg:'#FAECE7',tc:'#712B13'},
-  tech:{n:'Engineering & Tech',c:'#185FA5',bg:'#E6F1FB',tc:'#0C447C'}
-};
-var RO={
-  vision:{n:'Vision / CEO',i:'ti-bulb'},
-  tech_r:{n:'Tech / CTO',i:'ti-code'},
-  mktg:{n:'Marketing / CMO',i:'ti-speakerphone'},
-  ops:{n:'Operations / COO',i:'ti-list-check'},
-  res_r:{n:'Research Lead',i:'ti-microscope'},
-  creative:{n:'Creative Lead',i:'ti-palette'}
-};
-var CM={purple:{bg:'#EEEDFE',c:'#534AB7'},teal:{bg:'#E1F5EE',c:'#0F6E56'},coral:{bg:'#FAECE7',c:'#993C1D'},blue:{bg:'#E6F1FB',c:'#185FA5'},green:{bg:'#EAF3DE',c:'#3B6D11'}};
-var LBGS={Beginner:'#F1EFE8',Intermediate:'#E6F1FB',Advanced:'#EEEDFE',Expert:'#EAF3DE'};
-var LTCS={Beginner:'#444',Intermediate:'#0C447C',Advanced:'#3C3489',Expert:'#3B6D11'};
-var ALL_SKILLS=['Biology','Chemistry','Physics','Math / Stats','Coding / CS','Machine Learning','Writing / Research','Design / UX','Engineering','Business / Finance','Marketing','Visual Arts'];
+// ── State ──────────────────────────────────
+var S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
+var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
-var CATS_META={
-  science:{n:'Science',c:'#0F6E56',bg:'#E1F5EE',tc:'#085041'},
-  math:{n:'Math',c:'#534AB7',bg:'#EEEDFE',tc:'#3C3489'},
-  business:{n:'Business',c:'#0F6E56',bg:'#E1F5EE',tc:'#085041'},
-  impact:{n:'Social Impact',c:'#1D9E75',bg:'#E1F5EE',tc:'#085041'},
-  tech:{n:'Tech',c:'#185FA5',bg:'#E6F1FB',tc:'#0C447C'},
-  writing:{n:'Writing',c:'#993C1D',bg:'#FAECE7',tc:'#712B13'},
-  arts:{n:'Arts',c:'#D85A30',bg:'#FAECE7',tc:'#712B13'}
-};
+// ── Countries with NO postal/zip system ────
+var NO_ZIP=["Afghanistan","Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Central African Republic","Chad","Comoros","Congo","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Fiji","Gambia","Ghana","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong","Ireland","Jamaica","Kenya","Kiribati","Laos","Libya","Macau","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Nigeria","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Saudi Arabia","Sierra Leone","Solomon Islands","Somalia","South Africa","South Sudan","Sudan","Suriname","Syria","Tanzania","Togo","Tonga","Trinidad and Tobago","Tuvalu","Uganda","United Arab Emirates","Vanuatu","Venezuela","Yemen","Zambia","Zimbabwe"];
 
-var ALL_COMPS=[
-  {n:'Regeneron ISEF',cat:'science',team:'Up to 3 students',eli:'Global',tier:1,desc:"World's largest pre-college science competition · $75k top prize",why:'Need a lab partner, data analyst, or research writer'},
-  {n:'iGEM (Synthetic Biology)',cat:'science',team:'Teams of 3-6',eli:'Global',tier:1,desc:'International synthetic biology competition · prestigious Giant Jamboree',why:'Requires diverse skills across biology, coding, and design'},
-  {n:'Science Olympiad',cat:'science',team:'Teams of 15',eli:'US + international',tier:2,desc:'Team-based science & engineering event competition',why:'Need teammates across 23 different science events'},
-  {n:'Conrad Challenge',cat:'science',team:'2-5 students',eli:'Global',tier:2,desc:'Innovation challenge — aerospace, health, energy, cyber',why:'Cross-disciplinary teams with science and business skills'},
-  {n:'Regeneron STS Prep Partner',cat:'science',team:'Prep partner',eli:'US (12th grade)',tier:1,desc:"Most prestigious US science competition — strongest applicants prep with peers",why:'Find a thinking partner to sharpen your research before applying solo'},
-  {n:'HMMT (Harvard-MIT Math Tournament)',cat:'math',team:'Teams of 4-8',eli:'International',tier:1,desc:'One of the most prestigious team math tournaments for high schoolers',why:'Requires coordinated team strategy across individual and team rounds'},
-  {n:'PUMaC (Princeton Math Competition)',cat:'math',team:'Teams of 6-8',eli:'International',tier:2,desc:'Annual Princeton team math competition with individual and team rounds',why:'Team round requires coordinated problem solving'},
-  {n:'HiMCM (Math Modeling)',cat:'math',team:'Teams of 2-4',eli:'International',tier:2,desc:'International math modeling contest — apply math to real-world problems',why:'Requires both math skills and strong research writing'},
-  {n:'AMC / AIME Prep Partner',cat:'math',team:'Prep partner',eli:'US + international',tier:1,desc:'AMC 10/12 → AIME → USAMO pathway — team prep is standard among top competitors',why:'Find a study partner at your exact skill level to train together'},
-  {n:'DECA ICDC',cat:'business',team:'Individual + team events',eli:'Global',tier:2,desc:'International business & marketing competition · 230k+ students',why:'Many events are team-based — find a partner for case studies and presentations'},
-  {n:'Blue Ocean Competition',cat:'business',team:'Teams of 1-5',eli:'Global · 135 countries',tier:2,desc:"World's largest virtual entrepreneurship pitch · $1,000 top prize",why:'5-minute pitch video — need teammates across business, tech, and design'},
-  {n:'Conrad Challenge',cat:'business',team:'2-5 students',eli:'Global',tier:2,desc:'Innovation challenge across aerospace, health, energy & cyber',why:'Need co-founders with complementary skills across science and business'},
-  {n:'Diamond Challenge',cat:'business',team:'2-4 students',eli:'Global ages 14-18',tier:2,desc:'University of Delaware dual-track competition — business + social innovation',why:'Two co-founders with Vision and Tech roles is the ideal team'},
-  {n:'FBLA Competitive Events',cat:'business',team:'1-3 students',eli:'US + international chapters',tier:2,desc:'Future Business Leaders of America — wide range of business events',why:'Many FBLA events are team-based case presentations'},
-  {n:'Wharton Investment Competition',cat:'business',team:'Teams of 3-5',eli:'Global',tier:2,desc:'Free global investment strategy competition · 6,000+ students',why:'Team needs finance, research, and presentation skills'},
-  {n:'SAGE World Cup',cat:'impact',team:'Teams',eli:'Global',tier:2,desc:'Sustainable entrepreneurship — state, national, and world finals',why:'Social enterprise requires business and research co-founders'},
-  {n:'WSI Impact League',cat:'impact',team:'Teams of 2-4',eli:'Global',tier:2,desc:'Social impact case competition — mental health, climate, economics',why:'Need diverse skills across research, design, and business strategy'},
-  {n:'Citizen Entrepreneurship Competition',cat:'impact',team:'Teams',eli:'Global',tier:2,desc:'Social business competition tied to UN SDGs · three-phase process',why:'Combines business, research, and social impact skills'},
-  {n:'Diamond Challenge (Social Track)',cat:'impact',team:'2-4 students',eli:'Global',tier:2,desc:'Social innovation track at the University of Delaware competition',why:'Mission-driven co-founders with complementary skills'},
-  {n:'Hackathon (MLH)',cat:'tech',team:'2-4 students',eli:'Global',tier:2,desc:'Weekend coding sprints — build and ship in 24-36 hours · rolling worldwide',why:'Core team competition — coder + designer + product vision'},
-  {n:'FIRST Robotics Competition',cat:'tech',team:'Teams of 10-30+',eli:'Global',tier:2,desc:'Premier high school robotics competition · regional and world championships',why:'Large teams need programming, mechanical, electrical, and strategy skills'},
-  {n:'Congressional App Challenge',cat:'tech',team:'Up to 4 students',eli:'US residents',tier:2,desc:'Official US House of Representatives coding competition · display at Capitol Hill',why:'Real app development needs coding, design, and product co-founders'},
-  {n:'VEX Robotics',cat:'tech',team:'Teams of 2-10',eli:'Global',tier:2,desc:'Global robotics competition with regional qualifiers and world championship',why:'Programming + mechanical engineering skills required'},
-  {n:'John Locke Essay Competition',cat:'writing',team:'Prep partner',eli:'Global · 150 countries',tier:1,desc:'Most prestigious global essay contest · 63k students · Oxford & Princeton judges · $10k prize',why:'Find an intellectual sparring partner to strengthen your argument before submitting solo'},
-  {n:'Scholastic Art & Writing (Writing)',cat:'writing',team:'Prep partner',eli:'US & Canada',tier:1,desc:"Nation's longest-running teen writing recognition · 28 categories · Gold Key wins $12.5k scholarship",why:'Find a writing partner for feedback, editing, and portfolio development'},
-  {n:'Kennedy Profile in Courage Essay',cat:'writing',team:'Prep partner',eli:'US high schoolers',tier:1,desc:'One of the most prestigious US essay competitions · $10k first prize',why:'Find a research and editing partner to strengthen your essay before solo submission'},
-  {n:'Adroit Journal Prize',cat:'writing',team:'Prep partner',eli:'Global',tier:2,desc:'Prestigious literary journal competition · winners published in The Adroit Journal',why:'Find a peer writing partner for feedback and editing on poetry or prose'},
-  {n:'YoungArts',cat:'arts',team:'Prep partner',eli:'US ages 15-18',tier:1,desc:'Most prestigious US arts competition · up to $10k · Presidential Scholar eligibility',why:'Find a creative partner to workshop and strengthen your submission'},
-  {n:'Scholastic Art & Writing (Art)',cat:'arts',team:'Prep partner',eli:'US & Canada',tier:1,desc:"Nation's most prestigious teen art recognition · Gold Keys can win $12,500 scholarship",why:'Find a creative peer to give feedback and refine your portfolio together'},
-  {n:'Local / Regional Science Fair',cat:'science',team:'1-3 students',eli:'Local',tier:3,desc:'Your local or regional fair — feeds into the ISEF pathway',why:'Find a local lab partner or research collaborator'}
+function hasZip(co){return NO_ZIP.indexOf(co)<0;}
+
+// ── Data ───────────────────────────────────
+var TR={research:{n:"Research & Science",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"},business:{n:"Build a Business",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},arts:{n:"Arts & Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"}};
+var RO={vision:{n:"Vision / CEO",i:"ti-bulb"},tech_r:{n:"Tech / CTO",i:"ti-code"},mktg:{n:"Marketing / CMO",i:"ti-speakerphone"},ops:{n:"Operations / COO",i:"ti-list-check"},res_r:{n:"Research Lead",i:"ti-microscope"},creative:{n:"Creative Lead",i:"ti-palette"}};
+var CM={purple:{bg:"#EEEDFE",c:"#534AB7"},teal:{bg:"#E1F5EE",c:"#0F6E56"},coral:{bg:"#FAECE7",c:"#993C1D"},blue:{bg:"#E6F1FB",c:"#185FA5"},green:{bg:"#EAF3DE",c:"#3B6D11"}};
+var LB={Beginner:"#F1EFE8",Intermediate:"#E6F1FB",Advanced:"#EEEDFE",Expert:"#EAF3DE"};
+var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D11"};
+var CM2={science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},math:{n:"Math",c:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},business:{n:"Business",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},tech:{n:"Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},writing:{n:"Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},arts:{n:"Arts",c:"#D85A30",bg:"#FAECE7",tc:"#712B13"},custom:{n:"Custom",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"}};
+var TRC={1:{bg:"#EAF3DE",tc:"#3B6D11",lbl:"Tier 1"},2:{bg:"#EEEDFE",tc:"#3C3489",lbl:"Tier 2"},3:{bg:"#F1EFE8",tc:"#5F5E5A",lbl:"Local"}};
+var SKS=["Biology","Chemistry","Physics","Math / Stats","Coding / CS","Machine Learning","Writing / Research","Design / UX","Engineering","Business / Finance","Marketing","Visual Arts"];
+var EXTRA_SKS=["Public Speaking","Video / Media","Environmental Sci","Neuroscience","Social Science","Robotics / Hardware","Philosophy","Economics","Law","Architecture","Music","Data Analysis"];
+var LANGS=["Mandarin","Spanish","English","Hindi","Arabic","Bengali","Portuguese","Russian","Urdu","Amharic","French","Swahili","Hausa","Yoruba","Japanese","German","Korean","Turkish","Italian","Vietnamese","Tagalog","Thai","Polish","Dutch"];
+var COUNTRIES=["","Afghanistan","Albania","Algeria","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Bolivia","Bosnia","Botswana","Brazil","Bulgaria","Cambodia","Cameroon","Canada","Chile","China","Colombia","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Dominican Republic","Ecuador","Egypt","El Salvador","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Guatemala","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Libya","Lithuania","Luxembourg","Macau","Malaysia","Malta","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
+var COMPS=[
+  {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer"},
+  {n:"iGEM Synthetic Biology",cat:"science",team:"Teams of 3-6",eli:"Global",tier:1,desc:"International synthetic biology competition - Giant Jamboree",why:"Requires biology, coding, and design skills"},
+  {n:"Science Olympiad",cat:"science",team:"Teams of 15",eli:"US + intl",tier:2,desc:"Team-based science and engineering event competition",why:"Need teammates across 23 science events"},
+  {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-disciplinary science and business teams"},
+  {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,desc:"Most prestigious US science competition - prep with a peer first",why:"Find a thinking partner to sharpen your research"},
+  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,desc:"Most prestigious team math tournament for high schoolers",why:"Requires coordinated strategy across rounds"},
+  {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,desc:"Annual Princeton team math competition",why:"Team round requires coordinated problem solving"},
+  {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,desc:"International math modeling contest",why:"Needs math skills and strong research writing"},
+  {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,desc:"AMC to AIME to USAMO pathway - top competitors prep in pairs",why:"Find a study partner at your exact level"},
+  {n:"DECA ICDC",cat:"business",team:"Individual + team events",eli:"Global",tier:2,desc:"International business and marketing - 230k+ students",why:"Many events are team-based case presentations"},
+  {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"5-min pitch needs business, tech, and design skills"},
+  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,desc:"University of Delaware - business and social innovation tracks",why:"Two co-founders with Vision and Tech roles is ideal"},
+  {n:"FBLA Competitive Events",cat:"business",team:"1-3 students",eli:"US + intl chapters",tier:2,desc:"Future Business Leaders - wide range of business events",why:"Many FBLA events are team-based case presentations"},
+  {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,desc:"Free global investment strategy competition - 6,000+ students",why:"Team needs finance, research, and presentation skills"},
+  {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Social enterprise needs business and research co-founders"},
+  {n:"WSI Impact League",cat:"impact",team:"Teams of 2-4",eli:"Global",tier:2,desc:"Social impact case competition - mental health, climate, economics",why:"Need research, design, and business strategy skills"},
+  {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,desc:"Social business tied to UN SDGs - three-phase process",why:"Combines business, research, and social impact"},
+  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,desc:"Social innovation track at University of Delaware",why:"Mission-driven co-founders with complementary skills"},
+  {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Core team competition - coder plus designer plus product vision"},
+  {n:"FIRST Robotics",cat:"tech",team:"Teams of 10-30+",eli:"Global",tier:2,desc:"Premier high school robotics - regional and world championships",why:"Needs programming, mechanical, and strategy skills"},
+  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:2,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Real apps need coding, design, and product co-founders"},
+  {n:"VEX Robotics",cat:"tech",team:"Teams of 2-10",eli:"Global",tier:2,desc:"Global robotics with regional and world championship",why:"Programming and mechanical engineering skills needed"},
+  {n:"John Locke Essay",cat:"writing",team:"Prep partner",eli:"Global - 150 countries",tier:1,desc:"Most prestigious global essay contest - 63k students - $10k prize",why:"Find an intellectual sparring partner before submitting solo"},
+  {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,desc:"Nation's longest-running teen writing recognition - 28 categories",why:"Find a writing partner for feedback and editing"},
+  {n:"Kennedy Profile in Courage Essay",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:1,desc:"One of the most prestigious US essay competitions - $10k prize",why:"Find a research and editing partner before solo submission"},
+  {n:"Adroit Journal Prize",cat:"writing",team:"Prep partner",eli:"Global",tier:2,desc:"Prestigious literary journal - winners published in The Adroit Journal",why:"Find a peer for feedback on poetry or prose"},
+  {n:"YoungArts",cat:"arts",team:"Prep partner",eli:"US ages 15-18",tier:1,desc:"Most prestigious US arts competition - up to $10k - Presidential Scholar eligible",why:"Find a creative partner to workshop your submission"},
+  {n:"Scholastic Art Award",cat:"arts",team:"Prep partner",eli:"US and Canada",tier:1,desc:"Nation's most prestigious teen art recognition - Gold Keys win $12,500",why:"Find a creative peer to refine your portfolio"},
+  {n:"Local / Regional Science Fair",cat:"science",team:"1-3 students",eli:"Local",tier:3,desc:"Your local or regional fair - feeds into the ISEF pathway",why:"Find a local lab partner or research collaborator"}
 ];
 
-var TIER_COLORS={1:{bg:'#EAF3DE',tc:'#3B6D11'},2:{bg:'#EEEDFE',tc:'#3C3489'},3:{bg:'#F1EFE8',tc:'#5F5E5A'}};
-var TIER_LABELS={1:'Tier 1 · Top prestige',2:'Tier 2 · Well-known',3:'Local'};
-
-function render(html){document.getElementById('ROOT').innerHTML=html;}
-function goTo(page){
+// ── Helpers ────────────────────────────────
+function R(h){document.getElementById("ROOT").innerHTML=h;}
+function goTo(p){
   window.scrollTo(0,0);
-  if(page==='welcome')renderWelcome();
-  else if(page==='signup')renderSignup();
-  else if(page==='track')renderTrack();
-  else if(page==='skills')renderSkills();
-  else if(page==='goals')renderGoals();
-  else if(page==='loading')renderLoading();
-  else if(page==='matches')renderMatchesPage();
+  if(p==="welcome")rWelcome();
+  else if(p==="signup")rSignup();
+  else if(p==="track")rTrack();
+  else if(p==="skills")rSkills();
+  else if(p==="goals")rGoals();
+  else if(p==="loading")rLoading();
+  else if(p==="matches")rMatches();
 }
+function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
+function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
+function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
-function logo(){return '<div class="logo">Partn<span>r</span></div>';}
-function stepBar(n){var h='<div class="step-bar">';for(var i=1;i<=5;i++)h+='<div class="step-dot'+(i<=n?' done':'')+'"></div>';return h+'</div>';}
-function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function chipGroup(id,items,sel,single){
-  return '<div class="chip-group" id="'+id+'">'+
-    items.map(function(item){
-      var on=Array.isArray(sel)?sel.indexOf(item)>=0:sel===item;
-      return '<div class="chip'+(on?' on':'')+'" onclick="chipClick(this,\''+id+'\','+(single?'true':'false')+')">'+item+'</div>';
-    }).join('')+
-  '</div>';
-}
-function chipClick(el,gid,single){if(single){document.querySelectorAll('#'+gid+' .chip').forEach(function(c){c.classList.remove('on');});}el.classList.toggle('on');}
-function countryOpts(){
-  return ['','United States','United Kingdom','Canada','Australia','India','Germany','France','Brazil','Japan','South Korea','Singapore','Nigeria','South Africa','Mexico','Other'].map(function(c){
-    return '<option value="'+c+'"'+(S.country===c&&c?' selected':'')+'>'+(c||'Select country')+'</option>';
-  }).join('');
-}
-function gradeOpts(){
-  return ['','9th grade','10th grade','11th grade','12th grade','IB Year 1','IB Year 2','A-Level Year 1','A-Level Year 2'].map(function(g){
-    return '<option value="'+g+'"'+(S.grade===g&&g?' selected':'')+'>'+(g||'Select grade')+'</option>';
-  }).join('');
-}
-function tcard(val,icon,color,border,name,comps){
-  var sel=S.track===val;
-  return '<div class="track-card'+(sel?' on':'')+'" data-val="'+val+'" style="border-color:'+border+';'+(sel?'background:'+TR[val].bg+';':'')+'">'+
-    '<i class="ti '+icon+'" style="font-size:20px;color:'+color+';" aria-hidden="true"></i>'+
-    '<div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-top:5px;">'+name+'</div>'+
-    '<div style="font-size:11px;color:'+color+';margin-top:3px;">'+comps+'</div>'+
-  '</div>';
-}
-function rcard(val,icon,color,name,desc){
-  var sel=S.role===val;
-  return '<div class="role-card'+(sel?' on':'')+'" data-role="'+val+'">'+
-    '<i class="ti '+icon+'" style="font-size:20px;color:'+color+';" aria-hidden="true"></i>'+
-    '<div class="rname">'+name+'</div>'+
-    '<div class="rdesc">'+desc+'</div>'+
-  '</div>';
-}
-
-function renderWelcome(){
-  render(
-    logo()+
-    '<div style="display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;">for ambitious students worldwide</div>'+
-    '<h2 style="font-size:24px;margin-bottom:0.5rem;">Find your perfect project partner</h2>'+
-    '<div class="sub">Match globally by track, skill level, and competition. Search for specific skills or let AI match you.</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.5rem;">'+
-      '<div style="padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;"><i class="ti ti-microscope" style="font-size:24px;color:#534AB7;" aria-hidden="true"></i><div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;">Research</div></div>'+
-      '<div style="padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;"><i class="ti ti-chart-line" style="font-size:24px;color:#0F6E56;" aria-hidden="true"></i><div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;">Business</div></div>'+
-      '<div style="padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;"><i class="ti ti-world" style="font-size:24px;color:#1D9E75;" aria-hidden="true"></i><div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;">Social Impact</div></div>'+
-      '<div style="padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;"><i class="ti ti-pencil" style="font-size:24px;color:#993C1D;" aria-hidden="true"></i><div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;">Arts & Writing</div></div>'+
-      '<div style="padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;"><i class="ti ti-cpu" style="font-size:24px;color:#185FA5;" aria-hidden="true"></i><div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;">Engineering & Tech</div></div>'+
-    '</div>'+
-    '<button class="bp" id="gs-btn">Get started →</button>'+
-    '<div style="text-align:center;margin-top:12px;font-size:12px;color:#999;">School email required · Free · Global</div>'
-  );
-  document.getElementById('gs-btn').addEventListener('click',function(){goTo('signup');});
-}
-
-function renderSignup(){
-  render(
-    logo()+stepBar(1)+
-    '<h2>Create your profile</h2>'+
-    '<div class="sub">School email keeps the community verified and safe.</div>'+
-    '<div class="fi"><label>Full name</label><input id="i-name" placeholder="Alex Chen" value="'+esc(S.name)+'"/></div>'+
-    '<div class="fi"><label>School email</label><input id="i-email" type="email" placeholder="alex@school.edu" value="'+esc(S.email)+'"/></div>'+
-    '<div class="fi"><label>High school</label><input id="i-school" placeholder="Burbank High School" value="'+esc(S.school)+'"/></div>'+
-    '<div class="fi"><label>Country</label><select id="i-country">'+countryOpts()+'</select></div>'+
-    '<div class="fi"><label>Zip / Postal code</label><input id="i-zip" placeholder="91501" value="'+esc(S.zip)+'"/></div>'+
-    '<div class="fi"><label>Grade / Year</label><select id="i-grade">'+gradeOpts()+'</select></div>'+
-    '<div class="slabel" style="margin-top:0;">Languages spoken</div>'+
-    chipGroup('lang',['English','Spanish','Mandarin','Hindi','French','German','Arabic','Portuguese','Japanese','Korean'],S.languages,false)+
-    '<button class="bp" id="s2-btn">Continue →</button>'+
-    '<button id="back-welcome" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
-  );
-  document.getElementById('s2-btn').addEventListener('click',step2);
-  document.getElementById('back-welcome').addEventListener('click',function(){goTo('welcome');});
-}
-
-function renderTrack(){
-  render(
-    logo()+stepBar(2)+
-    '<h2>Your track & role</h2>'+
-    '<div class="sub">Pick your focus area and the role you bring to a team. You\'ll be matched with complementary roles.</div>'+
-    '<div class="slabel" style="margin-top:0;">Track</div>'+
-    '<div id="tg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;">'+
-      tcard('research','ti-microscope','#534AB7','#AFA9EC','Research & Science','ISEF · iGEM · Science Olympiad')+
-      tcard('business','ti-chart-line','#0F6E56','#9FE1CB','Build a Business','DECA · Blue Ocean · Conrad')+
-      tcard('impact','ti-world','#1D9E75','#5DCAA5','Social Impact','Diamond · CEC · SAGE')+
-      tcard('arts','ti-pencil','#993C1D','#F0997B','Arts & Writing','Scholastic · YoungArts · John Locke')+
-      tcard('tech','ti-cpu','#185FA5','#85B7EB','Engineering & Tech','Hackathons · FIRST · Congressional App')+
-    '</div>'+
-    '<div class="slabel">Your role</div>'+
-    '<div style="font-size:13px;color:#888;margin-bottom:10px;">A CEO gets matched with a CTO. A researcher gets matched with an engineer.</div>'+
-    '<div id="rg" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">'+
-      rcard('vision','ti-bulb','#534AB7','Vision / CEO','I have the idea and lead direction')+
-      rcard('tech_r','ti-code','#185FA5','Tech / CTO','I build — code, data, engineering')+
-      rcard('mktg','ti-speakerphone','#993C1D','Marketing / CMO','I pitch, promote, tell the story')+
-      rcard('ops','ti-list-check','#0F6E56','Operations / COO','I organize and make things happen')+
-      rcard('res_r','ti-microscope','#1D9E75','Research Lead','I do deep research, analysis, writing')+
-      rcard('creative','ti-palette','#D85A30','Creative Lead','I design, illustrate, create')+
-    '</div>'+
-    '<div class="slabel">Status</div>'+
-    chipGroup('status',['I have a project — need partners','I have skills — open to joining','I have an idea — need co-founders','Just exploring'],[S.status],true)+
-    '<button class="bp" id="s3-btn" style="opacity:'+(S.track&&S.role?'1':'0.4')+'"  >Continue →</button>'+
-    '<button id="back-signup" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
-  );
-  if(S.track){var el=document.querySelector('[data-val="'+S.track+'"]');if(el){el.classList.add('on');el.style.background=TR[S.track].bg;}}
-  if(S.role){var el2=document.querySelector('[data-role="'+S.role+'"]');if(el2)el2.classList.add('on');}
-  document.getElementById('s3-btn').addEventListener('click',step3);
-  document.getElementById('back-signup').addEventListener('click',function(){goTo('signup');});
-  document.querySelectorAll('.track-card').forEach(function(el){
-    el.addEventListener('click',function(){
-      S.track=this.dataset.val;
-      document.querySelectorAll('.track-card').forEach(function(c){c.classList.remove('on');c.style.background='';});
-      this.classList.add('on');this.style.background=TR[S.track].bg;
-      document.getElementById('s3-btn').style.opacity=(S.track&&S.role)?'1':'0.4';
+function mkChips(containerId, items, selected, single) {
+  var div = document.getElementById(containerId);
+  if (!div) return;
+  div.innerHTML = "";
+  items.forEach(function(item) {
+    var c = document.createElement("div");
+    c.className = "chip";
+    c.textContent = item;
+    var isOn = Array.isArray(selected) ? selected.indexOf(item) >= 0 : selected === item;
+    if (isOn) c.classList.add("on");
+    c.addEventListener("click", function() {
+      if (single) div.querySelectorAll(".chip").forEach(function(x){x.classList.remove("on");});
+      c.classList.toggle("on");
     });
-  });
-  document.querySelectorAll('.role-card').forEach(function(el){
-    el.addEventListener('click',function(){
-      S.role=this.dataset.role;
-      document.querySelectorAll('.role-card').forEach(function(c){c.classList.remove('on');});
-      this.classList.add('on');
-      document.getElementById('s3-btn').style.opacity=(S.track&&S.role)?'1':'0.4';
-    });
-  });
-  document.querySelectorAll('#status .chip').forEach(function(el){
-    el.addEventListener('click',function(){document.querySelectorAll('#status .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.status=this.textContent;});
+    div.appendChild(c);
   });
 }
 
-function renderSkills(){
-  var skillsHtml=ALL_SKILLS.map(function(sk){
-    var on=S.skillLevels[sk]!==undefined&&S.skillLevels[sk]!==null;
-    var lv=S.skillLevels[sk]||null;
-    return '<div class="skill-chip'+(on?' on':'')+'" data-skill="'+esc(sk)+'">'+
-      '<div class="skill-chip-top">'+
-        '<span class="skill-chip-name">'+sk+'</span>'+
-        '<div class="skill-chip-check">'+(on?'<i class="ti ti-check" style="font-size:11px;color:white;" aria-hidden="true"></i>':'')+'</div>'+
-      '</div>'+
-      '<div class="skill-hint">Tap a level below</div>'+
-      '<div class="lv-row">'+
-        ['Beginner','Intermediate','Advanced','Expert'].map(function(l){
-          return '<div class="lv'+(lv===l?' on':'')+'" data-lv="'+l+'">'+l+'</div>';
-        }).join('')+
-      '</div>'+
-    '</div>';
-  }).join('');
+function getChips(containerId) {
+  return Array.from(document.querySelectorAll("#" + containerId + " .chip.on")).map(function(c){return c.textContent;});
+}
 
-  render(
-    logo()+stepBar(3)+
-    '<h2>Your skills</h2>'+
-    '<div class="sub">Select the skills you have — then tap your level. Skip anything that doesn\'t apply.</div>'+
-    '<div id="skill-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">'+skillsHtml+'</div>'+
-    '<div id="skill-summary" style="font-size:13px;color:#888;margin-bottom:1rem;min-height:20px;"></div>'+
-    '<div class="slabel">Add more skills</div>'+
-    '<div class="chip-group" id="extra-chips">'+
-      ['Public Speaking','Video / Media','Environmental Sci','Neuroscience','Social Science','Robotics / Hardware','Philosophy','Economics'].map(function(s){
-        return '<div class="chip'+(S.skillLevels[s]?' on':'')+'" data-skill="'+s+'">'+s+'</div>';
-      }).join('')+
-    '</div>'+
-    '<div class="slabel">Weekly availability</div>'+
-    chipGroup('avail',['1-3 hrs/week','4-8 hrs/week','10+ hrs/week','Weekends only'],[S.availability],true)+
-    '<div class="slabel">Portfolio / GitHub (optional)</div>'+
-    '<div class="fi"><input id="i-github" placeholder="github.com/yourname or portfolio URL" value="'+esc(S.github)+'"/></div>'+
-    '<button class="bp" id="s4-btn">Continue →</button>'+
-    '<button id="back-track" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
+function countryOpts() {
+  return COUNTRIES.map(function(c){
+    return "<option value=\""+c+"\""+(S.country===c&&c?" selected":"")+">"+(c||"Select country")+"</option>";
+  }).join("");
+}
+function gradeOpts() {
+  return ["","9th grade","10th grade","11th grade","12th grade","IB Year 1","IB Year 2","A-Level Year 1","A-Level Year 2"].map(function(g){
+    return "<option value=\""+g+"\""+(S.grade===g&&g?" selected":"")+">"+(g||"Select grade")+"</option>";
+  }).join("");
+}
+
+// ── Screen: Welcome ────────────────────────
+function rWelcome() {
+  R(logo()+
+    "<div style=\"display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;\">startups \u00b7 research \u00b7 nonprofits \u00b7 competitions \u00b7 global</div>"+
+    "<h2 style=\"font-size:24px;margin-bottom:0.5rem;\">Find the right person to build with</h2>"+
+    "<div class=\"sub\">Whether you're building a startup, launching a nonprofit, doing research, or competing globally \u2014 find a co-founder, research partner, or teammate with the exact skills you need.</div>"+
+    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.5rem;\">"+
+      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-microscope\" style=\"font-size:24px;color:#534AB7;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Research</div></div>"+
+      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-chart-line\" style=\"font-size:24px;color:#0F6E56;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Startups</div></div>"+
+      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-world\" style=\"font-size:24px;color:#1D9E75;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Nonprofits</div></div>"+
+      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-pencil\" style=\"font-size:24px;color:#993C1D;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Arts & Writing</div></div>"+
+      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-cpu\" style=\"font-size:24px;color:#185FA5;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Engineering</div></div>"+
+    "</div>"+
+    "<button class=\"bp\" id=\"gs\">Get started \u2192</button>"+
+    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#999;\">School email required \u00b7 Free \u00b7 Global</div>"
   );
+  document.getElementById("gs").addEventListener("click", function(){goTo("signup");});
+}
 
-  document.querySelectorAll('.skill-chip').forEach(function(chip){
-    chip.addEventListener('click',function(e){
-      if(e.target.classList.contains('lv'))return;
-      var sk=this.dataset.skill;
-      var wasOn=this.classList.contains('on');
-      if(wasOn){this.classList.remove('on');delete S.skillLevels[sk];this.querySelector('.skill-chip-check').innerHTML='';}
-      else{this.classList.add('on');S.skillLevels[sk]=null;this.querySelector('.skill-chip-check').innerHTML='<i class="ti ti-check" style="font-size:11px;color:white;" aria-hidden="true"></i>';}
-      updateSkillSummary();
+// ── Screen: Signup ─────────────────────────
+function rSignup() {
+  R(logo()+sb(1)+
+    "<h2>Create your profile</h2>"+
+    "<div class=\"sub\">School email keeps the community verified and safe.</div>"+
+    "<div class=\"fi\"><label>Full name</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
+    "<div class=\"fi\"><label>School email</label><input id=\"iemail\" type=\"email\" placeholder=\"alex@school.edu\" value=\""+esc(S.email)+"\"/></div>"+
+    "<div class=\"fi\"><label>High school name</label><input id=\"ischool\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/></div>"+
+    "<div class=\"fi\"><label>Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
+    "<div id=\"zipwrap\" style=\""+(hasZip(S.country)?"":"display:none;")+"\">"+
+      "<div class=\"fi\"><label>Zip / Postal code <span style=\"font-weight:400;color:#aaa;\">(helps with regional matching)</span></label>"+
+      "<input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
+    "</div>"+
+    "<div class=\"fi\"><label>Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken</div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:8px;\">Select all that apply — this helps match you with partners who share a language.</div>"+
+    "<div class=\"cgrow\" id=\"lang\"></div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\"><input id=\"langother\" placeholder=\"Add another language (e.g. Igbo, Somali, Zulu...)\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/><button id=\"langaddbtn\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
+    "<button class=\"bp\" id=\"s2\">Continue \u2192</button>"+
+    "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
+  );
+  mkChips("lang", LANGS, S.languages, false);
+  // Add custom language button
+  document.getElementById("langaddbtn").addEventListener("click", function(){
+    var inp = document.getElementById("langother");
+    var val = inp.value.trim();
+    if(!val) return;
+    // Capitalize first letter
+    val = val.charAt(0).toUpperCase() + val.slice(1);
+    // Add as a chip in the lang group
+    var langDiv = document.getElementById("lang");
+    var existing = Array.from(langDiv.querySelectorAll(".chip")).find(function(c){return c.textContent.toLowerCase()===val.toLowerCase();});
+    if(existing){existing.classList.add("on");inp.value="";return;}
+    var chip = document.createElement("div");
+    chip.className = "chip on";
+    chip.textContent = val;
+    chip.style.background="#EEEDFE"; chip.style.borderColor="#AFA9EC"; chip.style.color="#3C3489"; chip.style.fontWeight="500";
+    chip.addEventListener("click", function(){chip.classList.toggle("on");});
+    langDiv.appendChild(chip);
+    inp.value = "";
+  });
+  document.getElementById("langother").addEventListener("keydown", function(e){
+    if(e.key==="Enter"){e.preventDefault();document.getElementById("langaddbtn").click();}
+  });
+  document.getElementById("icountry").addEventListener("change", function(){
+    S.country = this.value;
+    document.getElementById("zipwrap").style.display = hasZip(this.value) ? "" : "none";
+  });
+  document.getElementById("s2").addEventListener("click", step2);
+  document.getElementById("bk").addEventListener("click", function(){goTo("welcome");});
+}
+
+// ── Screen: Track ──────────────────────────
+function rTrack() {
+  var tracks = [
+    {val:"research",icon:"ti-microscope",color:"#534AB7",border:"#AFA9EC",name:"Research & Science",sub:"ISEF \u00b7 iGEM \u00b7 Science Olympiad"},
+    {val:"business",icon:"ti-chart-line",color:"#0F6E56",border:"#9FE1CB",name:"Build a Business",sub:"DECA \u00b7 Blue Ocean \u00b7 Conrad"},
+    {val:"impact",icon:"ti-world",color:"#1D9E75",border:"#5DCAA5",name:"Social Impact",sub:"Diamond \u00b7 CEC \u00b7 SAGE"},
+    {val:"arts",icon:"ti-pencil",color:"#993C1D",border:"#F0997B",name:"Arts & Writing",sub:"Scholastic \u00b7 YoungArts \u00b7 John Locke"},
+    {val:"tech",icon:"ti-cpu",color:"#185FA5",border:"#85B7EB",name:"Engineering & Tech",sub:"Hackathons \u00b7 FIRST \u00b7 Congressional App"}
+  ];
+  var roles = [
+    {val:"vision",icon:"ti-bulb",color:"#534AB7",name:"Vision / CEO",desc:"I have the idea and lead direction"},
+    {val:"tech_r",icon:"ti-code",color:"#185FA5",name:"Tech / CTO",desc:"I build \u2014 code, data, engineering"},
+    {val:"mktg",icon:"ti-speakerphone",color:"#993C1D",name:"Marketing / CMO",desc:"I pitch, promote, tell the story"},
+    {val:"ops",icon:"ti-list-check",color:"#0F6E56",name:"Operations / COO",desc:"I organize and make things happen"},
+    {val:"res_r",icon:"ti-microscope",color:"#1D9E75",name:"Research Lead",desc:"I do deep research, analysis, writing"},
+    {val:"creative",icon:"ti-palette",color:"#D85A30",name:"Creative Lead",desc:"I design, illustrate, create"}
+  ];
+  var tHTML = tracks.map(function(t){
+    var sel = S.track === t.val;
+    return "<div class=\"tc"+(sel?" on":"")+"\" data-val=\""+t.val+"\" style=\"border-color:"+t.border+";"+(sel?"background:"+TR[t.val].bg+";":"")+"\">" +
+      "<i class=\"ti "+t.icon+"\" style=\"font-size:20px;color:"+t.color+";\"></i>" +
+      "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:5px;\">"+t.name+"</div>" +
+      "<div style=\"font-size:11px;color:"+t.color+";margin-top:3px;\">"+t.sub+"</div></div>";
+  }).join("");
+  var rHTML = roles.map(function(r){
+    var sel = S.role === r.val;
+    return "<div class=\"rc"+(sel?" on":"")+"\" data-role=\""+r.val+"\">" +
+      "<i class=\"ti "+r.icon+"\" style=\"font-size:20px;color:"+r.color+";\"></i>" +
+      "<div class=\"rn\">"+r.name+"</div><div class=\"rd\">"+r.desc+"</div></div>";
+  }).join("");
+  R(logo()+sb(2)+
+    "<h2>Your track & role</h2>"+
+    "<div class=\"sub\">Pick your focus and the role you bring to a team. You'll be matched with complementary roles.</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Track</div>"+
+    "<div id=\"tg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+tHTML+"</div>"+
+    "<div class=\"slabel\">Your role</div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:10px;\">A CEO gets matched with a CTO. A researcher gets matched with an engineer.</div>"+
+    "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
+    "<div class=\"slabel\">Status</div>"+
+    "<div class=\"cgrow\" id=\"status\"></div>"+
+    "<button class=\"bp\" id=\"s3\" style=\"opacity:"+(S.track&&S.role?"1":"0.4")+"\">Continue \u2192</button>"+
+    "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
+  );
+  mkChips("status",["I have a project \u2014 need partners","I have skills \u2014 open to joining","I have an idea \u2014 need co-founders","Just exploring"],[S.status],true);
+  document.getElementById("s3").addEventListener("click", step3);
+  document.getElementById("bk").addEventListener("click", function(){goTo("signup");});
+  document.querySelectorAll(".tc").forEach(function(el){
+    el.addEventListener("click", function(){
+      S.track = this.dataset.val;
+      document.querySelectorAll(".tc").forEach(function(c){c.classList.remove("on");c.style.background="";});
+      this.classList.add("on"); this.style.background = TR[S.track].bg;
+      document.getElementById("s3").style.opacity = (S.track&&S.role)?"1":"0.4";
     });
-    chip.querySelectorAll('.lv').forEach(function(lv){
-      lv.addEventListener('click',function(e){
+  });
+  document.querySelectorAll(".rc").forEach(function(el){
+    el.addEventListener("click", function(){
+      S.role = this.dataset.role;
+      document.querySelectorAll(".rc").forEach(function(c){c.classList.remove("on");});
+      this.classList.add("on");
+      document.getElementById("s3").style.opacity = (S.track&&S.role)?"1":"0.4";
+    });
+  });
+}
+
+// ── Screen: Skills ─────────────────────────
+function rSkills() {
+  var html = SKS.map(function(sk){
+    var on = !!S.skillLevels[sk];
+    var lv = S.skillLevels[sk]||null;
+    return "<div class=\"sc"+(on?" on":"")+"\" data-skill=\""+esc(sk)+"\">"+
+      "<div class=\"sct\"><span class=\"scn\">"+sk+"</span>"+
+      "<div class=\"scc\">"+(on?"<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>":"")+"</div></div>"+
+      "<div class=\"shint\">Tap a level below</div>"+
+      "<div class=\"lvrow\">"+
+        ["Beginner","Intermediate","Advanced","Expert"].map(function(l){
+          return "<div class=\"lv"+(lv===l?" on":"")+"\" data-lv=\""+l+"\">"+l+"</div>";
+        }).join("")+
+      "</div></div>";
+  }).join("");
+  R(logo()+sb(3)+
+    "<h2>Your skills</h2>"+
+    "<div class=\"sub\">Select skills you have, then tap your level. Skip anything that does not apply.</div>"+
+    "<div id=\"sgrid\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+html+"</div>"+
+    "<div id=\"ssum\" style=\"font-size:13px;color:#888;margin-bottom:1rem;\"></div>"+
+    "<div class=\"slabel\">Add more skills</div>"+
+    "<div class=\"cgrow\" id=\"ex\"></div>"+
+    "<div class=\"slabel\">Weekly availability</div>"+
+    "<div class=\"cgrow\" id=\"avail\"></div>"+
+    "<div class=\"slabel\">Portfolio / GitHub (optional)</div>"+
+    "<div class=\"fi\"><input id=\"igh\" placeholder=\"github.com/yourname or portfolio URL\" value=\""+esc(S.github)+"\"/></div>"+
+    "<button class=\"bp\" id=\"s4\">Continue \u2192</button>"+
+    "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
+  );
+  mkChips("ex", EXTRA_SKS, Object.keys(S.skillLevels).filter(function(k){return EXTRA_SKS.indexOf(k)>=0;}), false);
+  mkChips("avail", ["1-3 hrs/week","4-8 hrs/week","10+ hrs/week","Weekends only"], [S.availability], true);
+  bindSkillChips();
+  document.querySelectorAll("#ex .chip").forEach(function(chip){
+    chip.addEventListener("click", function(){
+      var sk = chip.textContent;
+      if(S.skillLevels[sk]!==undefined) return;
+      S.skillLevels[sk] = null;
+      addSkillCard(sk);
+      updSS();
+    });
+  });
+  document.getElementById("s4").addEventListener("click", step4);
+  document.getElementById("bk").addEventListener("click", function(){goTo("track");});
+  updSS();
+}
+
+function bindSkillChips() {
+  document.querySelectorAll(".sc").forEach(function(chip){
+    chip.addEventListener("click", function(e){
+      if(e.target.classList.contains("lv")) return;
+      var sk = this.dataset.skill;
+      if(this.classList.contains("on")){
+        this.classList.remove("on");
+        delete S.skillLevels[sk];
+        this.querySelector(".scc").innerHTML = "";
+      } else {
+        this.classList.add("on");
+        S.skillLevels[sk] = null;
+        this.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
+      }
+      updSS();
+    });
+    chip.querySelectorAll(".lv").forEach(function(lv){
+      lv.addEventListener("click", function(e){
         e.stopPropagation();
-        var sk=chip.dataset.skill;var level=this.dataset.lv;
-        chip.querySelectorAll('.lv').forEach(function(x){x.classList.remove('on');});
-        this.classList.add('on');S.skillLevels[sk]=level;
-        chip.classList.add('on');
-        chip.querySelector('.skill-chip-check').innerHTML='<i class="ti ti-check" style="font-size:11px;color:white;" aria-hidden="true"></i>';
-        updateSkillSummary();
+        var sk = chip.dataset.skill;
+        chip.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
+        this.classList.add("on");
+        S.skillLevels[sk] = this.dataset.lv;
+        chip.classList.add("on");
+        chip.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
+        updSS();
       });
     });
   });
-
-  document.querySelectorAll('#extra-chips .chip').forEach(function(el){
-    el.addEventListener('click',function(){
-      var sk=this.dataset.skill;
-      if(S.skillLevels[sk]!==undefined)return;
-      this.classList.add('on');S.skillLevels[sk]=null;
-      var grid=document.getElementById('skill-grid');
-      var div=document.createElement('div');
-      div.className='skill-chip on';div.dataset.skill=sk;
-      div.innerHTML='<div class="skill-chip-top"><span class="skill-chip-name">'+sk+'</span><div class="skill-chip-check"><i class="ti ti-check" style="font-size:11px;color:white;" aria-hidden="true"></i></div></div>'+
-        '<div class="skill-hint">Tap a level below</div>'+
-        '<div class="lv-row">'+['Beginner','Intermediate','Advanced','Expert'].map(function(l){return '<div class="lv" data-lv="'+l+'">'+l+'</div>';}).join('')+'</div>';
-      grid.appendChild(div);
-      div.querySelectorAll('.lv').forEach(function(lv){
-        lv.addEventListener('click',function(e){
-          e.stopPropagation();
-          div.querySelectorAll('.lv').forEach(function(x){x.classList.remove('on');});
-          this.classList.add('on');S.skillLevels[sk]=this.dataset.lv;
-          updateSkillSummary();
-        });
-      });
-      updateSkillSummary();
-    });
-  });
-
-  document.querySelectorAll('#avail .chip').forEach(function(el){
-    el.addEventListener('click',function(){document.querySelectorAll('#avail .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.availability=this.textContent;});
-  });
-  document.getElementById('s4-btn').addEventListener('click',step4);
-  document.getElementById('back-track').addEventListener('click',function(){goTo('track');});
-  updateSkillSummary();
 }
 
-function updateSkillSummary(){
-  var el=document.getElementById('skill-summary');if(!el)return;
+function addSkillCard(sk) {
+  var grid = document.getElementById("sgrid");
+  if(!grid) return;
+  var d = document.createElement("div");
+  d.className = "sc on";
+  d.dataset.skill = sk;
+  d.innerHTML = "<div class=\"sct\"><span class=\"scn\">"+sk+"</span>"+
+    "<div class=\"scc\"><i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i></div></div>"+
+    "<div class=\"shint\">Tap a level below</div>"+
+    "<div class=\"lvrow\">"+["Beginner","Intermediate","Advanced","Expert"].map(function(l){return "<div class=\"lv\" data-lv=\""+l+"\">"+l+"</div>";}).join("")+"</div>";
+  grid.appendChild(d);
+  d.addEventListener("click", function(e){
+    if(e.target.classList.contains("lv")) return;
+    if(d.classList.contains("on")){d.classList.remove("on");delete S.skillLevels[sk];d.querySelector(".scc").innerHTML="";}
+    else{d.classList.add("on");S.skillLevels[sk]=null;d.querySelector(".scc").innerHTML="<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";}
+    updSS();
+  });
+  d.querySelectorAll(".lv").forEach(function(lv){
+    lv.addEventListener("click", function(e){
+      e.stopPropagation();
+      d.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
+      this.classList.add("on");
+      S.skillLevels[sk] = this.dataset.lv;
+      d.classList.add("on");
+      d.querySelector(".scc").innerHTML = "<i class=\"ti ti-check\" style=\"font-size:11px;color:white;\"></i>";
+      updSS();
+    });
+  });
+}
+
+function updSS(){
+  var el=document.getElementById("ssum"); if(!el) return;
   var sel=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k]!==undefined;});
   var rated=sel.filter(function(k){return S.skillLevels[k];});
-  var unrated=sel.filter(function(k){return !S.skillLevels[k];});
-  if(!sel.length){el.textContent='No skills selected yet — tap any skill above to add it.';return;}
-  var parts=[];
-  if(rated.length)parts.push(rated.length+' skill'+(rated.length>1?'s':'')+' rated');
-  if(unrated.length)parts.push(unrated.length+' still need a level');
-  el.innerHTML=parts.join(' · ')+(unrated.length?' <span style="color:#854F0B;">← tap a level for each</span>':'<span style="color:#3B6D11;font-weight:500;"> ✓ All set</span>');
+  var un=sel.filter(function(k){return !S.skillLevels[k];});
+  if(!sel.length){el.textContent="No skills selected yet \u2014 tap any skill to add it.";return;}
+  el.innerHTML=(rated.length?rated.length+" skill"+(rated.length>1?"s":"")+" rated":"")+(un.length?(rated.length?" \u00b7 ":"")+un.length+" need a level <span style=\"color:#854F0B;\">\u2190 tap a level</span>":"<span style=\"color:#3B6D11;font-weight:600;\"> \u2713 All set</span>");
 }
 
-function renderGoals(){
-  render(
-    logo()+stepBar(4)+
-    '<h2>Your project & goals</h2>'+
-    '<div class="slabel" style="margin-top:0;">Project stage</div>'+
-    '<div id="sg" class="stage-bar">'+
-      ['Spark|Just an idea|spark','Planning|Researching|planning','Building|Active work|building','Submitting|Competition ready|submitting','Open|No idea yet|open'].map(function(x){
-        var p=x.split('|');return '<div class="sb'+(S.stage===p[2]?' on':'')+'" data-val="'+p[2]+'">'+p[0]+'<br><span style="font-size:9px;">'+p[1]+'</span></div>';
-      }).join('')+
-    '</div>'+
-    '<div class="slabel">Target competitions</div>'+
-    '<div style="font-size:13px;color:#888;margin-bottom:10px;">All competitions here support teams or prep partners — that\'s how Partnr helps.</div>'+
-    '<div style="position:relative;margin-bottom:10px;">'+
-      '<i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:#aaa;pointer-events:none;" aria-hidden="true"></i>'+
-      '<input id="ci" placeholder="Search by name — ISEF, Hackathon, Conrad, John Locke..." style="width:100%;padding:10px 12px 10px 38px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;"/>'+
-      '<div id="cdd" class="cdd" style="display:none;"></div>'+
-    '</div>'+
-    '<button class="explore-btn" id="explore-toggle">'+
-      '<i class="ti ti-compass" style="font-size:18px;color:#7F77DD;" aria-hidden="true"></i>'+
-      '<span>Not sure what\'s out there? Browse by category</span>'+
-      '<i class="ti ti-chevron-down" id="explore-chevron" style="font-size:15px;margin-left:auto;" aria-hidden="true"></i>'+
-    '</button>'+
-    '<div class="explore-panel" id="explore-panel">'+
-      '<div class="cat-tabs" id="cat-tabs">'+
-        '<button class="ctab on" data-cat="all" style="color:#7F77DD;">All</button>'+
-        '<button class="ctab" data-cat="science">Science</button>'+
-        '<button class="ctab" data-cat="math">Math</button>'+
-        '<button class="ctab" data-cat="business">Business</button>'+
-        '<button class="ctab" data-cat="impact">Social Impact</button>'+
-        '<button class="ctab" data-cat="tech">Tech</button>'+
-        '<button class="ctab" data-cat="writing">Writing</button>'+
-        '<button class="ctab" data-cat="arts">Arts</button>'+
-      '</div>'+
-      '<div id="comp-list"></div>'+
-    '</div>'+
-    '<div id="sc-pills" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px;margin-bottom:1rem;"></div>'+
-    '<div class="fi"><label>Describe your idea or what you\'re looking for in a partner</label><textarea id="i-idea" placeholder="e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app. I\'ll handle vision, fundraising, and pitching...">'+esc(S.idea)+'</textarea></div>'+
-    '<div class="slabel">Commitment</div>'+
-    chipGroup('commit',['Casual','Serious','All in'],[S.commit],true)+
-    '<div class="slabel">Partner location</div>'+
-    chipGroup('loc',['Near me','Remote / global','Either'],[S.location],true)+
-    '<button class="bp" id="gf-btn">Find my partners →</button>'+
-    '<button id="back-skills" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;">← Back</button>'
+// ── Screen: Goals ──────────────────────────
+function rGoals() {
+  var stages=[{v:"spark",n:"Spark",s:"Just an idea"},{v:"planning",n:"Planning",s:"Researching"},{v:"building",n:"Building",s:"Active work"},{v:"submitting",n:"Submitting",s:"Competition ready"},{v:"open",n:"Open",s:"No idea yet"}];
+  var stHTML=stages.map(function(st){return "<div class=\"stb"+(S.stage===st.v?" on":"")+"\" data-val=\""+st.v+"\">"+st.n+"<br><span style=\"font-size:9px;\">"+st.s+"</span></div>";}).join("");
+  var catKeys=["science","math","business","impact","tech","writing","arts"];
+  var catTabs=catKeys.map(function(c){return "<button class=\"ctab\" data-cat=\""+c+"\">"+CM2[c].n+"</button>";}).join("");
+  R(logo()+sb(4)+
+    "<h2>Your project & goals</h2>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Project stage</div>"+
+    "<div id=\"stg\" class=\"stbar\">"+stHTML+"</div>"+
+    "<div class=\"slabel\">Target competitions</div>"+
+    "<div class=\"hint\">All competitions here support teams or prep partners. Search by name, or browse by category.</div>"+
+    "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search \u2014 ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
+    "<div id=\"pills\" style=\"display:flex;flex-wrap:wrap;gap:5px;min-height:10px;margin-bottom:1rem;\"></div>"+
+    "<button class=\"exbtn\" id=\"exbtn\"><i class=\"ti ti-compass\" style=\"font-size:18px;color:#7F77DD;\"></i><span>Not sure what's out there? Browse by category</span><i class=\"ti ti-chevron-down\" id=\"exch\" style=\"font-size:15px;margin-left:auto;\"></i></button>"+
+    "<div class=\"expp\" id=\"expp\"><div class=\"ctabs\" id=\"ctabs\"><button class=\"ctab on\" data-cat=\"all\" style=\"color:#7F77DD;\">All</button>"+catTabs+"</div><div id=\"clist\"></div></div>"+
+    "<div class=\"fi\"><label>Describe your idea or what you're looking for in a partner</label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app. I'll handle vision, fundraising, and pitching...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div class=\"slabel\">Commitment</div>"+
+    "<div class=\"cgrow\" id=\"commit\"></div>"+
+    "<div class=\"slabel\">Partner location</div>"+
+    "<div class=\"cgrow\" id=\"loc\"></div>"+
+    "<button class=\"bp\" id=\"gf\">Find my partners \u2192</button>"+
+    "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
-
-  document.querySelectorAll('#sg .sb').forEach(function(el){
-    el.addEventListener('click',function(){document.querySelectorAll('#sg .sb').forEach(function(b){b.classList.remove('on');});this.classList.add('on');S.stage=this.dataset.val;});
+  mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
+  mkChips("loc",["Near me","Remote / global","Either"],[S.location],true);
+  document.querySelectorAll("#stg .stb").forEach(function(el){
+    el.addEventListener("click",function(){document.querySelectorAll("#stg .stb").forEach(function(b){b.classList.remove("on");});this.classList.add("on");S.stage=this.dataset.val;});
   });
-
-  var ci=document.getElementById('ci');
-  ci.addEventListener('input',function(){onCompSearch(this.value);});
-  ci.addEventListener('focus',function(){if(this.value.length>=2)onCompSearch(this.value);});
-
-  document.getElementById('explore-toggle').addEventListener('click',function(){
+  var ci=document.getElementById("ci");
+  ci.addEventListener("input",function(){doSearch(this.value);});
+  ci.addEventListener("focus",function(){if(this.value.length>=1)doSearch(this.value);});
+  document.addEventListener("click",function onDocClick(e){
+    var d=document.getElementById("cdd");
+    if(d&&!e.target.closest("#ci")&&!e.target.closest("#cdd"))d.style.display="none";
+  });
+  document.getElementById("exbtn").addEventListener("click",function(){
     exploreOpen=!exploreOpen;
-    document.getElementById('explore-panel').classList.toggle('open',exploreOpen);
-    document.getElementById('explore-chevron').style.transform=exploreOpen?'rotate(180deg)':'';
-    if(exploreOpen)renderCompCat('all');
+    document.getElementById("expp").classList.toggle("open",exploreOpen);
+    document.getElementById("exch").style.transform=exploreOpen?"rotate(180deg)":"";
+    if(exploreOpen)renderCat();
   });
-
-  document.querySelectorAll('.ctab').forEach(function(t){
-    t.addEventListener('click',function(){renderCompCat(this.dataset.cat);});
-  });
-
-  document.querySelectorAll('#commit .chip').forEach(function(el){
-    el.addEventListener('click',function(){document.querySelectorAll('#commit .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.commit=this.textContent;});
-  });
-  document.querySelectorAll('#loc .chip').forEach(function(el){
-    el.addEventListener('click',function(){document.querySelectorAll('#loc .chip').forEach(function(c){c.classList.remove('on');});this.classList.add('on');S.location=this.textContent;});
-  });
-  document.getElementById('gf-btn').addEventListener('click',goFind);
-  document.getElementById('back-skills').addEventListener('click',function(){goTo('skills');});
-  document.addEventListener('click',function(e){
-    var d=document.getElementById('cdd');if(d&&!e.target.closest('#ci')&&!e.target.closest('#cdd'))d.style.display='none';
-  });
-  renderSelComps();
-}
-
-function onCompSearch(v){
-  var dd=document.getElementById('cdd');if(!dd)return;
-  if(!v||v.length<2){dd.style.display='none';return;}
-  var q=v.toLowerCase();
-  var res=ALL_COMPS.filter(function(c){return c.n.toLowerCase().includes(q)||c.cat.includes(q)||c.desc.toLowerCase().includes(q);}).slice(0,8);
-  dd.innerHTML='';
-  res.forEach(function(c){
-    var cm=CATS_META[c.cat]||{c:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'};
-    var div=document.createElement('div');div.className='cdo';
-    div.innerHTML='<div style="flex:1;min-width:0;"><div class="cdo-name">'+c.n+'</div><div class="cdo-sub">'+c.team+' · '+c.eli+'</div></div>'+
-      '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:'+cm.bg+';color:'+cm.tc+';font-weight:500;flex-shrink:0;">'+cm.n+'</span>';
-    div.addEventListener('click',function(){addComp(c);document.getElementById('ci').value='';dd.style.display='none';});
-    dd.appendChild(div);
-  });
-  var exact=res.find(function(c){return c.n.toLowerCase()===q;});
-  if(!exact){
-    var addDiv=document.createElement('div');addDiv.className='cdo';
-    addDiv.style.borderTop=res.length?'1px solid #f0f0ec':'none';
-    addDiv.innerHTML='<div style="flex:1;min-width:0;"><div class="cdo-name" style="color:#7F77DD;">+ Add "'+v+'" as custom competition</div><div class="cdo-sub">Regional, state, or local competition</div></div>';
-    addDiv.addEventListener('click',function(){
-      addComp({n:v,cat:'custom',team:'Varies',eli:'Local / Regional',tier:3,desc:'Custom competition',why:'Find a partner for your specific competition'});
-      document.getElementById('ci').value='';dd.style.display='none';
-    });
-    dd.appendChild(addDiv);
-  }
-  dd.style.display='block';
-}
-
-function renderCompCat(cat){
-  var tabEl=document.querySelector('.ctab[data-cat="'+cat+'"]');
-  if(cat==='all'){
-    activeCats=[];
-    document.querySelectorAll('.ctab').forEach(function(t){t.classList.remove('on');t.style.color='';});
-    if(tabEl){tabEl.classList.add('on');tabEl.style.color='#7F77DD';}
-  } else {
-    var allTab=document.querySelector('.ctab[data-cat="all"]');
-    if(allTab){allTab.classList.remove('on');allTab.style.color='';}
-    if(tabEl){
-      var isOn=tabEl.classList.contains('on');
-      if(isOn){
-        tabEl.classList.remove('on');tabEl.style.color='';
-        activeCats=activeCats.filter(function(c){return c!==cat;});
+  document.querySelectorAll(".ctab").forEach(function(t){
+    t.addEventListener("click",function(){
+      var cat=this.dataset.cat;
+      if(cat==="all"){
+        activeCats=[];
+        document.querySelectorAll(".ctab").forEach(function(x){x.classList.remove("on");x.style.color="";});
+        this.classList.add("on");this.style.color="#7F77DD";
       } else {
-        var cm2=CATS_META[cat];
-        tabEl.classList.add('on');tabEl.style.color=cm2?cm2.c:'#7F77DD';
-        activeCats.push(cat);
+        document.querySelector(".ctab[data-cat=\"all\"]").classList.remove("on");
+        document.querySelector(".ctab[data-cat=\"all\"]").style.color="";
+        var isOn=this.classList.contains("on");
+        if(isOn){this.classList.remove("on");this.style.color="";activeCats=activeCats.filter(function(c){return c!==cat;});}
+        else{var cm=CM2[cat];this.classList.add("on");this.style.color=cm?cm.c:"#7F77DD";activeCats.push(cat);}
+        if(!activeCats.length){
+          document.querySelector(".ctab[data-cat=\"all\"]").classList.add("on");
+          document.querySelector(".ctab[data-cat=\"all\"]").style.color="#7F77DD";
+        }
       }
-    }
-    if(!activeCats.length){
-      var allTab2=document.querySelector('.ctab[data-cat="all"]');
-      if(allTab2){allTab2.classList.add('on');allTab2.style.color='#7F77DD';}
+      renderCat();
+    });
+  });
+  document.getElementById("gf").addEventListener("click",goFind);
+  document.getElementById("bk").addEventListener("click",function(){goTo("skills");});
+  renderPills();
+}
+
+function doSearch(v){
+  var dd=document.getElementById("cdd"); if(!dd) return;
+  if(!v||v.length<1){dd.style.display="none";return;}
+  var q=v.toLowerCase();
+  var res=COMPS.filter(function(c){return c.n.toLowerCase().indexOf(q)>=0||c.cat.indexOf(q)>=0||c.desc.toLowerCase().indexOf(q)>=0;}).slice(0,8);
+  dd.innerHTML="";
+  res.forEach(function(c){
+    var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    var d=document.createElement("div"); d.className="cddo";
+    d.innerHTML="<div style=\"flex:1;min-width:0;\"><div style=\"font-size:13px;font-weight:500;\">"+c.n+"</div><div style=\"font-size:11px;color:#888;margin-top:1px;\">"+c.team+" \u00b7 "+c.eli+"</div></div>"+
+      "<span style=\"font-size:10px;padding:2px 8px;border-radius:20px;background:"+cm.bg+";color:"+cm.tc+";font-weight:500;flex-shrink:0;\">"+cm.n+"</span>";
+    d.addEventListener("click",function(){addComp(c);document.getElementById("ci").value="";dd.style.display="none";});
+    dd.appendChild(d);
+  });
+  if(v.trim().length>2){
+    var cv=v.trim();
+    var already=COMPS.some(function(c){return c.n.toLowerCase()===cv.toLowerCase();});
+    if(!already){
+      var cd=document.createElement("div"); cd.className="cddo";
+      if(res.length) cd.style.borderTop="2px solid #f0f0ec";
+      cd.innerHTML="<div><div style=\"font-size:13px;font-weight:600;color:#7F77DD;\">+ Add \""+esc(cv)+"\" as custom competition</div><div style=\"font-size:11px;color:#888;margin-top:1px;\">Regional, state, local, or any other competition</div></div>";
+      cd.addEventListener("click",function(){addComp({n:cv,cat:"custom",team:"Varies",eli:"Local / Regional",tier:3,desc:"Custom competition",why:"Find a partner for your specific competition"});document.getElementById("ci").value="";dd.style.display="none";});
+      dd.appendChild(cd);
     }
   }
-  activeCat=cat;
-  var list=ALL_COMPS.filter(function(c){return activeCats.length===0||activeCats.indexOf(c.cat)>=0;});
-  var el=document.getElementById('comp-list');if(!el)return;
-  el.innerHTML='';
+  dd.style.display=(res.length||v.trim().length>2)?"block":"none";
+}
+
+function renderCat(){
+  var list=activeCats.length?COMPS.filter(function(c){return activeCats.indexOf(c.cat)>=0;}):COMPS;
+  var el=document.getElementById("clist"); if(!el) return;
+  el.innerHTML="";
   list.forEach(function(c){
-    var cm=CATS_META[c.cat]||{c:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'};
-    var tm=TIER_COLORS[c.tier]||TIER_COLORS[2];
-    var added=selComps.find(function(s){return s.n===c.n;});
-    var div=document.createElement('div');div.className='cl-item';
-    div.innerHTML='<div class="cl-left">'+
-      '<div class="cl-name">'+c.n+'</div>'+
-      '<div class="cl-desc">'+c.desc+'</div>'+
-      '<div class="cl-meta">'+
-        '<span class="cl-tag" style="background:'+cm.bg+';color:'+cm.tc+';">'+cm.n+'</span>'+
-        '<span class="cl-tag" style="background:'+tm.bg+';color:'+tm.tc+';">'+TIER_LABELS[c.tier]+'</span>'+
-        '<span class="cl-tag" style="background:#f4f4f0;color:#666;">'+c.team+'</span>'+
-        '<span class="cl-tag" style="background:#f4f4f0;color:#666;">'+c.eli+'</span>'+
-      '</div>'+
-      '<div class="cl-why" style="color:'+cm.c+';"><i class="ti ti-users" style="font-size:11px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>'+c.why+'</div>'+
-    '</div>'+
-    '<button class="cl-add" style="background:'+(added?'#3B6D11':cm.c)+';">'+(added?'Added ✓':'+ Add')+'</button>';
+    var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    var tm=TRC[c.tier]||TRC[2];
+    var added=selComps.some(function(s){return s.n===c.n;});
+    var d=document.createElement("div"); d.className="citem";
+    d.innerHTML="<div style=\"flex:1;min-width:0;\">"+
+      "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.n+"</div>"+
+      "<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+c.desc+"</div>"+
+      "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.team+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
+      "</div>"+
+      "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
+    "</div>"+
+    "<button style=\"flex-shrink:0;padding:6px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:white;margin-top:2px;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\">"+
+      (added?"Added \u2713":"+ Add")+
+    "</button>";
     if(!added){
-      div.querySelector('.cl-add').addEventListener('click',function(e){
+      d.querySelector("button").addEventListener("click",function(e){
         e.stopPropagation();addComp(c);
-        this.textContent='Added ✓';this.style.background='#3B6D11';this.disabled=true;
+        this.textContent="Added \u2713";this.style.background="#3B6D11";this.disabled=true;
       });
-    }else{div.querySelector('.cl-add').disabled=true;}
-    el.appendChild(div);
+    } else {d.querySelector("button").disabled=true;}
+    el.appendChild(d);
   });
 }
 
-function addComp(c){
-  if(selComps.find(function(s){return s.n===c.n;}))return;
-  selComps.push(c);renderSelComps();
-}
-function removeComp(n){
-  selComps=selComps.filter(function(c){return c.n!==n;});
-  renderSelComps();
-  if(exploreOpen)renderCompCat(activeCat);
-}
-function renderSelComps(){
-  var el=document.getElementById('sc-pills');if(!el)return;
-  el.innerHTML=selComps.map(function(c){
-    var cm=CATS_META[c.cat]||{bg:'#EEEDFE',tc:'#3C3489'};
-    return '<span class="cpill" style="background:'+cm.bg+';color:'+cm.tc+';">'+c.n+'<button onclick="removeComp(\''+c.n.replace(/'/g,"\\'")+'\')">×</button></span>';
-  }).join('');
+function addComp(c){if(selComps.some(function(s){return s.n===c.n;}))return;selComps.push(c);renderPills();if(exploreOpen)renderCat();}
+function removeComp(name){selComps=selComps.filter(function(c){return c.n!==name;});renderPills();if(exploreOpen)renderCat();}
+function renderPills(){
+  var el=document.getElementById("pills"); if(!el) return;
+  el.innerHTML="";
+  if(!selComps.length){
+    var msg=document.createElement("span");
+    msg.style.cssText="font-size:13px;color:#aaa;font-style:italic;";
+    msg.textContent="None yet \u2014 search above or browse by category";
+    el.appendChild(msg); return;
+  }
+  selComps.forEach(function(c){
+    var cm=CM2[c.cat]||{bg:"#EEEDFE",tc:"#3C3489"};
+    var sp=document.createElement("span");
+    sp.className="pill"; sp.style.background=cm.bg; sp.style.color=cm.tc;
+    var txt=document.createTextNode(c.n+" ");
+    var btn=document.createElement("button");
+    btn.textContent="\u00d7";
+    var name=c.n;
+    btn.addEventListener("click",function(){removeComp(name);});
+    sp.appendChild(txt); sp.appendChild(btn);
+    el.appendChild(sp);
+  });
 }
 
+// ── Step functions ─────────────────────────
 function step2(){
-  var n=document.getElementById('i-name').value.trim(),e=document.getElementById('i-email').value.trim(),sc=document.getElementById('i-school').value.trim(),g=document.getElementById('i-grade').value,co=document.getElementById('i-country').value;
-  if(!n||!e||!sc||!g||!co){alert('Please fill in all fields');return;}
-  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.zip=document.getElementById('i-zip').value.trim();
-  S.languages=Array.from(document.querySelectorAll('#lang .chip.on')).map(function(c){return c.textContent;});
-  goTo('track');
+  var n=document.getElementById("iname").value.trim();
+  var e=document.getElementById("iemail").value.trim();
+  var sc=document.getElementById("ischool").value.trim();
+  var g=document.getElementById("igrade").value;
+  var co=document.getElementById("icountry").value;
+  if(!n||!e||!sc||!g||!co){alert("Please fill in all required fields");return;}
+  S.name=n; S.email=e; S.school=sc; S.grade=g; S.country=co;
+  var ze=document.getElementById("izip"); S.zip=ze?ze.value.trim():"";
+  S.languages=getChips("lang");
+  goTo("track");
 }
-function step3(){if(!S.track||!S.role){alert('Please choose your track and role');return;}goTo('skills');}
+function step3(){
+  if(!S.track||!S.role){alert("Please choose your track and role");return;}
+  goTo("skills");
+}
 function step4(){
   var rated=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];});
-  if(!rated.length){alert('Please select and rate at least one skill');return;}
-  S.availability=Array.from(document.querySelectorAll('#avail .chip.on')).map(function(c){return c.textContent;})[0]||'';
-  S.github=document.getElementById('i-github').value.trim();
-  goTo('goals');
+  if(!rated.length){alert("Please select and rate at least one skill");return;}
+  S.availability=getChips("avail")[0]||"";
+  S.github=document.getElementById("igh").value.trim();
+  goTo("goals");
 }
 function goFind(){
   S.comps=selComps.map(function(c){return c.n;});
-  S.idea=document.getElementById('i-idea').value.trim();
-  S.commit=Array.from(document.querySelectorAll('#commit .chip.on')).map(function(c){return c.textContent;})[0]||'';
-  S.location=Array.from(document.querySelectorAll('#loc .chip.on')).map(function(c){return c.textContent;})[0]||'';
-  goTo('loading');doFetch();
+  S.idea=document.getElementById("iidea").value.trim();
+  S.commit=getChips("commit")[0]||"";
+  S.location=getChips("loc")[0]||"";
+  goTo("loading"); doFetch();
 }
 
-function renderLoading(){
-  render(logo()+'<div style="text-align:center;padding:3rem 1rem;"><div class="spin"></div><div id="lmsg" style="font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:6px;">Analyzing your profile...</div><div style="font-size:14px;color:#888;">Finding your best partners worldwide</div></div>');
-  var ms=['Analyzing your profile...','Searching students globally...','Matching roles & skill levels...','Building your results...'];
-  var i=0;var iv=setInterval(function(){i++;var el=document.getElementById('lmsg');if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
+// ── Loading ────────────────────────────────
+function rLoading(){
+  R(logo()+"<div style=\"text-align:center;padding:3rem 1rem;\"><div class=\"spin\"></div><div id=\"lmsg\" style=\"font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:6px;\">Analyzing your profile...</div><div style=\"font-size:14px;color:#888;\">Finding your best partners worldwide</div></div>");
+  var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skill levels...","Building your results..."];
+  var i=0; var iv=setInterval(function(){i++;var el=document.getElementById("lmsg");if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
 }
+function skStr(){return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){return k+" ("+S.skillLevels[k]+")";}).join(", ");}
 
-function skStr(){return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){return k+' ('+S.skillLevels[k]+')';}).join(', ');}
-
+// ── API fetch ──────────────────────────────
 async function doFetch(){
-  var t=TR[S.track]||{},r=RO[S.role]||{};
-  var prompt='You are Partnr\'s AI matching engine for global high school students finding project partners and co-founders.\n\nStudent: '+S.name+', '+S.school+', '+S.country+', '+S.grade+'\nLanguages: '+(S.languages.join(', ')||'English')+'\nTrack: '+t.n+', Role: '+r.n+', Status: '+S.status+'\nStage: '+(S.stage||'open')+'\nSkills: '+skStr()+'\nAvailability: '+S.availability+', Commitment: '+S.commit+'\nCompetitions: '+(S.comps.join(', ')||'open')+'\nIdea: '+(S.idea||'open')+'\nLocation: '+(S.location||'open')+'\n\nRULES: Match COMPLEMENTARY roles. Match skill LEVELS carefully. At least 1 match from a different continent.\n\nGenerate 3 student matches. Each:\nname, school, country, grade, avatar(2 initials), avatarColor(purple/teal/coral/blue/green), track, role(vision/tech_r/mktg/ops/res_r/creative), skillsWithLevels(object e.g.{"Python":"Advanced"}), competitions(array 2-3), matchScore(85-98), why(2 specific sentences on role+skill complementarity), projectIdea(1 sentence), commitment, availability, timezone, isNearby(bool), languages(array), status, stage(spark/planning/building/submitting/open), bio(2 sentences), experience(array of 3:{title,desc}), awards(array 0-2 strings), portfolio(realistic URL or null), lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role "'+r.n+'". Each: title, description, neededRole, skills(2-3), competition, spots(1-2), authorName, authorSchool, authorCountry, track, posted, matchReason, stage\n\nGenerate 5 competitions for track '+t.n+'. Each: name, track, description, deadline(e.g."Feb 1 2026"), daysUntil(30-300 integer), prize, teamSize, isRecommended(bool), eligibility\n\nReturn ONLY valid JSON: {"matches":[...],"projects":[...],"competitions":[...]}';
+  var t=TR[S.track]||{n:S.track}; var r=RO[S.role]||{n:S.role};
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.country+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+(S.comps.join(", ")||"open")+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nRULES: Match COMPLEMENTARY roles. Match skill LEVELS carefully. At least 1 from different continent.\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 sentences),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2500,messages:[{role:'user',content:prompt}]})});
+    var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
+    if(!res.ok) throw new Error("status "+res.status);
     var d=await res.json();
-    var parsed=JSON.parse(d.content.map(function(b){return b.text||'';}).join('').replace(/```json|```/g,'').trim());
-    MATCHES=parsed.matches||[];PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
-    goTo('matches');
-  }catch(e){fallback();}
+    if(d.error) throw new Error("api error");
+    var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
+    var parsed=JSON.parse(txt);
+    MATCHES=parsed.matches||[]; PROJECTS=parsed.projects||[]; COMPS_DATA=parsed.competitions||[];
+    goTo("matches");
+  } catch(e){ fallback(); }
 }
 
-function renderMatchesPage(){
-  render(
-    logo()+
-    '<div class="nav">'+
-      '<button class="nb on" id="nb-matches">Matches</button>'+
-      '<button class="nb" id="nb-recruit">Recruiting me</button>'+
-      '<button class="nb" id="nb-search">Skill search</button>'+
-      '<button class="nb" id="nb-deadlines">Deadlines</button>'+
-      '<button class="nb" id="nb-conns">Connections'+(CONNS.length?' <span style="background:#7F77DD;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;">'+CONNS.length+'</span>':'')+' </button>'+
-      '<button class="nb" id="nb-me">My profile</button>'+
-    '</div>'+
-    '<div id="tab-content"></div>'
+// ── Matches page ───────────────────────────
+function rMatches(){
+  R(logo()+
+    "<div class=\"nav\">"+
+      "<button class=\"nb on\" id=\"nb-matches\">Matches</button>"+
+      "<button class=\"nb\" id=\"nb-recruit\">Recruiting me</button>"+
+      "<button class=\"nb\" id=\"nb-search\">Skill search</button>"+
+      "<button class=\"nb\" id=\"nb-deadlines\">Deadlines</button>"+
+      "<button class=\"nb\" id=\"nb-conns\">Connections"+(CONNS.length?" <span style=\"background:#7F77DD;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;\">"+CONNS.length+"</span>":"")+
+      " </button>"+
+      "<button class=\"nb\" id=\"nb-me\">My profile</button>"+
+    "</div>"+
+    "<div id=\"tc\"></div>"
   );
-  bindNav();showTab('matches');
-}
-
-function bindNav(){
-  ['matches','recruit','search','deadlines','conns','me'].forEach(function(t){
-    var btn=document.getElementById('nb-'+t);
-    if(btn)btn.addEventListener('click',function(){document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});this.classList.add('on');showTab(t);});
+  ["matches","recruit","search","deadlines","conns","me"].forEach(function(t){
+    var b=document.getElementById("nb-"+t);
+    if(b) b.addEventListener("click",function(){document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});this.classList.add("on");showTab(t);});
   });
+  showTab("matches");
 }
 
 function showTab(tab){
-  var el=document.getElementById('tab-content');if(!el)return;
-  if(tab==='matches'){el.innerHTML=renderMatchCards();bindMatchEvents();}
-  else if(tab==='recruit'){el.innerHTML=renderProjectCards();bindProjectEvents();}
-  else if(tab==='search'){el.innerHTML=renderSearchTab();bindSearchEvents();}
-  else if(tab==='deadlines'){el.innerHTML=renderDeadlineCards();}
-  else if(tab==='conns'){el.innerHTML=renderConnCards();bindConnEvents();}
-  else if(tab==='me'){el.innerHTML=renderMeTab();var rb=document.getElementById('reset-btn');if(rb)rb.addEventListener('click',resetAll);}
+  var el=document.getElementById("tc"); if(!el) return;
+  if(tab==="matches"){el.innerHTML=mCards();bindME();}
+  else if(tab==="recruit"){el.innerHTML=pCards();bindPE();}
+  else if(tab==="search"){el.innerHTML=sTab();bindSE();}
+  else if(tab==="deadlines"){el.innerHTML=dCards();}
+  else if(tab==="conns"){el.innerHTML=cCards();bindCE();}
+  else if(tab==="me"){el.innerHTML=meTab();var rb=document.getElementById("rst");if(rb)rb.addEventListener("click",resetAll);}
 }
 
-function renderMatchCards(){
-  if(!MATCHES.length)return '<div style="text-align:center;padding:2rem;color:#888;">No matches yet.</div>';
-  var h='<div class="slabel" style="margin-top:0;">Your AI matches — tap Full profile to see everything</div>';
+function mCards(){
+  if(!MATCHES.length) return "<div style=\"text-align:center;padding:2rem;color:#888;\">No matches yet.</div>";
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Your AI matches</div>";
   MATCHES.forEach(function(m,i){
-    var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||'Partner',i:'ti-user'};
+    var cm=CM[m.avatarColor]||CM.purple; var t=TR[m.track]||TR.research; var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
     var sw=m.skillsWithLevels||{};
-    var stags=Object.keys(sw).slice(0,4).map(function(sk){var lv=sw[sk];return '<span class="tag" style="background:'+(LBGS[lv]||'#F1EFE8')+';color:'+(LTCS[lv]||'#666')+';">'+sk+' · '+lv+'</span>';}).join('');
-    var conn=CONNS.find(function(c){return c.name===m.name;});
-    h+='<div class="card">'+
-      '<div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'+
-        '<div class="av" style="width:44px;height:44px;font-size:15px;background:'+cm.bg+';color:'+cm.c+';">'+m.avatar+'</div>'+
-        '<div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:600;color:#1a1a1a;">'+m.name+'</div>'+
-        '<div style="font-size:12px;color:#888;">'+m.school+' · '+m.country+' · '+m.timezone+'</div></div>'+
-        '<div style="font-size:16px;font-weight:700;color:'+t.c+';">'+m.matchScore+'%</div>'+
-      '</div>'+
-      '<div class="tags">'+stags+
-        '<span class="tag" style="background:'+t.bg+';color:'+t.tc+';">'+t.n+'</span>'+
-        '<span class="tag" style="background:#EEEDFE;color:#534AB7;"><i class="ti '+r.i+'" style="font-size:11px;vertical-align:-1px;margin-right:2px;" aria-hidden="true"></i>'+r.n+'</span>'+
-        '<span class="tag">'+m.stage+'</span></div>'+
-      '<div class="why"><strong>Why you match:</strong> '+m.why+'</div>'+
-      '<div style="font-size:12px;color:#888;margin-bottom:10px;"><i class="ti ti-clock" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>'+m.availability+' · '+m.commitment+'</div>'+
-      '<div style="display:flex;gap:8px;">'+
-        (conn?'<button class="bc" style="flex:1;background:#3B6D11;" disabled><i class="ti ti-check" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>Request sent</button>':'<button class="bc conn-btn" style="flex:1;background:'+t.c+';" data-idx="'+i+'">Connect →</button>')+
-        '<button class="bo prof-btn" data-idx="'+i+'">Full profile</button>'+
-        '<button class="bg pass-btn">Pass</button>'+
-      '</div></div>';
+    var stags=Object.keys(sw).slice(0,4).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" \u00b7 "+lv+"</span>";}).join("");
+    var conn=CONNS.some(function(c){return c.name===m.name;});
+    h+="<div class=\"card\">"+
+      "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
+        "<div class=\"av\" style=\"width:44px;height:44px;font-size:15px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
+        "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+m.name+"</div>"+
+        "<div style=\"font-size:12px;color:#888;\">"+m.school+" \u00b7 "+m.country+" \u00b7 "+m.timezone+"</div></div>"+
+        "<div style=\"font-size:16px;font-weight:700;color:"+t.c+";\">"+m.matchScore+"%</div>"+
+      "</div>"+
+      "<div class=\"tags\">"+stags+
+        "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
+        "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
+        "<span class=\"tag\">"+m.stage+"</span>"+
+      "</div>"+
+      "<div class=\"why\"><strong>Why you match:</strong> "+m.why+"</div>"+
+      "<div style=\"font-size:12px;color:#888;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+m.availability+" \u00b7 "+m.commitment+"</div>"+
+      "<div style=\"display:flex;gap:8px;\">"+
+        (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
+              "<button class=\"bc cob\" style=\"flex:1;background:"+t.c+";\" data-idx=\""+i+"\">Connect \u2192</button>")+
+        "<button class=\"bo pfb\" data-idx=\""+i+"\">Full profile</button>"+
+        "<button class=\"bg2 psb\">Pass</button>"+
+      "</div>"+
+    "</div>";
   });
   return h;
 }
-
-function bindMatchEvents(){
-  document.querySelectorAll('.conn-btn').forEach(function(b){b.addEventListener('click',function(){openModal(parseInt(this.dataset.idx));});});
-  document.querySelectorAll('.prof-btn').forEach(function(b){b.addEventListener('click',function(){openProfile(parseInt(this.dataset.idx));});});
-  document.querySelectorAll('.pass-btn').forEach(function(b){b.addEventListener('click',function(){this.closest('.card').style.opacity='0.3';});});
+function bindME(){
+  document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){openModal(parseInt(this.dataset.idx));});});
+  document.querySelectorAll(".pfb").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(this.dataset.idx));});});
+  document.querySelectorAll(".psb").forEach(function(b){b.addEventListener("click",function(){this.closest(".card").style.opacity="0.3";});});
 }
 
 function openProfile(i){
-  var m=MATCHES[i];if(!m)return;
-  var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||'Partner',i:'ti-user'};
+  var m=MATCHES[i]; if(!m) return;
+  var cm=CM[m.avatarColor]||CM.purple; var t=TR[m.track]||TR.research; var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
   var sw=m.skillsWithLevels||{};
-  var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];return '<span class="tag" style="background:'+(LBGS[lv]||'#F1EFE8')+';color:'+(LTCS[lv]||'#666')+';">'+sk+' · '+lv+'</span>';}).join('');
-  var ctags=(m.competitions||[]).map(function(c){return '<span class="tag" style="background:'+t.bg+';color:'+t.tc+';">'+c+'</span>';}).join('');
-  var ltags=(m.languages||[]).map(function(l){return '<span class="tag">'+l+'</span>';}).join('');
-  var exp=(m.experience||[]).map(function(e){return '<div class="ei"><div style="font-size:13px;font-weight:600;color:#1a1a1a;">'+e.title+'</div><div style="font-size:12px;color:#666;margin-top:2px;line-height:1.5;">'+e.desc+'</div></div>';}).join('');
-  var awds=(m.awards||[]).map(function(a){return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;"><i class="ti ti-award" style="font-size:14px;color:'+t.c+';" aria-hidden="true"></i>'+a+'</div>';}).join('');
-  var conn=CONNS.find(function(c){return c.name===m.name;});
-  render(
-    logo()+
-    '<button id="back-btn" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#888;cursor:pointer;background:none;border:none;margin-bottom:1.25rem;padding:0;font-family:inherit;"><i class="ti ti-arrow-left" style="font-size:15px;" aria-hidden="true"></i> Back to matches</button>'+
-    '<div style="background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;">'+
-      '<div class="ps">'+
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
-          '<div class="av" style="width:54px;height:54px;font-size:18px;background:'+cm.bg+';color:'+cm.c+';">'+m.avatar+'</div>'+
-          '<div style="flex:1;"><div style="font-size:18px;font-weight:700;color:#1a1a1a;">'+m.name+'</div>'+
-          '<div style="font-size:13px;color:#888;">'+m.school+' · '+m.country+' · '+m.grade+'</div>'+
-          '<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">'+
-            '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:'+t.bg+';color:'+t.tc+';">'+t.n+'</span>'+
-            '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;"><i class="ti '+r.i+'" style="font-size:11px;vertical-align:-1px;margin-right:2px;" aria-hidden="true"></i>'+r.n+'</span>'+
-          '</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:26px;font-weight:700;color:'+t.c+';">'+m.matchScore+'%</div><div style="font-size:11px;color:#888;">match</div></div>'+
-        '</div>'+
-        '<div class="tags" style="margin-bottom:6px;">'+stags+'</div>'+
-        '<div class="tags" style="margin-bottom:8px;">'+ctags+'</div>'+
-        '<div style="font-size:13px;color:#666;line-height:1.6;">'+m.bio+'</div>'+
-      '</div>'+
-      '<div class="ps"><div class="slabel" style="margin-top:0;margin-bottom:8px;">Availability & details</div>'+
-        '<div class="ag">'+
-          '<div class="ac"><div class="al">Weekly hours</div><div class="av2">'+m.availability+'</div></div>'+
-          '<div class="ac"><div class="al">Timezone</div><div class="av2">'+m.timezone+'</div></div>'+
-          '<div class="ac"><div class="al">Commitment</div><div class="av2">'+m.commitment+'</div></div>'+
-          '<div class="ac"><div class="al">Project stage</div><div class="av2">'+m.stage+'</div></div>'+
-        '</div>'+
-        '<div style="margin-top:8px;"><div class="al" style="margin-bottom:4px;">Languages</div><div class="tags">'+ltags+'</div></div>'+
-      '</div>'+
-      (m.portfolio?'<div class="ps"><div class="slabel" style="margin-top:0;margin-bottom:6px;">Portfolio</div><a href="https://'+m.portfolio+'" style="font-size:13px;color:'+t.c+';text-decoration:none;" target="_blank"><i class="ti ti-external-link" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>'+m.portfolio+'</a></div>':'')+
-      (exp?'<div class="ps"><div class="slabel" style="margin-top:0;margin-bottom:4px;">Experience</div>'+exp+'</div>':'')+
-      (awds?'<div class="ps"><div class="slabel" style="margin-top:0;margin-bottom:4px;">Awards</div>'+awds+'</div>':'')+
-      '<div class="ps"><div class="slabel" style="margin-top:0;margin-bottom:6px;">What they\'re looking for</div>'+
-        '<div style="font-size:13px;color:#666;line-height:1.6;background:#f8f8f6;padding:12px 14px;border-radius:8px;">'+m.lookingFor+'</div>'+
-      '</div>'+
-      '<div style="display:flex;gap:8px;">'+
-        (conn?'<button class="bc" style="flex:1;background:#3B6D11;padding:10px;" disabled><i class="ti ti-check" style="font-size:12px;vertical-align:-1px;margin-right:3px;" aria-hidden="true"></i>Request sent</button>':'<button id="prof-conn" class="bc" style="flex:1;background:'+t.c+';padding:10px;">Connect →</button>')+
-        '<button id="prof-back" class="bo">Back</button>'+
-      '</div>'+
-    '</div>'
+  var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" \u00b7 "+lv+"</span>";}).join("");
+  var ctags=(m.competitions||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+c+"</span>";}).join("");
+  var ltags=(m.languages||[]).map(function(l){return "<span class=\"tag\">"+l+"</span>";}).join("");
+  var exp=(m.experience||[]).map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+e.title+"</div><div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.5;\">"+e.desc+"</div></div>";}).join("");
+  var awds=(m.awards||[]).map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:"+t.c+";\"></i>"+a+"</div>";}).join("");
+  var conn=CONNS.some(function(c){return c.name===m.name;});
+  R(logo()+
+    "<button id=\"pbk\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#888;cursor:pointer;background:none;border:none;margin-bottom:1.25rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to matches</button>"+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div class=\"ps\">"+
+        "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:12px;\">"+
+          "<div class=\"av\" style=\"width:54px;height:54px;font-size:18px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
+          "<div style=\"flex:1;\">"+
+            "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;\">"+m.name+"</div>"+
+            "<div style=\"font-size:13px;color:#888;\">"+m.school+" \u00b7 "+m.country+" \u00b7 "+m.grade+"</div>"+
+            "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
+              "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
+              "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
+            "</div>"+
+          "</div>"+
+          "<div style=\"text-align:center;\"><div style=\"font-size:26px;font-weight:700;color:"+t.c+";\">"+m.matchScore+"%</div><div style=\"font-size:11px;color:#888;\">match</div></div>"+
+        "</div>"+
+        "<div class=\"tags\" style=\"margin-bottom:6px;\">"+stags+"</div>"+
+        "<div class=\"tags\" style=\"margin-bottom:8px;\">"+ctags+"</div>"+
+        "<div style=\"font-size:13px;color:#666;line-height:1.6;\">"+m.bio+"</div>"+
+      "</div>"+
+      "<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:8px;\">Availability & details</div>"+
+        "<div class=\"ag\">"+
+          "<div class=\"ac\"><div class=\"al2\">Weekly hours</div><div class=\"av2\">"+m.availability+"</div></div>"+
+          "<div class=\"ac\"><div class=\"al2\">Timezone</div><div class=\"av2\">"+m.timezone+"</div></div>"+
+          "<div class=\"ac\"><div class=\"al2\">Commitment</div><div class=\"av2\">"+m.commitment+"</div></div>"+
+          "<div class=\"ac\"><div class=\"al2\">Stage</div><div class=\"av2\">"+m.stage+"</div></div>"+
+        "</div>"+
+        "<div style=\"margin-top:8px;\"><div class=\"al2\" style=\"margin-bottom:4px;\">Languages</div><div class=\"tags\">"+ltags+"</div></div>"+
+      "</div>"+
+      (m.portfolio?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:6px;\">Portfolio</div><a href=\"https://"+m.portfolio+"\" style=\"font-size:13px;color:"+t.c+";text-decoration:none;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;\"></i>"+m.portfolio+"</a></div>":"")+
+      (exp?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:4px;\">Experience</div>"+exp+"</div>":"")+
+      (awds?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:4px;\">Awards</div>"+awds+"</div>":"")+
+      "<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:6px;\">What they're looking for</div>"+
+        "<div style=\"font-size:13px;color:#666;line-height:1.6;background:#f8f8f6;padding:12px 14px;border-radius:8px;\">"+m.lookingFor+"</div>"+
+      "</div>"+
+      "<div style=\"display:flex;gap:8px;\">"+
+        (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;padding:10px;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
+              "<button id=\"pconn\" class=\"bc\" style=\"flex:1;background:"+t.c+";padding:10px;\">Connect \u2192</button>")+
+        "<button id=\"pbk2\" class=\"bo\">Back</button>"+
+      "</div>"+
+    "</div>"
   );
-  document.getElementById('back-btn').addEventListener('click',function(){goTo('matches');});
-  document.getElementById('prof-back').addEventListener('click',function(){goTo('matches');});
-  if(!conn)document.getElementById('prof-conn').addEventListener('click',function(){openModal(i);});
+  document.getElementById("pbk").addEventListener("click",function(){goTo("matches");});
+  document.getElementById("pbk2").addEventListener("click",function(){goTo("matches");});
+  if(!conn) document.getElementById("pconn").addEventListener("click",function(){openModal(i);});
 }
 
 function openModal(idx){
   modalTarget=idx;
   var m=idx>=0&&idx<MATCHES.length?MATCHES[idx]:null;
-  var name=m?m.name:'';
-  var t=m?TR[m.track]||TR.research:TR.research;
-  render(
-    logo()+
-    '<div style="min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;">'+
-      '<div style="background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);">'+
-        '<div style="font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;">Connect with '+esc(name)+'</div>'+
-        '<div style="font-size:13px;color:#888;margin-bottom:1rem;">Write a short intro — tell them why you want to collaborate. They\'ll see your full profile.</div>'+
-        '<div style="background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;"><i class="ti ti-shield-check" style="font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;" aria-hidden="true"></i>No private messages until both students accept and parent / teacher is notified.</div>'+
-        '<textarea id="mmsg" placeholder="Hi! I saw your profile and think we\'d work great together. I\'m working on [project] and need your [skill]..." style="width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;"></textarea>'+
-        '<div style="display:flex;gap:8px;">'+
-          '<button id="send-btn" style="flex:1;padding:10px;background:'+t.c+';color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Send request →</button>'+
-          '<button id="cancel-btn" style="padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;">Cancel</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>'
+  var name=m?m.name:""; var t=m?TR[m.track]||TR.research:TR.research;
+  R(logo()+
+    "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
+      "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
+        "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
+        "<div style=\"font-size:13px;color:#888;margin-bottom:1rem;\">Write a short intro \u2014 tell them why you want to collaborate.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>No private messages until both students accept and parent / teacher is notified.</div>"+
+        "<textarea id=\"mmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
+        "<div style=\"display:flex;gap:8px;\">"+
+          "<button id=\"sbtn\" style=\"flex:1;padding:10px;background:"+t.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request \u2192</button>"+
+          "<button id=\"cbtn\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Cancel</button>"+
+        "</div>"+
+      "</div>"+
+    "</div>"
   );
-  document.getElementById('send-btn').addEventListener('click',sendConn);
-  document.getElementById('cancel-btn').addEventListener('click',function(){goTo('matches');});
+  document.getElementById("sbtn").addEventListener("click",sendConn);
+  document.getElementById("cbtn").addEventListener("click",function(){goTo("matches");});
 }
 
 function sendConn(){
-  var msg=document.getElementById('mmsg').value.trim();
-  if(!msg){alert('Please write a short intro message');return;}
+  var msg=document.getElementById("mmsg").value.trim();
+  if(!msg){alert("Please write a short intro message");return;}
   var m=modalTarget>=0&&modalTarget<MATCHES.length?MATCHES[modalTarget]:null;
-  var name=m?m.name:'Partner';
-  if(m&&!CONNS.find(function(c){return c.name===name;})){
-    CONNS.push({name:name,school:m.school,country:m.country,avatar:m.avatar,avatarColor:m.avatarColor,role:m.role,track:m.track,msg:msg,status:'pending'});
+  var name=m?m.name:"Partner";
+  if(m&&!CONNS.some(function(c){return c.name===name;})){
+    CONNS.push({name:name,school:m.school,country:m.country,avatar:m.avatar,avatarColor:m.avatarColor,role:m.role,track:m.track,msg:msg,status:"pending"});
   }
-  render(
-    logo()+
-    '<div style="min-height:280px;display:flex;align-items:center;justify-content:center;">'+
-      '<div style="text-align:center;padding:2rem;">'+
-        '<i class="ti ti-circle-check" style="font-size:52px;color:#1D9E75;" aria-hidden="true"></i>'+
-        '<div style="font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;">Request sent!</div>'+
-        '<div style="font-size:14px;color:#888;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;">We notified <strong>'+esc(name)+'</strong>. You\'ll both get a shared project board when they accept.</div>'+
-        '<button id="done-btn" class="bp" style="max-width:240px;margin:0 auto;display:block;">Back to matches</button>'+
-      '</div>'+
-    '</div>'
+  R(logo()+
+    "<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\">"+
+      "<div style=\"text-align:center;padding:2rem;\">"+
+        "<i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i>"+
+        "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div>"+
+        "<div style=\"font-size:14px;color:#888;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div>"+
+        "<button id=\"dbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button>"+
+      "</div>"+
+    "</div>"
   );
-  document.getElementById('done-btn').addEventListener('click',function(){goTo('matches');});
+  document.getElementById("dbn").addEventListener("click",function(){goTo("matches");});
 }
 
-function renderProjectCards(){
-  var r=RO[S.role]||{n:S.role||'Partner'};
-  if(!PROJECTS.length)return '<div style="text-align:center;padding:2rem;color:#888;">No projects matched your role yet.</div>';
-  var h='<div class="slabel" style="margin-top:0;">Projects recruiting your role & skills</div><p style="font-size:13px;color:#888;margin-bottom:1rem;">Each specifically needs what you offer.</p>';
+function pCards(){
+  var r=RO[S.role]||{n:S.role||"Partner"};
+  if(!PROJECTS.length) return "<div style=\"text-align:center;padding:2rem;color:#888;\">No projects matched your role yet.</div>";
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Projects recruiting your role</div>";
   PROJECTS.forEach(function(p){
     var t=TR[p.track]||TR[S.track]||TR.research;
-    var stags=(p.skills||[]).map(function(s){return '<span class="tag">'+s+'</span>';}).join('');
-    h+='<div class="card">'+
-      '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">'+
-        '<div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#1a1a1a;">'+p.title+'</div>'+
-        '<div style="font-size:12px;color:#888;margin-top:1px;">'+p.authorName+' · '+p.authorSchool+', '+p.authorCountry+' · '+p.posted+'</div></div>'+
-        '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:'+t.bg+';color:'+t.tc+';flex-shrink:0;">'+p.spots+' spot'+(p.spots>1?'s':'')+' open</span>'+
-      '</div>'+
-      '<div style="font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;">'+p.description+'</div>'+
-      '<div style="font-size:12px;font-weight:600;color:'+t.c+';background:'+t.bg+';padding:6px 10px;border-radius:8px;margin-bottom:8px;"><i class="ti ti-star" style="font-size:12px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i>'+p.matchReason+'</div>'+
-      '<div class="tags" style="margin-bottom:8px;">'+stags+'<span class="tag" style="background:'+t.bg+';color:'+t.tc+';">'+p.competition+'</span><span class="tag">Needs '+r.n+'</span></div>'+
-      '<button class="apply-btn" data-title="'+esc(p.title)+'" style="background:'+t.c+';color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Apply with your profile →</button>'+
-    '</div>';
+    var stags=(p.skills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
+    h+="<div class=\"card\">"+
+      "<div style=\"display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;\">"+
+        "<div style=\"flex:1;\"><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+p.title+"</div>"+
+        "<div style=\"font-size:12px;color:#888;margin-top:1px;\">"+p.authorName+" \u00b7 "+p.authorSchool+", "+p.authorCountry+" \u00b7 "+p.posted+"</div></div>"+
+        "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";flex-shrink:0;\">"+p.spots+" spot"+(p.spots>1?"s":"")+" open</span>"+
+      "</div>"+
+      "<div style=\"font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;\">"+p.description+"</div>"+
+      "<div style=\"font-size:12px;font-weight:600;color:"+t.c+";background:"+t.bg+";padding:6px 10px;border-radius:8px;margin-bottom:8px;\"><i class=\"ti ti-star\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>"+p.matchReason+"</div>"+
+      "<div class=\"tags\" style=\"margin-bottom:8px;\">"+stags+"<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+p.competition+"</span><span class=\"tag\">Needs "+r.n+"</span></div>"+
+      "<button class=\"apb\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile \u2192</button>"+
+    "</div>";
   });
   return h;
 }
-function bindProjectEvents(){
-  document.querySelectorAll('.apply-btn').forEach(function(b){b.addEventListener('click',function(){alert('Application sent for "'+this.dataset.title+'"!\n\nYour role, skill levels, and portfolio will be shared with the project creator. They\'ll respond within 48 hours.');});});
+function bindPE(){document.querySelectorAll(".apb").forEach(function(b){b.addEventListener("click",function(){alert("Application sent for \""+this.dataset.title+"\"!\n\nYour role, skill levels, and portfolio will be shared. They will respond within 48 hours.");});});}
+
+function sTab(){
+  return "<div class=\"slabel\" style=\"margin-top:0;\">Search by skill, role, or interest</div>"+
+    "<div class=\"sub\">Find anyone globally \u2014 startup founders, researchers, artists, engineers. Even students without a project yet.</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
+      "<input id=\"ss\" placeholder=\"Python, startup founder, biology research, CEO, UX design...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search \u2192</button>"+
+    "</div>"+
+    "<div class=\"cgrow\" id=\"qs\"></div>"+
+    "<div id=\"sr\" style=\"margin-top:1rem;\"></div>";
+}
+function bindSE(){
+  mkChips("qs",["Python","Machine Learning","Biology","Startup founder","CEO / Vision","CTO / Tech","Design UX","Marketing","Social Impact","Research"],[],false);
+  document.querySelectorAll("#qs .chip").forEach(function(b){
+    b.addEventListener("click",function(){
+      document.getElementById("ss").value=this.textContent;
+      srchSkill(this.textContent);
+    });
+  });
+  document.getElementById("ssb").addEventListener("click",function(){
+    var q=document.getElementById("ss").value.trim();
+    if(q) srchSkill(q);
+  });
 }
 
-function renderSearchTab(){
-  return '<div class="slabel" style="margin-top:0;">Search by skill or role</div>'+
-    '<p style="font-size:13px;color:#888;margin-bottom:10px;">Find anyone globally — even students without a project yet.</p>'+
-    '<div style="display:flex;gap:8px;margin-bottom:1rem;"><input id="ss-inp" placeholder="Python, biology, CEO, CTO, marketing, design..." style="flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;"/>'+
-    '<button id="ss-btn" style="padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Search →</button></div>'+
-    '<div class="chip-group">'+['Python','Machine Learning','Biology','Math / Stats','CTO technical','CEO vision','Design UX','Marketing'].map(function(s){return '<div class="chip qs-btn" data-s="'+s+'">'+s+'</div>';}).join('')+'</div>'+
-    '<div id="sr" style="margin-top:1rem;"></div>';
-}
-function bindSearchEvents(){
-  document.getElementById('ss-btn').addEventListener('click',function(){var q=document.getElementById('ss-inp').value.trim();if(q)srchSkill(q);});
-  document.querySelectorAll('.qs-btn').forEach(function(b){b.addEventListener('click',function(){document.getElementById('ss-inp').value=this.dataset.s;srchSkill(this.dataset.s);});});
-}
-
-function renderDeadlineCards(){
-  if(!COMPS_DATA.length)return '<div class="slabel" style="margin-top:0;">Your competition calendar</div><div style="text-align:center;padding:2rem;color:#888;">No competitions loaded yet.</div>';
-  var h='<div class="slabel" style="margin-top:0;">Your competition calendar</div><p style="font-size:13px;color:#888;margin-bottom:1rem;">Sorted by deadline — competitions for your track and goals.</p>';
-  var sorted=[].concat(COMPS_DATA).sort(function(a,b){return a.daysUntil-b.daysUntil;});
-  sorted.forEach(function(c){
+function dCards(){
+  if(!COMPS_DATA.length) return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#888;\">No competitions loaded yet.</div>";
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
+  [].concat(COMPS_DATA).sort(function(a,b){return a.daysUntil-b.daysUntil;}).forEach(function(c){
     var t=TR[c.track]||TR.research;
     var urg=c.daysUntil<=45,soon=c.daysUntil<=90;
-    var ubg=urg?'#FCEBEB':soon?'#FAEEDA':'#EAF3DE';
-    var uc=urg?'#A32D2D':soon?'#854F0B':'#3B6D11';
-    var ut=urg?'Act now':soon?'Coming up':'Upcoming';
-    h+='<div class="dl" style="'+(c.isRecommended?'border-color:'+t.c+';border-width:2px;':'')+'">'+
-      '<div style="text-align:center;min-width:46px;flex-shrink:0;">'+
-        '<div style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase;">'+(c.deadline.split(' ')[0]||'').substring(0,3)+'</div>'+
-        '<div style="font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1;">'+(c.deadline.match(/\d+/)||['?'])[0]+'</div>'+
-        '<div style="font-size:10px;padding:2px 5px;border-radius:20px;font-weight:600;background:'+ubg+';color:'+uc+';display:inline-block;margin-top:3px;">'+ut+'</div>'+
-      '</div>'+
-      '<div style="flex:1;">'+
-        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">'+
-          '<div style="font-size:14px;font-weight:600;color:#1a1a1a;">'+c.name+'</div>'+
-          (c.isRecommended?'<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:'+t.bg+';color:'+t.tc+';">For you</span>':'')+
-        '</div>'+
-        '<div style="font-size:12px;color:#888;margin-bottom:5px;line-height:1.4;">'+c.description+'</div>'+
-        '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">'+
-          '<span class="tag" style="background:'+t.bg+';color:'+t.tc+';">'+t.n+'</span>'+
-          '<span style="font-size:11px;color:#888;">'+c.prize+'</span>'+
-          '<span style="font-size:11px;color:#888;">'+c.eligibility+'</span>'+
-          '<span style="font-size:11px;font-weight:600;color:'+uc+';margin-left:auto;">'+c.daysUntil+'d left</span>'+
-        '</div>'+
-      '</div></div>';
+    var ubg=urg?"#FCEBEB":soon?"#FAEEDA":"#EAF3DE";
+    var uc=urg?"#A32D2D":soon?"#854F0B":"#3B6D11";
+    var ut=urg?"Act now":soon?"Coming up":"Upcoming";
+    h+="<div class=\"dl\" style=\""+(c.isRecommended?"border-color:"+t.c+";border-width:2px;":"")+"\">"+
+      "<div style=\"text-align:center;min-width:46px;flex-shrink:0;\">"+
+        "<div style=\"font-size:10px;font-weight:600;color:#999;text-transform:uppercase;\">"+(c.deadline.split(" ")[0]||"").substring(0,3)+"</div>"+
+        "<div style=\"font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1;\">"+(c.deadline.match(/\d+/)||["?"])[0]+"</div>"+
+        "<div style=\"font-size:10px;padding:2px 5px;border-radius:20px;font-weight:600;background:"+ubg+";color:"+uc+";display:inline-block;margin-top:3px;\">"+ut+"</div>"+
+      "</div>"+
+      "<div style=\"flex:1;\">"+
+        "<div style=\"display:flex;align-items:center;gap:5px;margin-bottom:3px;\">"+
+          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+c.name+"</div>"+
+          (c.isRecommended?"<span style=\"font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">For you</span>":"")+
+        "</div>"+
+        "<div style=\"font-size:12px;color:#888;margin-bottom:5px;line-height:1.4;\">"+c.description+"</div>"+
+        "<div style=\"display:flex;flex-wrap:wrap;gap:5px;align-items:center;\">"+
+          "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
+          "<span style=\"font-size:11px;color:#888;\">"+c.prize+"</span>"+
+          "<span style=\"font-size:11px;color:#888;\">"+c.eligibility+"</span>"+
+          "<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+c.daysUntil+"d left</span>"+
+        "</div>"+
+      "</div>"+
+    "</div>";
   });
   return h;
 }
 
-function renderConnCards(){
-  var h='<div class="slabel" style="margin-top:0;">Your connections</div>';
-  if(!CONNS.length)return h+'<p style="font-size:13px;color:#888;margin-bottom:1rem;">No connections yet — connect with matches to start collaborating.</p>';
-  h+='<p style="font-size:13px;color:#888;margin-bottom:1rem;">Start a shared project board once both students accept.</p>';
+function cCards(){
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Your connections</div>";
+  if(!CONNS.length) return h+"<p style=\"font-size:13px;color:#888;\">No connections yet \u2014 connect with matches to start collaborating.</p>";
+  h+="<p style=\"font-size:13px;color:#888;margin-bottom:1rem;\">Start a shared project board once both students accept.</p>";
   CONNS.forEach(function(cn){
-    var cm=CM[cn.avatarColor]||CM.purple;var t=TR[cn.track]||TR.research;var r=RO[cn.role]||{n:cn.role||'Partner'};
-    h+='<div class="pi-item">'+
-      '<div class="av" style="width:40px;height:40px;font-size:13px;background:'+cm.bg+';color:'+cm.c+';">'+cn.avatar+'</div>'+
-      '<div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#1a1a1a;">'+cn.name+'</div>'+
-      '<div style="font-size:12px;color:#888;">'+cn.school+' · '+cn.country+'</div>'+
-      (cn.status==='accepted'?'<div style="font-size:11px;color:#3B6D11;margin-top:3px;font-weight:600;"><i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> Connected — project board ready</div>':'<div style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;margin-top:3px;font-weight:500;">Pending acceptance</div>')+
-      '</div>'+
-      '<div style="text-align:right;"><span class="tag" style="background:'+t.bg+';color:'+t.tc+';">'+r.n+'</span>'+
-      (cn.status!=='accepted'?'<div style="margin-top:5px;"><button class="sim-accept" data-name="'+esc(cn.name)+'" style="font-size:11px;padding:4px 10px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;">Simulate accept</button></div>':'')+
-      '</div></div>';
+    var cm=CM[cn.avatarColor]||CM.purple; var t=TR[cn.track]||TR.research; var r=RO[cn.role]||{n:cn.role||"Partner"};
+    h+="<div class=\"pit\">"+
+      "<div class=\"av\" style=\"width:40px;height:40px;font-size:13px;background:"+cm.bg+";color:"+cm.c+";\">"+cn.avatar+"</div>"+
+      "<div style=\"flex:1;\">"+
+        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cn.name+"</div>"+
+        "<div style=\"font-size:12px;color:#888;\">"+cn.school+" \u00b7 "+cn.country+"</div>"+
+        (cn.status==="accepted"?"<div style=\"font-size:11px;color:#3B6D11;margin-top:3px;font-weight:600;\">\u2713 Connected</div>":
+          "<div style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;margin-top:3px;font-weight:500;\">Pending</div>")+
+      "</div>"+
+      "<div style=\"text-align:right;\">"+
+        "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+r.n+"</span>"+
+        (cn.status!=="accepted"?"<div style=\"margin-top:5px;\"><button class=\"simb\" data-name=\""+esc(cn.name)+"\" style=\"font-size:11px;padding:4px 10px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;\">Simulate accept</button></div>":"")+
+      "</div>"+
+    "</div>";
   });
   return h;
 }
-function bindConnEvents(){
-  document.querySelectorAll('.sim-accept').forEach(function(b){
-    b.addEventListener('click',function(){
-      var n=this.dataset.name;var cn=CONNS.find(function(c){return c.name===n;});if(cn)cn.status='accepted';
-      showTab('conns');alert(n+' accepted your request!\n\nIn the full app you\'d both receive a shared project board with tasks, milestones, file sharing, and a verified message thread.');
+function bindCE(){
+  document.querySelectorAll(".simb").forEach(function(b){
+    b.addEventListener("click",function(){
+      var n=this.dataset.name;
+      var cn=CONNS.find(function(c){return c.name===n;});
+      if(cn) cn.status="accepted";
+      showTab("conns");
+      alert(n+" accepted!\n\nIn the full app you would both get a shared project board with tasks, milestones, and a verified message thread.");
     });
   });
 }
 
-function renderMeTab(){
-  var inits=S.name?S.name.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase():'?';
-  var t=TR[S.track]||{};var r=RO[S.role]||{};
+function meTab(){
+  var inits=S.name?S.name.split(" ").map(function(w){return w[0];}).join("").substring(0,2).toUpperCase():"?";
+  var t=TR[S.track]||{}; var r=RO[S.role]||{};
   var tags=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).slice(0,6).map(function(k){
-    var lv=S.skillLevels[k];return '<span class="tag" style="background:'+(LBGS[lv]||'#F1EFE8')+';color:'+(LTCS[lv]||'#666')+';">'+k+' · '+lv+'</span>';
-  }).join('');
-  tags+=(S.comps||[]).map(function(c){return '<span class="tag" style="background:'+(t.bg||'')+';color:'+(t.tc||'')+';">'+c+'</span>';}).join('');
-  return '<div class="card">'+
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'+
-      '<div class="av" style="width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;">'+inits+'</div>'+
-      '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:#1a1a1a;">'+esc(S.name)+'</div><div style="font-size:12px;color:#888;">'+esc(S.school)+', '+esc(S.country)+' · '+esc(S.grade)+'</div></div>'+
-      '<div style="text-align:right;"><div style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:'+(t.bg||'')+';color:'+(t.tc||'')+';">'+(t.n||'')+'</div>'+
-      '<div style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;margin-top:3px;display:inline-block;">'+(r.n||S.role||'')+'</div></div>'+
-    '</div>'+
-    '<div class="tags">'+tags+'</div>'+
-    '<div style="font-size:13px;color:#888;font-style:italic;margin-top:4px;">'+(S.idea||'Open to ideas')+'</div>'+
-  '</div>'+
-  '<button class="bp" id="reset-btn" style="background:#f8f8f6;color:#666;border:1px solid #ddd;">Start over</button>';
+    var lv=S.skillLevels[k];
+    return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+k+" \u00b7 "+lv+"</span>";
+  }).join("");
+  tags+=(S.comps||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+(c||"")+"</span>";}).join("");
+  return "<div class=\"card\">"+
+    "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
+      "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
+      "<div style=\"flex:1;\"><div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+esc(S.name)+"</div><div style=\"font-size:12px;color:#888;\">"+esc(S.school)+", "+esc(S.country)+" \u00b7 "+esc(S.grade)+"</div></div>"+
+      "<div style=\"text-align:right;\">"+
+        "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
+        "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;margin-top:3px;display:inline-block;\">"+(r.n||"")+"</div>"+
+      "</div>"+
+    "</div>"+
+    "<div class=\"tags\">"+tags+"</div>"+
+    "<div style=\"font-size:13px;color:#888;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
+  "</div>"+
+  "<button class=\"bp\" id=\"rst\" style=\"background:#f8f8f6;color:#666;border:1px solid #ddd;\">Start over</button>";
 }
 
+// ── Skill search ───────────────────────────
 async function srchSkill(skill){
-  var el=document.getElementById('sr');if(!el)return;
-  el.innerHTML='<div style="text-align:center;padding:1.5rem;"><div class="spin" style="margin:0 auto 0.5rem;"></div><div style="font-size:13px;color:#888;">Finding students with '+esc(skill)+'...</div></div>';
-  var p='Generate 4 fictional high school students globally with "'+skill+'" expertise. Diverse countries. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),availability,status(has project|open to joining|has idea|exploring),bio(1-2 sentences),keySkill,keyLevel(Beginner/Intermediate/Advanced/Expert),otherSkills(array 2-3),competitions(1-2),portfolio(URL or null). Return ONLY valid JSON: {"results":[...]}';
+  var el=document.getElementById("sr"); if(!el) return;
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#888;\">Searching for "+esc(skill)+"...</div></div>";
+  var p="Generate 4 fictional high school students globally who are strong in \""+skill+"\". Diverse countries and backgrounds. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),availability,status(has project|open to joining|has idea|exploring),bio(2 sentences that explain what they are building or looking for),keySkill,keyLevel(Beginner/Intermediate/Advanced/Expert),otherSkills(array 2-3),competitions(array 1-2),portfolio(realistic URL or null). Return ONLY valid JSON: {\"results\":[...]}";
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,messages:[{role:'user',content:p}]})});
+    var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:p}]})});
+    if(!res.ok) throw new Error("status "+res.status);
     var d=await res.json();
-    var parsed=JSON.parse(d.content.map(function(b){return b.text||'';}).join('').replace(/```json|```/g,'').trim());
-    var sbgs={'has project':'#EEEDFE','open to joining':'#EAF3DE','has idea':'#FAEEDA','exploring':'#F1EFE8'};
-    var stcs={'has project':'#3C3489','open to joining':'#3B6D11','has idea':'#854F0B','exploring':'#5F5E5A'};
-    var h='<div style="font-size:13px;color:#888;margin-bottom:10px;"><strong style="color:#1a1a1a;">'+(parsed.results||[]).length+'</strong> students found with '+esc(skill)+'</div>';
-    (parsed.results||[]).forEach(function(r){
-      var cm2=CM[r.avatarColor]||CM.purple;var t2=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role,i:'ti-user'};
-      var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().includes(k);})||'exploring';
-      var others=(r.otherSkills||[]).map(function(s){return '<span class="tag">'+s+'</span>';}).join('');
-      h+='<div class="card" style="display:flex;gap:12px;align-items:flex-start;">'+
-        '<div class="av" style="width:42px;height:42px;font-size:13px;background:'+cm2.bg+';color:'+cm2.c+';flex-shrink:0;">'+r.avatar+'</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:2px;"><span style="font-size:14px;font-weight:600;color:#1a1a1a;">'+r.name+'</span><span style="font-size:11px;padding:2px 8px;border-radius:20px;background:'+(sbgs[sk]||'#F1EFE8')+';color:'+(stcs[sk]||'#666')+';font-weight:500;">'+r.status+'</span></div>'+
-          '<div style="font-size:12px;color:#888;margin-bottom:4px;">'+r.school+' · '+r.country+' · '+r.grade+'</div>'+
-          '<div style="font-size:12px;color:#666;margin-bottom:6px;line-height:1.4;">'+r.bio+'</div>'+
-          '<div class="tags" style="margin-bottom:6px;"><span class="tag" style="background:'+(LBGS[r.keyLevel]||'#EEEDFE')+';color:'+(LTCS[r.keyLevel]||'#3C3489')+';font-weight:600;">'+r.keySkill+' · '+r.keyLevel+'</span>'+others+'<span class="tag" style="background:#EEEDFE;color:#534AB7;"><i class="ti '+ro.i+'" style="font-size:11px;vertical-align:-1px;margin-right:2px;" aria-hidden="true"></i>'+ro.n+'</span></div>'+
-          '<div style="display:flex;gap:6px;"><button class="bc" style="background:'+t2.c+';padding:6px 12px;font-size:12px;" onclick="alert(\'Connect flow — write your intro message.\')">Connect →</button>'+
-          (r.portfolio?'<a href="https://'+r.portfolio+'" style="font-size:12px;color:'+t2.c+';text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;" target="_blank"><i class="ti ti-external-link" style="font-size:12px;" aria-hidden="true"></i>Portfolio</a>':'')+
-          '</div>'+
-        '</div></div>';
-    });
-    el.innerHTML=h;
-  }catch(e){if(el)el.innerHTML='<div style="padding:1.5rem;text-align:center;color:#888;">Search failed — try again.</div>';}
+    if(d.error) throw new Error("api error");
+    var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
+    renderSR(JSON.parse(txt).results||[],skill);
+  } catch(e){ renderSR(demoSR(skill),skill); }
 }
 
+function demoSR(skill){
+  var sl=skill.toLowerCase();
+  var code=sl.indexOf("python")>=0||sl.indexOf("code")>=0||sl.indexOf("machine")>=0||sl.indexOf("ai")>=0||sl.indexOf("cto")>=0||sl.indexOf("tech")>=0||sl.indexOf("cs")>=0||sl.indexOf("engineer")>=0;
+  var bio=sl.indexOf("bio")>=0||sl.indexOf("chem")>=0||sl.indexOf("science")>=0||sl.indexOf("research")>=0||sl.indexOf("lab")>=0;
+  var biz=sl.indexOf("business")>=0||sl.indexOf("market")>=0||sl.indexOf("ceo")>=0||sl.indexOf("startup")>=0||sl.indexOf("founder")>=0||sl.indexOf("finance")>=0||sl.indexOf("venture")>=0;
+  if(code) return[
+    {name:"Yuki Tanaka",school:"Kaisei High School",country:"Japan",grade:"11th grade",avatar:"YT",avatarColor:"blue",track:"tech",role:"tech_r",availability:"10 hrs/week",status:"has project",bio:"Builds ML models for environmental monitoring and won Japan's National Informatics Olympiad. Looking for a CEO or vision partner who can drive the direction of his ISEF project.",keySkill:skill,keyLevel:"Expert",otherSkills:["Data Analysis","TensorFlow","Mathematics"],competitions:["Regeneron ISEF","IOI"],portfolio:"github.com/yuki-tanaka-ml"},
+    {name:"Priya Sharma",school:"Delhi Public School",country:"India",grade:"12th grade",avatar:"PS",avatarColor:"teal",track:"research",role:"tech_r",availability:"12 hrs/week",status:"open to joining",bio:"Bioinformatics specialist who built a protein-folding model and placed top 5 at India's Science Talent Search. Open to joining a strong research team.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Bioinformatics","R / Statistics","Biology"],competitions:["iGEM","Regeneron ISEF"],portfolio:"github.com/priya-bio-ml"},
+    {name:"Amir Hassan",school:"STEM High School",country:"Egypt",grade:"11th grade",avatar:"AH",avatarColor:"purple",track:"tech",role:"tech_r",availability:"8 hrs/week",status:"has idea",bio:"Full-stack developer who built a platform connecting 500+ students with tutors. Has an EdTech startup idea and is looking for a business-minded co-founder.",keySkill:skill,keyLevel:"Advanced",otherSkills:["React","Node.js","Product Design"],competitions:["Hackathon MLH","Congressional App Challenge"],portfolio:"github.com/amir-builds"},
+    {name:"Sofia Reyes",school:"UNAM Prepa",country:"Mexico",grade:"10th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"tech_r",availability:"6 hrs/week",status:"open to joining",bio:"Builds civic tech for underserved communities. Won a national coding competition for an inventory app helping street vendors. Looking for a social impact project.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["JavaScript","Community Research","Spanish"],competitions:["Hackathon MLH","Blue Ocean Competition"],portfolio:"github.com/sofia-civic-tech"}
+  ];
+  if(bio) return[
+    {name:"Amara Diallo",school:"Lycee Technique",country:"Senegal",grade:"12th grade",avatar:"AD",avatarColor:"green",track:"research",role:"res_r",availability:"10 hrs/week",status:"has project",bio:"Researching malaria drug resistance using CRISPR. Has wet lab skills and needs a data scientist or coder to complete her iGEM team.",keySkill:skill,keyLevel:"Expert",otherSkills:["CRISPR","Lab Techniques","French"],competitions:["iGEM","Regeneron ISEF"],portfolio:null},
+    {name:"James Park",school:"Seoul Science High",country:"South Korea",grade:"11th grade",avatar:"JP",avatarColor:"blue",track:"research",role:"res_r",availability:"14 hrs/week",status:"has project",bio:"Co-authored a paper on antibiotic resistance at 16. Preparing an ISEF submission on gut microbiome diversity. Needs a data analysis or writing partner.",keySkill:skill,keyLevel:"Expert",otherSkills:["Biochemistry","Statistics","Korean"],competitions:["Regeneron ISEF","Science Olympiad"],portfolio:"github.com/james-park-bio"},
+    {name:"Fatima Al-Rashid",school:"King Abdullah Academy",country:"Saudi Arabia",grade:"11th grade",avatar:"FA",avatarColor:"purple",track:"impact",role:"res_r",availability:"8 hrs/week",status:"has idea",bio:"Environmental science researcher focused on water sustainability. Won her regional science fair. Looking for a partner to co-develop a Conrad Challenge submission.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Environmental Science","Arabic","Chemistry"],competitions:["Conrad Challenge","Regeneron ISEF"],portfolio:null},
+    {name:"Lena Mueller",school:"Max Planck Gymnasium",country:"Germany",grade:"12th grade",avatar:"LM",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Neuroscience enthusiast who has shadowed at a research lab for two summers. Looking for a co-researcher and project to apply her analytical skills.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Neuroscience","German","Statistics"],competitions:["Regeneron STS Prep","Science Olympiad"],portfolio:null}
+  ];
+  if(biz) return[
+    {name:"Marcus Webb",school:"Design Tech HS",country:"United States",grade:"10th grade",avatar:"MW",avatarColor:"blue",track:"business",role:"vision",availability:"10 hrs/week",status:"has project",bio:"Launched a tutoring marketplace with 300+ users as a sophomore. Has a new startup idea and is looking for a technical co-founder to build it with him.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Product Strategy","Fundraising","Marketing"],competitions:["Conrad Challenge","Diamond Challenge"],portfolio:"linkedin.com/in/marcus-webb"},
+    {name:"Chioma Obi",school:"Corona Secondary School",country:"Nigeria",grade:"12th grade",avatar:"CO",avatarColor:"green",track:"business",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Grew her school's social enterprise from 10 to 500 customers in 6 months. Has an agri-tech startup idea and needs a technical and operations co-founder.",keySkill:skill,keyLevel:"Expert",otherSkills:["Social Media","Brand Strategy","Yoruba"],competitions:["Blue Ocean Competition","SAGE World Cup"],portfolio:"instagram.com/chioma.creates"},
+    {name:"Arjun Mehta",school:"Delhi Public School",country:"India",grade:"11th grade",avatar:"AM",avatarColor:"purple",track:"business",role:"ops",availability:"12 hrs/week",status:"open to joining",bio:"Finance and operations expert whose model portfolio outperformed the Sensex by 18%. Open to joining a strong founding team as the finance and ops co-founder.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Financial Modeling","Operations","Hindi"],competitions:["Wharton Investment Competition","DECA ICDC"],portfolio:"github.com/arjun-fintech"},
+    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Expert writer and public speaker who pitched to the French Senate at 16. Has a social enterprise idea and needs a technical co-founder to build the product.",keySkill:skill,keyLevel:"Expert",otherSkills:["Public Speaking","French","Research"],competitions:["Diamond Challenge","Conrad Challenge"],portfolio:"leadubois.fr"}
+  ];
+  return[
+    {name:"Nina Kovac",school:"Gimnazija Bezigrad",country:"Slovenia",grade:"12th grade",avatar:"NK",avatarColor:"purple",track:"arts",role:"creative",availability:"8 hrs/week",status:"has project",bio:"Award-winning designer who created the visual identity for her city's youth council. Has a creative project and is looking for a writer or researcher to collaborate with.",keySkill:skill,keyLevel:"Expert",otherSkills:["Illustration","Branding","Slovenian"],competitions:["YoungArts","Scholastic Art Award"],portfolio:"ninakovac.design"},
+    {name:"David Osei",school:"Achimota School",country:"Ghana",grade:"12th grade",avatar:"DO",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Placed 2nd in the John Locke Essay Competition. Strong analytical writer looking for a research project or team where he can apply his skills.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Philosophy","Writing","Twi"],competitions:["John Locke Essay","Conrad Challenge"],portfolio:null},
+    {name:"Mei Lin",school:"Shanghai High School",country:"China",grade:"11th grade",avatar:"ML",avatarColor:"blue",track:"tech",role:"tech_r",availability:"12 hrs/week",status:"has idea",bio:"Builder with three apps on the app store who wants to work on something with real social impact. Looking for a Vision partner who has the idea and mission.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Swift","UI Design","Mandarin"],competitions:["Congressional App Challenge","Hackathon MLH"],portfolio:"github.com/mei-builds"},
+    {name:"Rania Khalil",school:"AUC School",country:"Egypt",grade:"11th grade",avatar:"RK",avatarColor:"coral",track:"impact",role:"vision",availability:"6 hrs/week",status:"has idea",bio:"Social entrepreneur who launched a literacy program reaching 200+ students. Wants to scale it into a SAGE World Cup submission and needs a tech and ops partner.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["Arabic","Community Organizing","Public Speaking"],competitions:["SAGE World Cup","Diamond Challenge Social"],portfolio:null}
+  ];
+}
+
+function renderSR(results,skill){
+  var el=document.getElementById("sr"); if(!el) return;
+  var sbgs={"has project":"#EEEDFE","open to joining":"#EAF3DE","has idea":"#FAEEDA","exploring":"#F1EFE8"};
+  var stcs={"has project":"#3C3489","open to joining":"#3B6D11","has idea":"#854F0B","exploring":"#5F5E5A"};
+  if(!results||!results.length){el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#888;\">No results \u2014 try a different search.</div>";return;}
+  var h="<div style=\"font-size:13px;color:#888;margin-bottom:12px;\"><strong style=\"color:#1a1a1a;\">"+results.length+"</strong> students found matching <strong style=\"color:#1a1a1a;\">"+esc(skill)+"</strong></div>";
+  results.forEach(function(r){
+    var cm=CM[r.avatarColor]||CM.purple; var t=TR[r.track]||TR.research; var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
+    var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().indexOf(k)>=0;})||"exploring";
+    var others=(r.otherSkills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
+    h+="<div class=\"card\" style=\"display:flex;gap:12px;align-items:flex-start;\">"+
+      "<div class=\"av\" style=\"width:42px;height:42px;font-size:13px;background:"+cm.bg+";color:"+cm.c+";flex-shrink:0;\">"+r.avatar+"</div>"+
+      "<div style=\"flex:1;min-width:0;\">"+
+        "<div style=\"display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:3px;\">"+
+          "<span style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+r.name+"</span>"+
+          "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+r.status+"</span>"+
+        "</div>"+
+        "<div style=\"font-size:12px;color:#888;margin-bottom:5px;\">"+r.school+" \u00b7 "+r.country+" \u00b7 "+r.grade+"</div>"+
+        "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.5;\">"+r.bio+"</div>"+
+        "<div class=\"tags\" style=\"margin-bottom:8px;\">"+
+          "<span class=\"tag\" style=\"background:"+(LB[r.keyLevel]||"#EEEDFE")+";color:"+(LT[r.keyLevel]||"#3C3489")+";font-weight:600;\">"+r.keySkill+" \u00b7 "+r.keyLevel+"</span>"+
+          others+
+          "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+ro.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+ro.n+"</span>"+
+          "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
+        "</div>"+
+        "<div style=\"display:flex;gap:8px;\">"+
+          "<button class=\"bc\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\" onclick=\"alert('Connect with "+r.name+" \u2014 write your intro message.')\">Connect \u2192</button>"+
+          (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
+        "</div>"+
+      "</div>"+
+    "</div>";
+  });
+  el.innerHTML=h;
+}
+
+// ── Fallback data ──────────────────────────
 function fallback(){
-  var t=TR[S.track]||TR.research,r=RO[S.role]||RO.res_r;
+  var r2=RO[S.role]||RO.res_r;
   MATCHES=[
-    {name:'Priya Sharma',school:'Delhi Public School',country:'India',grade:'11th grade',avatar:'PS',avatarColor:'teal',track:S.track||'research',role:'tech_r',skillsWithLevels:{'Python':'Expert','Machine Learning':'Advanced','Biology':'Intermediate','Data Analysis':'Advanced'},competitions:['Regeneron ISEF','iGEM'],matchScore:94,why:'Priya is an Expert Python developer whose Tech/CTO role directly complements your '+r.n+' — she builds what you envision. Her Advanced ML skills match your project\'s data pipeline needs, and you share the same ISEF target at competition-ready commitment.',projectIdea:'ML model for early Alzheimer\'s detection from EEG signals',commitment:'Competition-ready',availability:'12 hrs/week',timezone:'IST (UTC+5:30)',isNearby:false,languages:['English','Hindi'],status:'has project',stage:'building',bio:'Priya is a junior at Delhi Public School passionate about computational neuroscience. She interned at IIT Delhi\'s bioinformatics lab and won India\'s National Science Fair with a microbiome study.',experience:[{title:'IIT Delhi Bioinformatics Internship',desc:'Built protein-folding prediction models in Python and PyTorch over 8 weeks.'},{title:'India National Science Fair — 1st Place',desc:'Research on microbiome diversity across 6 Indian cities, first place in biology.'},{title:'Google Girls Code',desc:'Built a disease-prediction web app now used by 200+ students.'}],awards:['India National Science Fair 1st place 2024','Google Girls Code participant 2024'],portfolio:'github.com/priya-sharma-ds',lookingFor:'I need a '+r.n+' who can lead scientific direction and handle judge presentations for our ISEF project. I build all code — you drive the research design and communication.'},
-    {name:'Marcus Webb',school:'Design Tech HS',country:'United States',grade:'10th grade',avatar:'MW',avatarColor:'blue',track:'tech',role:'ops',skillsWithLevels:{'Engineering':'Advanced','Project Management':'Intermediate','CAD':'Advanced','Hardware Design':'Intermediate'},competitions:['Conrad Challenge','FIRST Robotics'],matchScore:89,why:'Marcus\'s Ops/COO role keeps projects on schedule while you lead the research — a perfect division of labour. His Advanced engineering skills complement your analytical focus and you both target Conrad Challenge this cycle.',projectIdea:'IoT water quality sensor network for rural schools',commitment:'Serious',availability:'10 hrs/week, weekends',timezone:'PT (UTC-8)',isNearby:true,languages:['English'],status:'has project',stage:'planning',bio:'Marcus taught himself CAD and hardware prototyping through maker spaces and is passionate about making technology accessible in under-resourced schools.',experience:[{title:'FIRST Robotics Regional — 3rd place',desc:'Led team logistics and hardware assembly for his school\'s FRC robot competition.'},{title:'Conrad Challenge Semifinalist 2024',desc:'Solar-powered water purification device concept reached the semifinal round.'},{title:'School Maker Space Lead',desc:'Organizes weekly build sessions for 30+ students and teaches CAD basics.'}],awards:['FIRST Robotics Regional 3rd place 2024'],portfolio:'github.com/marcus-webb-builds',lookingFor:'I need a Research or Vision partner for scientific writing and data analysis on our Conrad project. I manage all timelines, hardware, and logistics. Must be available weekends.'},
-    {name:'Léa Dubois',school:'Lycée Henri IV',country:'France',grade:'Terminale (Year 13)',avatar:'LD',avatarColor:'coral',track:'impact',role:'mktg',skillsWithLevels:{'Writing / Research':'Expert','Public Speaking':'Advanced','French':'Expert','Spanish':'Advanced'},competitions:['Diamond Challenge','WSI Impact League'],matchScore:86,why:'Léa\'s Expert writing and Advanced public speaking as Marketing/CMO fills the exact gap a '+r.n+' needs — she translates your work into pitches that win international judges. Her French and Spanish fluency opens competitions across Europe and Latin America.',projectIdea:'Multilingual climate policy communication platform for EU students',commitment:'Serious',availability:'8 hrs/week evenings',timezone:'CET (UTC+1)',isNearby:false,languages:['French','English','Spanish'],status:'has idea',stage:'spark',bio:'Léa is a top student at one of France\'s most prestigious lycées with two published essays and Best Delegate at the European Youth Parliament.',experience:[{title:'European Youth Parliament — Best Delegate',desc:'Represented France at EYP Brussels, winning Best Delegate among 200 delegates.'},{title:'French National Philosophy Essay Prize',desc:'Runner-up for essay on AI ethics, published in academic journal.'},{title:'Le Monde Research Internship',desc:'Research assistant on the environment desk for 6 weeks, co-authored 2 published pieces.'}],awards:['EYP Best Delegate 2023','French National Philosophy Essay Prize runner-up 2024'],portfolio:'leadubois.fr',lookingFor:'Looking for a Research Lead or Tech partner to build the data backbone of our climate project. I handle all pitching, writing, and outreach in English, French, and Spanish.'}
+    {name:"Priya Sharma",school:"Delhi Public School",country:"India",grade:"11th grade",avatar:"PS",avatarColor:"teal",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Expert","Machine Learning":"Advanced",Biology:"Intermediate","Data Analysis":"Advanced"},competitions:["Regeneron ISEF","iGEM"],matchScore:94,why:"Priya's Expert Python and Tech/CTO role directly complements your "+r2.n+". Her Advanced ML skills match your data pipeline needs exactly.",projectIdea:"ML model for early Alzheimers detection from EEG signals",commitment:"Competition-ready",availability:"12 hrs/week",timezone:"IST (UTC+5:30)",isNearby:false,languages:["English","Hindi"],status:"has project",stage:"building",bio:"Priya is a junior at Delhi Public School passionate about computational neuroscience. She interned at IIT Delhi and won India's National Science Fair.",experience:[{title:"IIT Delhi Bioinformatics Internship",desc:"Built protein-folding prediction models in Python and PyTorch."},{title:"India National Science Fair 1st Place",desc:"Research on microbiome diversity across 6 Indian cities."},{title:"Google Girls Code",desc:"Built a disease-prediction web app used by 200+ students."}],awards:["India National Science Fair 1st place 2024"],portfolio:"github.com/priya-sharma-ds",lookingFor:"I need a "+r2.n+" who can lead scientific direction and handle judge presentations. I build all code."},
+    {name:"Marcus Webb",school:"Design Tech HS",country:"United States",grade:"10th grade",avatar:"MW",avatarColor:"blue",track:"tech",role:"ops",skillsWithLevels:{Engineering:"Advanced","Project Management":"Intermediate",CAD:"Advanced"},competitions:["Conrad Challenge","FIRST Robotics"],matchScore:89,why:"Marcus keeps projects on schedule while you lead the research. His Advanced engineering complements your analytical focus.",projectIdea:"IoT water quality sensor for rural schools",commitment:"Serious",availability:"10 hrs/week weekends",timezone:"PT (UTC-8)",isNearby:true,languages:["English"],status:"has project",stage:"planning",bio:"Marcus taught himself CAD through maker spaces. Passionate about technology accessibility in under-resourced schools.",experience:[{title:"FIRST Robotics Regional 3rd place",desc:"Led team logistics and hardware assembly."},{title:"Conrad Challenge Semifinalist 2024",desc:"Solar-powered water purification device reached semifinal round."},{title:"School Maker Space Lead",desc:"Organizes weekly build sessions for 30+ students."}],awards:["FIRST Robotics Regional 3rd place 2024"],portfolio:"github.com/marcus-webb-builds",lookingFor:"Need a Research or Vision partner for scientific writing and data analysis. Must be available weekends."},
+    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale (Year 13)",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills the gap a "+r2.n+" needs. She turns your work into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week evenings",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a Research Lead or Tech partner. I handle all pitching in three languages."}
   ];
   PROJECTS=[
-    {title:'AI tutoring app for rural schools',description:'Need a '+r.n+' to lead research and content direction for our Conrad Challenge submission.',neededRole:S.role||'res_r',skills:['Curriculum Design','Research'],competition:'Conrad Challenge',spots:2,authorName:'Jordan Lee',authorSchool:'Stuyvesant HS',authorCountry:'United States',track:'tech',posted:'2 days ago',matchReason:'Your '+r.n+' role and skill levels are exactly the gap this team needs.',stage:'building'},
-    {title:'Microplastics in local waterways',description:'Need a '+r.n+' to lead data analysis and write the ISEF submission for our 6-month water quality study.',neededRole:S.role||'res_r',skills:['Statistics','Research Writing'],competition:'Regeneron ISEF',spots:1,authorName:'Sofia Reyes',authorSchool:'Albuquerque HS',authorCountry:'United States',track:'research',posted:'5 days ago',matchReason:'Your analytical skills match what we need to process 6 months of water sample data.',stage:'building'},
-    {title:'Social enterprise for rural education',description:'Co-founder team needs a '+r.n+' to complete our Diamond Challenge pitch.',neededRole:S.role||'res_r',skills:['Research','Business Strategy'],competition:'Diamond Challenge',spots:1,authorName:'Amara Diallo',authorSchool:'Accra Academy',authorCountry:'Ghana',track:'impact',posted:'1 week ago',matchReason:'We have pitch and ops covered — we specifically need your research credibility.',stage:'planning'}
+    {title:"AI tutoring app for rural schools",description:"Need a "+r2.n+" to lead research and content for our Conrad Challenge submission.",neededRole:S.role||"res_r",skills:["Curriculum Design","Research"],competition:"Conrad Challenge",spots:2,authorName:"Jordan Lee",authorSchool:"Stuyvesant HS",authorCountry:"United States",track:"tech",posted:"2 days ago",matchReason:"Your role and skill levels are exactly the gap this team needs.",stage:"building"},
+    {title:"Microplastics in local waterways",description:"Need a "+r2.n+" to lead data analysis and write the ISEF submission.",neededRole:S.role||"res_r",skills:["Statistics","Research Writing"],competition:"Regeneron ISEF",spots:1,authorName:"Sofia Reyes",authorSchool:"Albuquerque HS",authorCountry:"United States",track:"research",posted:"5 days ago",matchReason:"Your analytical skills match what we need.",stage:"building"},
+    {title:"Social enterprise for rural education",description:"Co-founder team needs a "+r2.n+" to complete our Diamond Challenge pitch.",neededRole:S.role||"res_r",skills:["Research","Business Strategy"],competition:"Diamond Challenge",spots:1,authorName:"Amara Diallo",authorSchool:"Accra Academy",authorCountry:"Ghana",track:"impact",posted:"1 week ago",matchReason:"We have pitch and ops covered. We need your research credibility.",stage:"planning"}
   ];
   COMPS_DATA=[
-    {name:'Regeneron ISEF',track:'research',description:"World's largest pre-college science competition across 21 STEM categories.",deadline:'Feb 1 2026',daysUntil:58,prize:'Up to $75,000',teamSize:'1-3',isRecommended:true,eligibility:'Global'},
-    {name:'Conrad Challenge',track:'business',description:'Innovation competition in aerospace, health, energy, and cyber categories.',deadline:'Jan 15 2026',daysUntil:41,prize:'Scholarships + grants',teamSize:'2-5',isRecommended:true,eligibility:'Global'},
-    {name:'Diamond Challenge',track:'impact',description:'Dual-track entrepreneurship competition — business and social innovation.',deadline:'Mar 1 2026',daysUntil:86,prize:'$10,000 + mentorship',teamSize:'2-4',isRecommended:false,eligibility:'Global ages 14-18'},
-    {name:'Hackathon (MLH)',track:'tech',description:'Weekend coding sprints — build and ship a project in 24-36 hours.',deadline:'Rolling',daysUntil:30,prize:'$500-$5,000',teamSize:'2-4',isRecommended:false,eligibility:'Global'},
-    {name:'Scholastic Art & Writing',track:'arts',description:"Nation's most prestigious teen writing and art recognition program.",deadline:'Dec 1 2025',daysUntil:166,prize:'Gold Key + scholarships',teamSize:'Prep partner',isRecommended:false,eligibility:'US & Canada'}
+    {name:"Regeneron ISEF",track:"research",description:"World's largest pre-college science competition.",deadline:"Feb 1 2026",daysUntil:58,prize:"Up to $75,000",teamSize:"1-3",isRecommended:true,eligibility:"Global"},
+    {name:"Conrad Challenge",track:"business",description:"Innovation in aerospace, health, energy, and cyber.",deadline:"Jan 15 2026",daysUntil:41,prize:"Scholarships and grants",teamSize:"2-5",isRecommended:true,eligibility:"Global"},
+    {name:"Diamond Challenge",track:"impact",description:"Dual-track entrepreneurship competition.",deadline:"Mar 1 2026",daysUntil:86,prize:"$10,000 and mentorship",teamSize:"2-4",isRecommended:false,eligibility:"Global ages 14-18"},
+    {name:"Hackathon MLH",track:"tech",description:"Weekend coding sprints, build and ship in 24-36 hours.",deadline:"Rolling",daysUntil:30,prize:"$500-$5,000",teamSize:"2-4",isRecommended:false,eligibility:"Global"},
+    {name:"Scholastic Art and Writing",track:"arts",description:"Nation's most prestigious teen writing and art recognition.",deadline:"Dec 1 2025",daysUntil:166,prize:"Gold Key and scholarships",teamSize:"Prep partner",isRecommended:false,eligibility:"US and Canada"}
   ];
-  goTo('matches');
+  goTo("matches");
 }
 
 function resetAll(){
-  S={name:'',email:'',school:'',country:'',zip:'',grade:'',languages:[],track:'',role:'',status:'',skillLevels:{},availability:'',github:'',stage:'',comps:[],idea:'',commit:'',location:''};
-  MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCat='all';activeCats=[];
-  goTo('welcome');
+  S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
+  MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
+  goTo("welcome");
 }
 
-goTo('welcome');
+goTo("welcome");
 </script>
 </body>
 </html>
