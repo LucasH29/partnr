@@ -101,6 +101,15 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .pit{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0ec;}
 .pit:last-child{border-bottom:none;}
 .hint{font-size:12px;color:#888;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-bottom:8px;line-height:1.5;}
+
+.fi input.err,.fi select.err,.fi textarea.err{border-color:#E53E3E;background:#FFF5F5;}
+.fi input.err:focus,.fi select.err:focus{outline:none;border-color:#E53E3E;box-shadow:0 0 0 3px rgba(229,62,62,0.15);}
+.field-err{font-size:12px;color:#E53E3E;margin-top:4px;display:flex;align-items:center;gap:4px;}
+.field-err i{font-size:12px;flex-shrink:0;}
+.fi label.err-label{color:#E53E3E;}
+.sec-err{font-size:13px;color:#E53E3E;background:#FFF5F5;border:1px solid #FEB2B2;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.tc.err{border-color:#E53E3E !important;background:#FFF5F5;}
+.rc.err{border-color:#E53E3E !important;background:#FFF5F5;}
 </style>
 </head>
 <body>
@@ -108,7 +117,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
+var S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
 // ── Countries without zip codes ────────────
@@ -117,26 +126,66 @@ function hasZip(co){return NO_ZIP.indexOf(co)<0;}
 
 // ── Country language mapping ────────────────
 var COUNTRY_LANGS={
-  "Ethiopia":["Amharic"],"Nigeria":["Yoruba","Igbo","Hausa","English"],"Ghana":["English"],
-  "Kenya":["Swahili","English"],"Tanzania":["Swahili","English"],"Uganda":["English","Swahili"],
-  "Senegal":["French"],"Cameroon":["French","English"],"Congo":["French"],
-  "Morocco":["Arabic","French"],"Algeria":["Arabic","French"],"Tunisia":["Arabic","French"],
-  "Egypt":["Arabic"],"Libya":["Arabic"],"Sudan":["Arabic"],"Saudi Arabia":["Arabic"],
-  "United Arab Emirates":["Arabic","English"],"Iraq":["Arabic"],"Jordan":["Arabic"],
-  "Lebanon":["Arabic","French"],"Syria":["Arabic"],"Yemen":["Arabic"],
-  "Israel":["Hebrew","Arabic","English"],"China":["Mandarin"],"Taiwan":["Mandarin"],
-  "Hong Kong":["Mandarin","English"],"Singapore":["English","Mandarin"],
+  // Africa
+  "Ethiopia":["Amharic"],"Nigeria":["Yoruba","Igbo","Hausa","English"],
+  "Ghana":["English"],"Kenya":["Swahili","English"],"Tanzania":["Swahili","English"],
+  "Uganda":["English","Swahili"],"Senegal":["French"],"Cameroon":["French","English"],
+  "Congo":["French"],"Morocco":["Arabic","French"],"Algeria":["Arabic","French"],
+  "Tunisia":["Arabic","French"],"Egypt":["Arabic"],"Libya":["Arabic"],"Sudan":["Arabic"],
+  "Mozambique":["Portuguese"],"Zambia":["English"],"Zimbabwe":["English"],
+  "Namibia":["English"],"Botswana":["English"],"Rwanda":["French","English"],
+  // Middle East
+  "Saudi Arabia":["Arabic"],"United Arab Emirates":["Arabic","English"],
+  "Iraq":["Arabic"],"Jordan":["Arabic"],"Lebanon":["Arabic","French"],
+  "Syria":["Arabic"],"Yemen":["Arabic"],"Oman":["Arabic"],"Kuwait":["Arabic"],
+  "Bahrain":["Arabic"],"Qatar":["Arabic"],"Palestine":["Arabic"],
+  "Israel":["Hebrew","Arabic","English"],
+  // Asia
+  "China":["Mandarin"],"Taiwan":["Mandarin"],"Hong Kong":["Mandarin","English"],
+  "Singapore":["English","Mandarin"],"Japan":["Japanese"],"South Korea":["Korean"],
   "India":["Hindi","Bengali","English"],"Bangladesh":["Bengali"],
-  "Japan":["Japanese"],"South Korea":["Korean"],"Brazil":["Portuguese"],
-  "Portugal":["Portuguese"],"Russia":["Russian"],"Ukraine":["Russian"],
-  "Germany":["German"],"Austria":["German"],"France":["French"],"Belgium":["French"],
-  "Spain":["Spanish"],"Mexico":["Spanish"],"Colombia":["Spanish"],"Argentina":["Spanish"],
+  "Pakistan":["Urdu","English"],"Sri Lanka":["English"],"Nepal":["English"],
+  "Indonesia":["Indonesian"],"Malaysia":["Malay","English"],
+  "Philippines":["Filipino","English"],"Thailand":["Thai"],"Vietnam":["Vietnamese"],
+  "Cambodia":["Khmer"],"Myanmar":["Burmese"],"Macau":["Mandarin","Portuguese"],
+  "Mongolia":["Mongolian"],
+  // Central Asia
+  "Kazakhstan":["Russian","Kazakh"],"Uzbekistan":["Uzbek","Russian"],
+  "Kyrgyzstan":["Kyrgyz","Russian"],"Tajikistan":["Tajik","Russian"],
+  "Turkmenistan":["Turkmen","Russian"],"Afghanistan":["Pashto","Dari"],
+  "Azerbaijan":["Azerbaijani","Russian"],"Armenia":["Armenian"],
+  "Georgia":["Georgian"],
+  // Europe - West
+  "United Kingdom":["English"],"Ireland":["English"],"France":["French"],
+  "Germany":["German"],"Austria":["German"],"Switzerland":["German","French","Italian"],
+  "Netherlands":["Dutch"],"Belgium":["French","Dutch"],"Luxembourg":["French","German"],
+  "Spain":["Spanish"],"Portugal":["Portuguese"],"Italy":["Italian"],"Malta":["English"],
+  "Sweden":["Swedish"],"Norway":["Norwegian"],"Denmark":["Danish"],
+  "Finland":["Finnish"],"Iceland":["Icelandic"],
+  // Europe - East
+  "Russia":["Russian"],"Ukraine":["Russian","Ukrainian"],"Belarus":["Russian"],
+  "Poland":["Polish"],"Czech Republic":["Czech"],"Slovakia":["Slovak"],
+  "Hungary":["Hungarian"],"Romania":["Romanian"],"Bulgaria":["Bulgarian"],
+  "Greece":["Greek"],"Serbia":["Serbian"],"Croatia":["Croatian"],
+  "Bosnia":["Bosnian"],"Slovenia":["Slovenian"],"Estonia":["Estonian"],
+  "Latvia":["Latvian"],"Lithuania":["Lithuanian"],"Moldova":["Romanian"],
+  "Albania":["Albanian"],"North Macedonia":["Macedonian"],"Kosovo":["Albanian"],
+  "Montenegro":["Montenegrin"],"Cyprus":["Greek","English"],
+  // Americas
+  "United States":["English"],"Canada":["English","French"],
+  "Mexico":["Spanish"],"Colombia":["Spanish"],"Argentina":["Spanish"],
   "Chile":["Spanish"],"Peru":["Spanish"],"Venezuela":["Spanish"],
-  "United States":["English"],"United Kingdom":["English"],"Canada":["English","French"],
-  "Australia":["English"],"New Zealand":["English"],"Ireland":["English"],
-  "South Africa":["English"],"Netherlands":["Dutch"],"Italy":["Italian"],
-  "Poland":["Polish"],"Sweden":["Swedish"],"Norway":["Norwegian"],
-  "Denmark":["Danish"],"Finland":["Finnish"]
+  "Brazil":["Portuguese"],"Ecuador":["Spanish"],"Bolivia":["Spanish"],
+  "Paraguay":["Spanish"],"Uruguay":["Spanish"],"Cuba":["Spanish"],
+  "Dominican Republic":["Spanish"],"Guatemala":["Spanish"],"Honduras":["Spanish"],
+  "El Salvador":["Spanish"],"Nicaragua":["Spanish"],"Costa Rica":["Spanish"],
+  "Panama":["Spanish"],"Trinidad and Tobago":["English"],"Jamaica":["English"],
+  "Haiti":["French","Haitian Creole"],
+  // Oceania
+  "Australia":["English"],"New Zealand":["English"],
+  // Other
+  "South Africa":["English"],"Turkey":["Turkish"],"Iran":["Persian"],
+  "Pakistan":["Urdu","English"]
 };
 
 var LANGS=["Amharic","Arabic","Bengali","French","German","Hebrew","Hindi","Igbo","Japanese","Korean","Mandarin","Portuguese","Russian","Spanish","Swahili","Yoruba","English"];
@@ -160,7 +209,7 @@ function renderLangSections(country,selected){
   var oDiv=document.getElementById("lang-other");
   var oLabel=document.getElementById("lang-other-label");
   if(!pDiv||!oDiv) return;
-  sDiv.style.display=primary.length>1?"":"none";
+  sDiv.style.display=primary.length>=1?"":"none";
   pDiv.innerHTML="";
   primary.forEach(function(lang){
     var c=document.createElement("div");c.className="chip";c.textContent=lang;
@@ -261,6 +310,41 @@ function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
 function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
+function showErr(id,msg){
+  var el=document.getElementById(id);
+  if(!el) return;
+  el.classList.add("err");
+  // Remove existing error message if any
+  var existing=el.parentNode.querySelector(".field-err");
+  if(existing) existing.remove();
+  var err=document.createElement("div");
+  err.className="field-err";
+  err.innerHTML='<i class="ti ti-alert-circle"></i>'+msg;
+  el.parentNode.appendChild(err);
+  el.addEventListener("input",function(){clearErr(id);},{once:true});
+  el.addEventListener("change",function(){clearErr(id);},{once:true});
+}
+function clearErr(id){
+  var el=document.getElementById(id);
+  if(!el) return;
+  el.classList.remove("err");
+  var existing=el.parentNode.querySelector(".field-err");
+  if(existing) existing.remove();
+}
+function showSecErr(id,msg){
+  var existing=document.getElementById("sec-err-"+id);
+  if(existing) existing.remove();
+  var div=document.createElement("div");
+  div.className="sec-err";div.id="sec-err-"+id;
+  div.innerHTML='<i class="ti ti-alert-circle" style="font-size:14px;flex-shrink:0;"></i>'+msg;
+  var target=document.getElementById(id);
+  if(target) target.parentNode.insertBefore(div,target);
+}
+function scrollToFirstErr(){
+  var first=document.querySelector(".err,.sec-err");
+  if(first) first.scrollIntoView({behavior:"smooth",block:"center"});
+}
+
 function mkChips(id,items,sel,single){
   var div=document.getElementById(id);
   if(!div) return;
@@ -322,7 +406,7 @@ function rSignup(){
     "<div class=\"fi\"><label>High school name</label><input id=\"ischool\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/></div>"+
     "<div class=\"fi\"><label>Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
     "<div id=\"zipwrap\" style=\""+(hasZip(co)?"":"display:none;")+"\">"+
-      "<div class=\"fi\"><label>Zip / Postal code <span style=\"font-weight:400;color:#aaa;\">(helps with regional matching)</span></label>"+
+      "<div class=\"fi\"><label>Zip / Postal code <span style=\"font-weight:400;color:#aaa;\">(optional — helps with regional matching)</span></label>"+
       "<input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
     "</div>"+
     "<div class=\"fi\"><label>Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
@@ -357,10 +441,18 @@ function rSignup(){
     var all=document.querySelectorAll("#lang-primary .chip, #lang-other .chip");
     var ex=Array.from(all).find(function(c){return c.textContent.toLowerCase()===val.toLowerCase();});
     if(ex){ex.classList.add("on");inp.value="";return;}
-    var chip=document.createElement("div");chip.className="chip on";chip.textContent=val;
+    var chip=document.createElement("div");
+    chip.className="chip on";
+    chip.textContent=val;
+    chip.style.background="#EEEDFE";
+    chip.style.borderColor="#AFA9EC";
+    chip.style.color="#3C3489";
+    chip.style.fontWeight="500";
     chip.addEventListener("click",function(){chip.classList.toggle("on");});
-    document.getElementById("lang-other").appendChild(chip);
+    var oDiv=document.getElementById("lang-other");
+    if(oDiv){oDiv.appendChild(chip);}
     inp.value="";
+    inp.focus();
   });
   document.getElementById("langother").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("langaddbtn").click();}});
   document.getElementById("s2").addEventListener("click",step2);
@@ -407,10 +499,26 @@ function rTrack(){
     "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
     "<div class=\"slabel\">Status</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
+    "<div class=\"slabel\">Secondary interest <span style=\"font-weight:400;color:#aaa;text-transform:none;font-size:12px;letter-spacing:0;\">(optional — helps refine your matches)</span></div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:8px;\">Your primary track drives matching. Add a secondary interest if your project spans multiple areas.</div>"+
+    "<div class=\"cgrow\" id=\"secondary\"></div>"+
     "<button class=\"bp\" id=\"s3\" style=\"opacity:"+(S.track&&S.role?"1":"0.4")+"\">Continue \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
   mkChips("status",["I have a project \u2014 need partners","I have skills \u2014 open to joining","I have an idea \u2014 need co-founders","Just exploring"],[S.status],true);
+  var secTracks=Object.keys(TR).map(function(k){return TR[k].n;}).filter(function(n){return !S.track||n!==TR[S.track].n;});
+  mkChips("secondary",secTracks,[S.secondary||""],true);
+  // Update secondary when primary track changes
+  document.querySelectorAll(".tc").forEach(function(el){
+    el.addEventListener("click",function(){
+      // Rebuild secondary options excluding new primary
+      var newPrimary=this.dataset.val;
+      var secOpts=Object.keys(TR).filter(function(k){return k!==newPrimary;}).map(function(k){return TR[k].n;});
+      // Clear secondary if it matches new primary
+      if(S.secondary&&S.secondary===TR[newPrimary].n) S.secondary="";
+      mkChips("secondary",secOpts,[S.secondary||""],true);
+    });
+  });
   if(S.track){var e=document.querySelector("[data-val=\""+S.track+"\"]");if(e){e.classList.add("on");e.style.background=TR[S.track].bg;}}
   if(S.role){var e2=document.querySelector("[data-role=\""+S.role+"\"]");if(e2)e2.classList.add("on");}
   document.getElementById("s3").addEventListener("click",step3);
@@ -770,16 +878,47 @@ function step2(){
   var sc=document.getElementById("ischool").value.trim();
   var g=document.getElementById("igrade").value;
   var co=document.getElementById("icountry").value;
-  if(!n||!e||!sc||!g||!co){alert("Please fill in all required fields");return;}
+  var valid=true;
+  if(!n){showErr("iname","Please enter your name");valid=false;}
+  if(!e){showErr("iemail","Please enter your school email");valid=false;}
+  else if(!e.includes("@")){showErr("iemail","Please enter a valid email address");valid=false;}
+  if(!sc){showErr("ischool","Please enter your school name");valid=false;}
+  if(!g){showErr("igrade","Please select your grade");valid=false;}
+  if(!co){showErr("icountry","Please select your country");valid=false;}
+  if(!valid){scrollToFirstErr();return;}
   S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;
   var ze=document.getElementById("izip");S.zip=ze?ze.value.trim():"";
   S.languages=getAllSelectedLangs();
   goTo("track");
 }
-function step3(){if(!S.track||!S.role){alert("Please choose your track and role");return;}goTo("skills");}
+function step3(){
+  var valid=true;
+  if(!S.track){
+    showSecErr("tg","Please choose a track");valid=false;
+  }
+  if(!S.role){
+    showSecErr("rg","Please choose your role");valid=false;
+  }
+  if(!valid){scrollToFirstErr();return;}
+  // Save secondary interest if selected
+  var secSel=getChips("secondary");
+  S.secondary=secSel[0]||"";
+  goTo("skills");
+}
 function step4(){
   var rated=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];});
-  if(!rated.length){alert("Please select at least one skill");return;}
+  var needLevel=Object.keys(S.skillLevels).filter(function(k){
+    var cat=SKILL_CATS.find(function(c){return k.indexOf(c.id+":")===0;});
+    return cat&&cat.type==="level"&&!S.skillLevels[k];
+  });
+  if(!rated.length){
+    showSecErr("skill-cats","Please select and rate at least one skill — open any category above");
+    scrollToFirstErr();return;
+  }
+  if(needLevel.length){
+    showSecErr("ssum",""+needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level — tap Beginner, Intermediate, Advanced, or Expert");
+    scrollToFirstErr();return;
+  }
   S.availability=getChips("avail")[0]||"";
   S.github=document.getElementById("igh").value.trim();
   goTo("goals");
@@ -968,7 +1107,7 @@ function openModal(idx){
 
 function sendConn(){
   var msg=document.getElementById("mmsg").value.trim();
-  if(!msg){alert("Please write a short intro message");return;}
+  if(!msg){showErr("mmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
   var m=modalTarget>=0&&modalTarget<MATCHES.length?MATCHES[modalTarget]:null;
   var name=m?m.name:"Partner";
   if(m&&!CONNS.some(function(c){return c.name===name;}))
@@ -1209,7 +1348,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
+  S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   goTo("welcome");
 }
