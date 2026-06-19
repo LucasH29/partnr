@@ -126,69 +126,75 @@ function hasZip(co){return NO_ZIP.indexOf(co)<0;}
 
 // ── Country language mapping ────────────────
 var COUNTRY_LANGS={
-  // Africa
-  "Ethiopia":["Amharic"],"Nigeria":["Yoruba","Igbo","Hausa","English"],
-  "Ghana":["English"],"Kenya":["Swahili","English"],"Tanzania":["Swahili","English"],
-  "Uganda":["English","Swahili"],"Senegal":["French"],"Cameroon":["French","English"],
-  "Congo":["French"],"Morocco":["Arabic","French"],"Algeria":["Arabic","French"],
-  "Tunisia":["Arabic","French"],"Egypt":["Arabic"],"Libya":["Arabic"],"Sudan":["Arabic"],
-  "Mozambique":["Portuguese"],"Zambia":["English"],"Zimbabwe":["English"],
-  "Namibia":["English"],"Botswana":["English"],"Rwanda":["French","English"],
+  // Africa — official language(s) only
+  "Algeria":["Arabic"],"Angola":["Portuguese"],"Botswana":["English"],
+  "Burkina Faso":["French"],"Burundi":["French"],"Cameroon":["French","English"],
+  "Central African Republic":["French"],"Chad":["French","Arabic"],
+  "Congo":["French"],"Djibouti":["French","Arabic"],"Egypt":["Arabic"],
+  "Eritrea":["Arabic"],"Ethiopia":["Amharic"],"Gambia":["English"],
+  "Ghana":["English"],"Guinea":["French"],"Guinea-Bissau":["Portuguese"],
+  "Kenya":["English","Swahili"],"Libya":["Arabic"],"Madagascar":["French"],
+  "Malawi":["English"],"Mali":["French"],"Mauritania":["Arabic"],
+  "Morocco":["Arabic","French"],"Mozambique":["Portuguese"],"Namibia":["English"],
+  "Niger":["French"],"Nigeria":["English"],"Rwanda":["English","French"],
+  "Senegal":["French"],"Sierra Leone":["English"],"Somalia":["Arabic"],
+  "South Africa":["English"],"South Sudan":["English"],"Sudan":["Arabic"],
+  "Tanzania":["English","Swahili"],"Togo":["French"],"Tunisia":["Arabic"],
+  "Uganda":["English"],"Zambia":["English"],"Zimbabwe":["English"],
   // Middle East
-  "Saudi Arabia":["Arabic"],"United Arab Emirates":["Arabic","English"],
-  "Iraq":["Arabic"],"Jordan":["Arabic"],"Lebanon":["Arabic","French"],
-  "Syria":["Arabic"],"Yemen":["Arabic"],"Oman":["Arabic"],"Kuwait":["Arabic"],
-  "Bahrain":["Arabic"],"Qatar":["Arabic"],"Palestine":["Arabic"],
-  "Israel":["Hebrew","Arabic","English"],
+  "Bahrain":["Arabic"],"Iraq":["Arabic"],"Israel":["Hebrew","Arabic"],
+  "Jordan":["Arabic"],"Kuwait":["Arabic"],"Lebanon":["Arabic"],
+  "Oman":["Arabic"],"Palestine":["Arabic"],"Qatar":["Arabic"],
+  "Saudi Arabia":["Arabic"],"Syria":["Arabic"],
+  "United Arab Emirates":["Arabic"],"Yemen":["Arabic"],
   // Asia
-  "China":["Mandarin"],"Taiwan":["Mandarin"],"Hong Kong":["Mandarin","English"],
-  "Singapore":["English","Mandarin"],"Japan":["Japanese"],"South Korea":["Korean"],
-  "India":["Hindi","Bengali","English"],"Bangladesh":["Bengali"],
-  "Pakistan":["Urdu","English"],"Sri Lanka":["English"],"Nepal":["English"],
-  "Indonesia":["Indonesian"],"Malaysia":["Malay","English"],
-  "Philippines":["Filipino","English"],"Thailand":["Thai"],"Vietnam":["Vietnamese"],
-  "Cambodia":["Khmer"],"Myanmar":["Burmese"],"Macau":["Mandarin","Portuguese"],
-  "Mongolia":["Mongolian"],
+  "Afghanistan":["Dari"],"Bangladesh":["Bengali"],"Cambodia":["Khmer"],
+  "China":["Mandarin"],"Hong Kong":["Mandarin","English"],"India":["Hindi"],
+  "Indonesia":["Indonesian"],"Japan":["Japanese"],"Macau":["Mandarin","Portuguese"],
+  "Malaysia":["Malay"],"Mongolia":["Mongolian"],"Myanmar":["Burmese"],
+  "Nepal":["Nepali"],"Pakistan":["Urdu"],"Philippines":["Filipino","English"],
+  "Singapore":["English","Mandarin"],"South Korea":["Korean"],
+  "Sri Lanka":["Sinhala"],"Taiwan":["Mandarin"],"Thailand":["Thai"],
+  "Vietnam":["Vietnamese"],
   // Central Asia
-  "Kazakhstan":["Russian","Kazakh"],"Uzbekistan":["Uzbek","Russian"],
-  "Kyrgyzstan":["Kyrgyz","Russian"],"Tajikistan":["Tajik","Russian"],
-  "Turkmenistan":["Turkmen","Russian"],"Afghanistan":["Pashto","Dari"],
-  "Azerbaijan":["Azerbaijani","Russian"],"Armenia":["Armenian"],
-  "Georgia":["Georgian"],
+  "Armenia":["Armenian"],"Azerbaijan":["Azerbaijani"],"Georgia":["Georgian"],
+  "Kazakhstan":["Russian"],"Kyrgyzstan":["Kyrgyz"],"Tajikistan":["Tajik"],
+  "Turkmenistan":["Turkmen"],"Uzbekistan":["Uzbek"],
   // Europe - West
-  "United Kingdom":["English"],"Ireland":["English"],"France":["French"],
-  "Germany":["German"],"Austria":["German"],"Switzerland":["German","French","Italian"],
-  "Netherlands":["Dutch"],"Belgium":["French","Dutch"],"Luxembourg":["French","German"],
-  "Spain":["Spanish"],"Portugal":["Portuguese"],"Italy":["Italian"],"Malta":["English"],
-  "Sweden":["Swedish"],"Norway":["Norwegian"],"Denmark":["Danish"],
-  "Finland":["Finnish"],"Iceland":["Icelandic"],
+  "Austria":["German"],"Belgium":["French","Dutch"],"Cyprus":["Greek"],
+  "Denmark":["Danish"],"Finland":["Finnish"],"France":["French"],
+  "Germany":["German"],"Greece":["Greek"],"Iceland":["Icelandic"],
+  "Ireland":["English"],"Italy":["Italian"],"Luxembourg":["French","German"],
+  "Malta":["English"],"Netherlands":["Dutch"],"Norway":["Norwegian"],
+  "Portugal":["Portuguese"],"Spain":["Spanish"],"Sweden":["Swedish"],
+  "Switzerland":["German","French"],"United Kingdom":["English"],
   // Europe - East
-  "Russia":["Russian"],"Ukraine":["Russian","Ukrainian"],"Belarus":["Russian"],
-  "Poland":["Polish"],"Czech Republic":["Czech"],"Slovakia":["Slovak"],
-  "Hungary":["Hungarian"],"Romania":["Romanian"],"Bulgaria":["Bulgarian"],
-  "Greece":["Greek"],"Serbia":["Serbian"],"Croatia":["Croatian"],
-  "Bosnia":["Bosnian"],"Slovenia":["Slovenian"],"Estonia":["Estonian"],
+  "Albania":["Albanian"],"Belarus":["Russian"],"Bosnia":["Bosnian"],
+  "Bulgaria":["Bulgarian"],"Croatia":["Croatian"],"Czech Republic":["Czech"],
+  "Estonia":["Estonian"],"Hungary":["Hungarian"],"Kosovo":["Albanian"],
   "Latvia":["Latvian"],"Lithuania":["Lithuanian"],"Moldova":["Romanian"],
-  "Albania":["Albanian"],"North Macedonia":["Macedonian"],"Kosovo":["Albanian"],
-  "Montenegro":["Montenegrin"],"Cyprus":["Greek","English"],
+  "Montenegro":["Montenegrin"],"North Macedonia":["Macedonian"],"Poland":["Polish"],
+  "Romania":["Romanian"],"Russia":["Russian"],"Serbia":["Serbian"],
+  "Slovakia":["Slovak"],"Slovenia":["Slovenian"],"Turkey":["Turkish"],
+  "Ukraine":["Ukrainian"],
   // Americas
-  "United States":["English"],"Canada":["English","French"],
-  "Mexico":["Spanish"],"Colombia":["Spanish"],"Argentina":["Spanish"],
-  "Chile":["Spanish"],"Peru":["Spanish"],"Venezuela":["Spanish"],
-  "Brazil":["Portuguese"],"Ecuador":["Spanish"],"Bolivia":["Spanish"],
-  "Paraguay":["Spanish"],"Uruguay":["Spanish"],"Cuba":["Spanish"],
-  "Dominican Republic":["Spanish"],"Guatemala":["Spanish"],"Honduras":["Spanish"],
-  "El Salvador":["Spanish"],"Nicaragua":["Spanish"],"Costa Rica":["Spanish"],
-  "Panama":["Spanish"],"Trinidad and Tobago":["English"],"Jamaica":["English"],
-  "Haiti":["French","Haitian Creole"],
+  "Argentina":["Spanish"],"Bolivia":["Spanish"],"Brazil":["Portuguese"],
+  "Canada":["English","French"],"Chile":["Spanish"],"Colombia":["Spanish"],
+  "Costa Rica":["Spanish"],"Cuba":["Spanish"],"Dominican Republic":["Spanish"],
+  "Ecuador":["Spanish"],"El Salvador":["Spanish"],"Guatemala":["Spanish"],
+  "Haiti":["French"],"Honduras":["Spanish"],"Jamaica":["English"],
+  "Mexico":["Spanish"],"Nicaragua":["Spanish"],"Panama":["Spanish"],
+  "Paraguay":["Spanish"],"Peru":["Spanish"],"Trinidad and Tobago":["English"],
+  "United States":["English"],"Uruguay":["Spanish"],"Venezuela":["Spanish"],
   // Oceania
   "Australia":["English"],"New Zealand":["English"],
   // Other
-  "South Africa":["English"],"Turkey":["Turkish"],"Iran":["Persian"],
-  "Pakistan":["Urdu","English"]
+  "Iran":["Persian"]
 };
 
-var LANGS=["Amharic","Arabic","Bengali","French","German","Hebrew","Hindi","Igbo","Japanese","Korean","Mandarin","Portuguese","Russian","Spanish","Swahili","Yoruba","English"];
+// Global "Other languages" list — alphabetical, 13 major world languages
+// English is always added to Suggested automatically; it appears here only as fallback
+var LANGS=["Arabic","English","French","German","Hebrew","Hindi","Japanese","Korean","Mandarin","Portuguese","Russian","Spanish","Swahili"];
 
 function getLangsForCountry(country){
   var primary=COUNTRY_LANGS[country]||[];
@@ -296,8 +302,42 @@ var LEVELS=["Beginner","Intermediate","Advanced","Expert"];
 
 // ── Helpers ────────────────────────────────
 function R(h){document.getElementById("ROOT").innerHTML=h;}
+// ── localStorage persistence ─────────────────
+var SAVE_KEY="partnr_state_v1";
+var PAGE_KEY="partnr_page_v1";
+var MATCHES_KEY="partnr_matches_v1";
+
+function saveState(page){
+  try{
+    localStorage.setItem(SAVE_KEY,JSON.stringify(S));
+    localStorage.setItem(PAGE_KEY,page||"welcome");
+    if(MATCHES.length) localStorage.setItem(MATCHES_KEY,JSON.stringify({matches:MATCHES,projects:PROJECTS,comps:COMPS_DATA,conns:CONNS,selComps:selComps}));
+  } catch(e){}
+}
+
+function loadState(){
+  try{
+    var raw=localStorage.getItem(SAVE_KEY);
+    if(raw){
+      var parsed=JSON.parse(raw);
+      Object.keys(parsed).forEach(function(k){S[k]=parsed[k];});
+    }
+    var mraw=localStorage.getItem(MATCHES_KEY);
+    if(mraw){
+      var md=JSON.parse(mraw);
+      MATCHES=md.matches||[];PROJECTS=md.projects||[];COMPS_DATA=md.comps||[];CONNS=md.conns||[];selComps=md.selComps||[];
+    }
+    return localStorage.getItem(PAGE_KEY)||"welcome";
+  } catch(e){return "welcome";}
+}
+
+function clearSave(){
+  try{localStorage.removeItem(SAVE_KEY);localStorage.removeItem(PAGE_KEY);localStorage.removeItem(MATCHES_KEY);}catch(e){}
+}
+
 function goTo(p){
   window.scrollTo(0,0);
+  saveState(p);
   if(p==="welcome")rWelcome();
   else if(p==="signup")rSignup();
   else if(p==="track")rTrack();
@@ -1350,10 +1390,15 @@ function fallback(){
 function resetAll(){
   S={name:"",email:"",school:"",country:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
+  clearSave();
   goTo("welcome");
 }
 
-goTo("welcome");
+// Restore session on page load — never drop the user back to welcome if they were mid-flow
+var _startPage=loadState();
+// Don't restore to "loading" — that means the API call was mid-flight; send to goals instead
+if(_startPage==="loading") _startPage="goals";
+goTo(_startPage);
 </script>
 </body>
 </html>
