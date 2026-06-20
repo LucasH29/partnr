@@ -1144,21 +1144,31 @@ function submitWaitlist(){
   var email=document.getElementById("wl-email").value.trim();
   var city=document.getElementById("wl-city").value.trim();
   if(!email){showErr("wl-email","Please enter your email");return;}
-  // Submit to Google Form
-  var formUrl="https://docs.google.com/forms/d/e/1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ/formResponse";
-  var body=new FormData();
-  body.append("entry.1045781291",email+(city?" | "+city:""));
-  fetch(formUrl,{method:"POST",body:body,mode:"no-cors"}).catch(function(){});
-  // Show success
-  R(logo()+
-    "<div style=\"text-align:center;padding:3rem 1rem;\">"+
-      "<i class=\"ti ti-circle-check\" style=\"font-size:56px;color:#1D9E75;\"></i>"+
-      "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:16px 0 8px;\">You're on the list!</div>"+
-      "<div style=\"font-size:14px;color:#888;line-height:1.6;max-width:320px;margin:0 auto 1.5rem;\">We'll email you as soon as real students in your region sign up. Partnr is free, always.</div>"+
-      "<button class=\"bp\" id=\"wl-done\" style=\"max-width:260px;margin:0 auto;display:block;\">Back to matches \u2192</button>"+
-    "</div>"
-  );
-  document.getElementById("wl-done").addEventListener("click",function(){goTo("matches");});
+  var btn=document.getElementById("wl-submit");
+  btn.textContent="Joining...";btn.disabled=true;
+  fetch("https://formspree.io/f/mkolwgkd",{
+    method:"POST",
+    headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded"},
+    body:"email="+encodeURIComponent(email)+"&city="+encodeURIComponent(city||"")
+  }).then(function(r){
+    if(r.ok){
+      R(logo()+
+        "<div style=\"text-align:center;padding:3rem 1rem;\">"+
+          "<i class=\"ti ti-circle-check\" style=\"font-size:56px;color:#1D9E75;\"></i>"+
+          "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:16px 0 8px;\">You're on the list!</div>"+
+          "<div style=\"font-size:14px;color:#888;line-height:1.6;max-width:320px;margin:0 auto 1.5rem;\">We'll reach out as soon as real students in your region join. Partnr is free, always.</div>"+
+          "<button class=\"bp\" id=\"wl-done\" style=\"max-width:260px;margin:0 auto;display:block;\">Back to matches \u2192</button>"+
+        "</div>"
+      );
+      document.getElementById("wl-done").addEventListener("click",function(){goTo("matches");});
+    } else {
+      btn.textContent="Join the waitlist \u2192";btn.disabled=false;
+      showErr("wl-email","Something went wrong \u2014 please try again");
+    }
+  }).catch(function(){
+    btn.textContent="Join the waitlist \u2192";btn.disabled=false;
+    showErr("wl-email","Something went wrong \u2014 please try again");
+  });
 }
 
 function showTab(tab){
