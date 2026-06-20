@@ -1128,11 +1128,13 @@ function rMatches(){
 // Waitlist modal (Google Form)
 function openWaitlist(){
   R(logo()+
-    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
-      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
-      "<div style=\"font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6;\">Fill in your details below \u2014 no spam, just one email when real matches are waiting.</div>"+
-      "<iframe src=\"https://docs.google.com/forms/d/e/1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ/viewform?embedded=true\" width=\"640\" height=\"556\" frameborder=\"0\" marginheight=\"0\" marginwidth=\"0\">Loading\u2026</iframe>"+
-      "<button class=\"bkbtn\" id=\"wl-back\">\u2190 Back to matches</button>"+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;overflow:hidden;\">"+
+      "<div style=\"padding:1.25rem 1.25rem 0.75rem;\">"+
+        "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
+        "<div style=\"font-size:13px;color:#888;line-height:1.6;\">Fill in your details below \u2014 no spam, just one email when real matches are waiting.</div>"+
+      "</div>"+
+      "<iframe src=\"https://docs.google.com/forms/d/e/1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ/viewform?embedded=true\" width=\"100%\" height=\"480\" frameborder=\"0\" marginheight=\"0\" marginwidth=\"0\" style=\"display:block;\">Loading\u2026</iframe>"+
+      "<div style=\"padding:0.75rem 1.25rem;\"><button class=\"bkbtn\" id=\"wl-back\" style=\"margin-top:0;\">\u2190 Back to matches</button></div>"+
     "</div>"
   );
   document.getElementById("wl-back").addEventListener("click",function(){goTo("matches");});
