@@ -109,9 +109,9 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .sec-err{font-size:13px;color:#E53E3E;background:#FFF5F5;border:1px solid #FEB2B2;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .tc.err{border-color:#E53E3E !important;background:#FFF5F5;}
 .rc.err{border-color:#E53E3E !important;background:#FFF5F5;}
-.exp-item{background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:8px;position:relative;}
-.exp-item-del{position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:#aaa;font-size:16px;padding:0;line-height:1;}
-.exp-item-del:hover{color:#E53E3E;}
+.exp-pill{display:flex;align-items:flex-start;gap:8px;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.exp-pill-del{background:none;border:none;cursor:pointer;color:#aaa;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;}
+.wl-banner{background:#EEEDFE;border-radius:12px;padding:12px 14px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;}
 </style>
 </head>
 <body>
@@ -122,11 +122,34 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",experience:[],awards:[]};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
-// ── Countries without zip codes ────────────
-var NO_ZIP=["Angola","Antigua and Barbuda","Aruba","Bahamas","Belize","Benin","Bolivia","Botswana","Burkina Faso","Burundi","Cambodia","Cameroon","Cape Verde","Central African Republic","Chad","Comoros","Congo","Congo (DRC)","Congo (Republic)","Cook Islands","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Fiji","Gabon","Gambia","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Ivory Coast","Jamaica","Kiribati","Laos","Lesotho","Liberia","Libya","Malawi","Maldives","Mali","Mauritania","Micronesia","Mozambique","Myanmar","Namibia","Nauru","Niger","Palau","Panama","Papua New Guinea","Qatar","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","Sao Tome and Principe","Seychelles","Sierra Leone","Solomon Islands","Somalia","South Sudan","Sudan","Suriname","Syria","Togo","Tonga","Trinidad and Tobago","Tuvalu","United Arab Emirates","Vanuatu","Yemen","Zambia","Zimbabwe"];
-function hasZip(co){return NO_ZIP.indexOf(co)<0;}
+// ── Countries WITHOUT zip/postal codes ─────
+// Only require zip when student would realistically know their code
+var NO_ZIP=[
+  // Africa — most countries don't use postal codes in daily practice
+  "Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi","Cameroon","Cape Verde",
+  "Central African Republic","Chad","Comoros","Congo","Congo (DRC)","Congo (Republic)",
+  "Djibouti","Equatorial Guinea","Eritrea","Eswatini","Ethiopia","Gabon","Gambia",
+  "Ghana","Guinea","Guinea-Bissau","Ivory Coast","Kenya","Lesotho","Liberia","Libya",
+  "Madagascar","Malawi","Mali","Mauritania","Mozambique","Namibia","Niger","Rwanda",
+  "Sao Tome and Principe","Senegal","Seychelles","Sierra Leone","Somalia",
+  "South Sudan","Sudan","Tanzania","Togo","Uganda","Zambia","Zimbabwe",
+  // Middle East
+  "Qatar","United Arab Emirates","Yemen","Syria","Oman",
+  // Asia — no practical postal codes
+  "Afghanistan","Cambodia","Laos","Myanmar","Mongolia",
+  // Caribbean & Americas — no postal codes
+  "Antigua and Barbuda","Aruba","Bahamas","Belize","Bolivia","Cook Islands",
+  "Dominica","Dominican Republic","Ecuador","El Salvador","Grenada",
+  "Guatemala","Guyana","Haiti","Honduras","Jamaica","Kiribati","Micronesia",
+  "Nauru","Nicaragua","Palau","Panama","Papua New Guinea","Saint Kitts and Nevis",
+  "Saint Lucia","Saint Vincent and the Grenadines","Samoa","Solomon Islands",
+  "Suriname","Trinidad and Tobago","Tuvalu","Vanuatu","Venezuela",
+  // Oceania
+  "Tonga","Fiji","Maldives","East Timor"
+];
+function hasZip(co){return co&&NO_ZIP.indexOf(co)<0;}
 
-// ── Country language mapping ────────────────
+// ── Country → language mapping (all 54 African + rest of world) ──
 var COUNTRY_LANGS={
   "Algeria":["Arabic"],"Angola":["Portuguese","Umbundu"],
   "Benin":["French","Fon"],"Botswana":["English","Setswana"],
@@ -237,13 +260,20 @@ function renderLangSections(country,selected){
 }
 
 // ── Core data ───────────────────────────────
-var TR={research:{n:"Research & Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},business:{n:"Build a Business",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},arts:{n:"Arts & Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"}};
+// Track colors — Research=teal, Business=green (updated from doc 23)
+var TR={
+  research:{n:"Research & Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
+  business:{n:"Build a Business",c:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
+  impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},
+  arts:{n:"Arts & Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
+  tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"}
+};
 var RO={vision:{n:"Vision / CEO",i:"ti-bulb"},tech_r:{n:"Tech / CTO",i:"ti-code"},mktg:{n:"Marketing / CMO",i:"ti-speakerphone"},ops:{n:"Operations / COO",i:"ti-list-check"},res_r:{n:"Research Lead",i:"ti-microscope"},creative:{n:"Creative Lead",i:"ti-palette"}};
 var CM={purple:{bg:"#EEEDFE",c:"#534AB7"},teal:{bg:"#E1F5EE",c:"#0F6E56"},coral:{bg:"#FAECE7",c:"#993C1D"},blue:{bg:"#E6F1FB",c:"#185FA5"},green:{bg:"#EAF3DE",c:"#3B6D11"}};
 var LB={Beginner:"#F1EFE8",Intermediate:"#E6F1FB",Advanced:"#EEEDFE",Expert:"#EAF3DE"};
 var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D11"};
 
-// Competition category colors — matched to skill categories
+// Competition category colors — unique per category
 var CM2={
   science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
   math:{n:"Math",c:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
@@ -255,41 +285,40 @@ var CM2={
   custom:{n:"Custom",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"}
 };
 
-// Tier colors — unique per tier
+// Tier: 1=amber(premium), 2=blue, 3=grey
 var TRC={
-  1:{bg:"#FAEEDA",tc:"#633806",lbl:"Tier 1 \u2605"},
+  1:{bg:"#FAEEDA",tc:"#633806",lbl:"\u2605 Tier 1"},
   2:{bg:"#E6F1FB",tc:"#0C447C",lbl:"Tier 2"},
   3:{bg:"#F1EFE8",tc:"#5F5E5A",lbl:"Local"}
 };
 
-// Team type colors — unique per type
+// Cross-school chip: cross=green, prep=purple, same=amber
 var CROSS_STYLE={
-  "cross":{bg:"#EAF3DE",tc:"#3B6D11",icon:"ti-world",lbl:"Cross-school ok"},
-  "prep":{bg:"#EEEDFE",tc:"#534AB7",icon:"ti-user",lbl:"Prep partner"},
-  "same":{bg:"#FAEEDA",tc:"#854F0B",icon:"ti-school",lbl:"Same school"}
+  cross:{bg:"#EAF3DE",tc:"#3B6D11",icon:"ti-world",lbl:"Cross-school ok"},
+  prep:{bg:"#EEEDFE",tc:"#534AB7",icon:"ti-user",lbl:"Prep partner"},
+  same:{bg:"#FAEEDA",tc:"#854F0B",icon:"ti-school",lbl:"Same school"}
 };
 
 // Stage chip colors
 var STAGE_COLORS={
-  spark:{bg:"#FAEEDA",tc:"#854F0B",lbl:"Spark"},
-  planning:{bg:"#E6F1FB",tc:"#0C447C",lbl:"Planning"},
-  building:{bg:"#E1F5EE",tc:"#085041",lbl:"Building"},
-  submitting:{bg:"#EAF3DE",tc:"#3B6D11",lbl:"Submitting"},
-  open:{bg:"#F1EFE8",tc:"#5F5E5A",lbl:"Open"}
+  spark:{bg:"#FAEEDA",tc:"#854F0B"},
+  planning:{bg:"#E6F1FB",tc:"#0C447C"},
+  building:{bg:"#E1F5EE",tc:"#085041"},
+  submitting:{bg:"#EAF3DE",tc:"#3B6D11"},
+  open:{bg:"#F1EFE8",tc:"#5F5E5A"}
 };
 
-// Skill category colors — consistent, unique per category
-var SKILL_CAT_COLORS={
-  math:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  coding:{color:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
-  science:{color:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
-  engineering:{color:"#0C447C",bg:"#E6F1FB",tc:"#042C53"},
-  design:{color:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
-  business:{color:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
-  writing:{color:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
-  humanities:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  social:{color:"#1D9E75",bg:"#E1F5EE",tc:"#085041"}
-};
+function getCrossStyle(cross){
+  if(cross===true)return CROSS_STYLE.cross;
+  if(cross==="prep")return CROSS_STYLE.prep;
+  return CROSS_STYLE.same;
+}
+function getStageChip(stage){
+  var s=stage?(stage+"").toLowerCase():"open";
+  var sc=STAGE_COLORS[s]||{bg:"#F1EFE8",tc:"#5F5E5A"};
+  var lbl=stage?stage.charAt(0).toUpperCase()+stage.slice(1):"Open";
+  return "<span class=\"tag\" style=\"background:"+sc.bg+";color:"+sc.tc+";font-weight:500;\">"+lbl+"</span>";
+}
 
 var COUNTRIES=["","Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia","Botswana","Brazil","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (DRC)","Congo (Republic)","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Estonia","Ethiopia","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala","Guinea","Guinea-Bissau","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lesotho","Liberia","Libya","Lithuania","Luxembourg","Macau","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritania","Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
 
@@ -325,6 +354,19 @@ var COMPS=[
   {n:"Local / Regional Science Fair",cat:"science",team:"1-3 students",eli:"Local",tier:3,cross:false,desc:"Your local or regional fair - feeds into the ISEF pathway",why:"Usually same school or district - find a local lab partner"}
 ];
 
+// Skill category colors — unique per category, consistent with competition colors
+var SKILL_CAT_COLORS={
+  math:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
+  coding:{color:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
+  science:{color:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
+  engineering:{color:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
+  design:{color:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
+  business:{color:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
+  writing:{color:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
+  humanities:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
+  social:{color:"#1D9E75",bg:"#E1F5EE",tc:"#085041"}
+};
+
 var SKILL_CATS=[
   {id:"math",label:"Math",question:"What math courses have you taken?",icon:"ti-math-function",type:"course",hint:"The course itself tells us your level - select everything you have studied",
    items:["Algebra 1","Algebra 2","Geometry","Trigonometry","Pre-Calculus","Statistics & Probability","Calculus (AB/BC)","Linear Algebra","Multivariable Calculus","Differential Equations","Number Theory","Combinatorics & Discrete Math","Real Analysis"]},
@@ -345,9 +387,7 @@ var SKILL_CATS=[
   {id:"social",label:"Social Impact & Leadership",question:"What impact and leadership skills do you have?",icon:"ti-world",type:"level",hint:"Skills from clubs, volunteering, organizing, or community projects",
    items:["Community Organizing","Nonprofit Management","Volunteer Coordination","International Development","Civic Engagement","Education / Tutoring","Fundraising","Event Planning","Project Management"]}
 ];
-
 var LEVELS=["Beginner","Intermediate","Advanced","Expert"];
-
 
 // ── Helpers ────────────────────────────────
 function R(h){document.getElementById("ROOT").innerHTML=h;}
@@ -362,70 +402,44 @@ function goTo(p){
   else if(p==="matches")rMatches();
 }
 function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
-function sb(n,total){
-  total=total||5;
-  var h="<div class=\"sbar\">";
-  for(var i=1;i<=total;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";
-  return h+"</div>";
-}
+// 5-step progress bar
+function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function getCatColors(catId){return SKILL_CAT_COLORS[catId]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};}
-function getCrossStyle(cross){
-  if(cross===true)return CROSS_STYLE.cross;
-  if(cross==="prep")return CROSS_STYLE.prep;
-  return CROSS_STYLE.same;
-}
-function getStageChip(stage){
-  var s=stage?stage.toLowerCase():"open";
-  var sc=STAGE_COLORS[s]||{bg:"#F1EFE8",tc:"#5F5E5A",lbl:stage||"Open"};
-  return "<span class=\"tag\" style=\"background:"+sc.bg+";color:"+sc.tc+";font-weight:500;\">"+sc.lbl+"</span>";
-}
 
 function showErr(id,msg){
-  var el=document.getElementById(id);
-  if(!el) return;
+  var el=document.getElementById(id);if(!el)return;
   el.classList.add("err");
-  var existing=el.parentNode.querySelector(".field-err");
-  if(existing) existing.remove();
-  var err=document.createElement("div");
-  err.className="field-err";
-  err.innerHTML="<i class=\"ti ti-alert-circle\"></i>"+msg;
+  var existing=el.parentNode.querySelector(".field-err");if(existing)existing.remove();
+  var err=document.createElement("div");err.className="field-err";
+  err.innerHTML='<i class="ti ti-alert-circle"></i>'+msg;
   el.parentNode.appendChild(err);
   el.addEventListener("input",function(){clearErr(id);},{once:true});
   el.addEventListener("change",function(){clearErr(id);},{once:true});
 }
 function clearErr(id){
-  var el=document.getElementById(id);
-  if(!el) return;
+  var el=document.getElementById(id);if(!el)return;
   el.classList.remove("err");
-  var existing=el.parentNode.querySelector(".field-err");
-  if(existing) existing.remove();
+  var existing=el.parentNode.querySelector(".field-err");if(existing)existing.remove();
 }
 function showSecErr(id,msg){
-  var existing=document.getElementById("sec-err-"+id);
-  if(existing) existing.remove();
-  var div=document.createElement("div");
-  div.className="sec-err";div.id="sec-err-"+id;
-  div.innerHTML="<i class=\"ti ti-alert-circle\" style=\"font-size:14px;flex-shrink:0;\"></i>"+msg;
-  var target=document.getElementById(id);
-  if(target) target.parentNode.insertBefore(div,target);
+  var existing=document.getElementById("sec-err-"+id);if(existing)existing.remove();
+  var div=document.createElement("div");div.className="sec-err";div.id="sec-err-"+id;
+  div.innerHTML='<i class="ti ti-alert-circle" style="font-size:14px;flex-shrink:0;"></i>'+msg;
+  var target=document.getElementById(id);if(target)target.parentNode.insertBefore(div,target);
 }
 function scrollToFirstErr(){
   var first=document.querySelector(".err,.sec-err");
-  if(first) first.scrollIntoView({behavior:"smooth",block:"center"});
+  if(first)first.scrollIntoView({behavior:"smooth",block:"center"});
 }
 function mkChips(id,items,sel,single){
-  var div=document.getElementById(id);
-  if(!div) return;
+  var div=document.getElementById(id);if(!div)return;
   div.innerHTML="";
   items.forEach(function(item){
-    var c=document.createElement("div");
-    c.className="chip";
-    c.textContent=item;
+    var c=document.createElement("div");c.className="chip";c.textContent=item;
     var isOn=Array.isArray(sel)?sel.indexOf(item)>=0:sel===item;
-    if(isOn) c.classList.add("on");
+    if(isOn)c.classList.add("on");
     c.addEventListener("click",function(){
-      if(single) div.querySelectorAll(".chip").forEach(function(x){x.classList.remove("on");});
+      if(single)div.querySelectorAll(".chip").forEach(function(x){x.classList.remove("on");});
       c.classList.toggle("on");
     });
     div.appendChild(c);
@@ -464,7 +478,6 @@ function rWelcome(){
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
 }
 
-
 // ── Signup ──────────────────────────────────
 function rSignup(){
   var co=S.country;
@@ -502,23 +515,20 @@ function rSignup(){
     S.country=this.value;
     document.getElementById("zipwrap").style.display=(this.value&&hasZip(this.value))?"":"none";
     var zipEl=document.getElementById("izip");
-    if(zipEl&&!hasZip(this.value)) zipEl.value="";
+    if(zipEl&&!hasZip(this.value))zipEl.value="";
     renderLangSections(this.value,getAllSelectedLangs());
   });
   document.getElementById("langaddbtn").addEventListener("click",function(){
     var inp=document.getElementById("langother");
-    var val=inp.value.trim();
-    if(!val) return;
+    var val=inp.value.trim();if(!val)return;
     val=val.charAt(0).toUpperCase()+val.slice(1);
     var all=document.querySelectorAll("#lang-primary .chip, #lang-other .chip");
     var ex=Array.from(all).find(function(c){return c.textContent.toLowerCase()===val.toLowerCase();});
     if(ex){ex.classList.add("on");inp.value="";return;}
-    var chip=document.createElement("div");
-    chip.className="chip on";chip.textContent=val;
+    var chip=document.createElement("div");chip.className="chip on";chip.textContent=val;
     chip.style.background="#EEEDFE";chip.style.borderColor="#AFA9EC";chip.style.color="#3C3489";chip.style.fontWeight="500";
     chip.addEventListener("click",function(){chip.classList.toggle("on");});
-    var oDiv=document.getElementById("lang-other");
-    if(oDiv) oDiv.appendChild(chip);
+    var oDiv=document.getElementById("lang-other");if(oDiv)oDiv.appendChild(chip);
     inp.value="";inp.focus();
   });
   document.getElementById("langother").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("langaddbtn").click();}});
@@ -539,8 +549,8 @@ function rTrack(){
     {val:"vision",icon:"ti-bulb",color:"#534AB7",name:"Vision / CEO",desc:"I have the idea and lead direction"},
     {val:"tech_r",icon:"ti-code",color:"#185FA5",name:"Tech / CTO",desc:"I build \u2014 code, data, engineering"},
     {val:"mktg",icon:"ti-speakerphone",color:"#993C1D",name:"Marketing / CMO",desc:"I pitch, promote, tell the story"},
-    {val:"ops",icon:"ti-list-check",color:"#3B6D11",name:"Operations / COO",desc:"I organize and make things happen"},
-    {val:"res_r",icon:"ti-microscope",color:"#0F6E56",name:"Research Lead",desc:"I do deep research, analysis, writing"},
+    {val:"ops",icon:"ti-list-check",color:"#0F6E56",name:"Operations / COO",desc:"I organize and make things happen"},
+    {val:"res_r",icon:"ti-microscope",color:"#1D9E75",name:"Research Lead",desc:"I do deep research, analysis, writing"},
     {val:"creative",icon:"ti-palette",color:"#D85A30",name:"Creative Lead",desc:"I design, illustrate, create"}
   ];
   var tHTML=tracks.map(function(t){
@@ -562,7 +572,7 @@ function rTrack(){
     "<div class=\"slabel\" style=\"margin-top:0;\">Track</div>"+
     "<div id=\"tg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+tHTML+"</div>"+
     "<div class=\"slabel\">Your role</div>"+
-    "<div style=\"font-size:13px;color:#888;margin-bottom:10px;\">You're matched with someone whose strengths fill the gap yours creates.</div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:10px;\">A CEO gets matched with a CTO. A researcher gets matched with an engineer.</div>"+
     "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
     "<div class=\"slabel\">Status</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
@@ -578,7 +588,7 @@ function rTrack(){
     el.addEventListener("click",function(){
       var newPrimary=this.dataset.val;
       var secOpts=Object.keys(TR).filter(function(k){return k!==newPrimary;}).map(function(k){return TR[k].n;});
-      if(S.secondary&&S.secondary===TR[newPrimary].n) S.secondary="";
+      if(S.secondary&&S.secondary===TR[newPrimary].n)S.secondary="";
       mkChips("secondary",secOpts,[S.secondary||""],true);
     });
   });
@@ -604,11 +614,10 @@ function rTrack(){
   });
 }
 
-
 // ── Skills ──────────────────────────────────
 function rSkills(){
   var html=SKILL_CATS.map(function(cat){
-    var cc=getCatColors(cat.id);
+    var cc=SKILL_CAT_COLORS[cat.id]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
     var sel=cat.items.filter(function(item){return S.skillLevels[cat.id+":"+item]!==undefined;});
     var isOpen=sel.length>0;
     var itemsHtml=cat.items.map(function(item){
@@ -652,6 +661,24 @@ function rSkills(){
     "</div>";
   }).join("");
 
+  // Build experience list HTML from state
+  var expHTML=S.experience.map(function(e,i){
+    return "<div class=\"exp-pill\">"+
+      "<div style=\"flex:1;\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div>"+
+      (e.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+esc(e.desc)+"</div>":"")+
+      "</div>"+
+      "<button class=\"exp-pill-del\" data-ei=\""+i+"\"><i class=\"ti ti-x\"></i></button>"+
+    "</div>";
+  }).join("");
+
+  var awardHTML=S.awards.map(function(a,i){
+    return "<div style=\"display:flex;align-items:center;gap:8px;padding:6px 10px;background:#EAF3DE;border-radius:8px;margin-bottom:6px;\">"+
+      "<i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;flex-shrink:0;\"></i>"+
+      "<span style=\"flex:1;font-size:13px;color:#1a1a1a;\">"+esc(a)+"</span>"+
+      "<button data-ai=\""+i+"\" style=\"background:none;border:none;cursor:pointer;color:#aaa;font-size:15px;padding:0;line-height:1;\">\u00d7</button>"+
+    "</div>";
+  }).join("");
+
   R(logo()+sb(3)+
     "<h2>Your skills</h2>"+
     "<div class=\"sub\">Select specific skills, courses, and tools you know. The more specific, the better your matches.</div>"+
@@ -667,10 +694,31 @@ function rSkills(){
     "<div class=\"cgrow\" id=\"avail\"></div>"+
     "<div class=\"slabel\">Portfolio / GitHub <span style=\"font-weight:400;color:#aaa;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
     "<div class=\"fi\"><input id=\"igh\" placeholder=\"github.com/yourname or portfolio URL\" value=\""+esc(S.github)+"\"/></div>"+
+    // Optional experience & awards section
+    "<div style=\"background:#f8f8f6;border-radius:12px;padding:14px;margin-bottom:1rem;\">"+
+      "<div style=\"font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;\">Experience & Awards <span style=\"font-weight:400;color:#aaa;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
+      "<div style=\"font-size:13px;color:#888;margin-bottom:12px;\">Add internships, competitions, projects, or awards. Skip if you're just getting started \u2014 that's totally fine.</div>"+
+      "<div id=\"exp-list\">"+expHTML+"</div>"+
+      (S.experience.length<5?
+        "<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
+          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label>Title</label><input id=\"exp-title\" placeholder=\"e.g. ISEF Semifinalist, Research Internship, DECA State Champion\"/></div>"+
+          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label>Description <span style=\"font-weight:400;color:#aaa;\">(optional)</span></label><textarea id=\"exp-desc\" style=\"height:60px;\" placeholder=\"What did you build, research, or accomplish?\"></textarea></div>"+
+          "<button id=\"exp-add\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add experience</button>"+
+        "</div>"
+        : "<div style=\"font-size:12px;color:#888;margin-bottom:10px;\">Maximum 5 experiences reached.</div>")+
+      "<div style=\"font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;\">Awards & Recognition</div>"+
+      "<div id=\"award-list\">"+awardHTML+"</div>"+
+      "<div style=\"display:flex;gap:8px;margin-top:4px;\">"+
+        "<input id=\"award-inp\" placeholder=\"e.g. 1st place regional science fair 2024\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+        "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
+      "</div>"+
+    "</div>"+
     "<button class=\"bp\" id=\"s4\">Continue \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
+
   mkChips("avail",["1-3 hrs/week","4-8 hrs/week","10+ hrs/week","Weekends only"],[S.availability],true);
+
   document.querySelectorAll(".skill-cat-header").forEach(function(hdr){
     hdr.addEventListener("click",function(){
       var cid=this.dataset.cat;
@@ -682,9 +730,10 @@ function rSkills(){
       chev.style.fontSize="16px";chev.style.color="#888";
     });
   });
+
   document.querySelectorAll(".skill-item").forEach(function(item){
     item.addEventListener("click",function(e){
-      if(e.target.classList.contains("lv")) return;
+      if(e.target.classList.contains("lv"))return;
       var key=this.dataset.key;var type=this.dataset.type;
       var on=this.classList.contains("on");
       var chk=this.querySelector(".skill-item-check");
@@ -707,8 +756,7 @@ function rSkills(){
         var key=this.dataset.key;
         var par=this.closest(".skill-item");
         par.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
-        this.classList.add("on");
-        S.skillLevels[key]=this.dataset.lv;
+        this.classList.add("on");S.skillLevels[key]=this.dataset.lv;
         if(!par.classList.contains("on")){
           par.classList.add("on");
           var chk=par.querySelector(".skill-item-check");
@@ -720,9 +768,10 @@ function rSkills(){
       });
     });
   });
+
   document.getElementById("addskillbtn").addEventListener("click",function(){
     var inp=document.getElementById("customskill");
-    var val=inp.value.trim();if(!val) return;
+    var val=inp.value.trim();if(!val)return;
     val=val.charAt(0).toUpperCase()+val.slice(1);
     var key="custom:"+val;
     if(S.skillLevels[key]!==undefined){inp.value="";return;}
@@ -738,37 +787,41 @@ function rSkills(){
     inp.value="";updSS();
   });
   document.getElementById("customskill").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("addskillbtn").click();}});
-  renderExpList();renderAwardList();
-  document.getElementById("exp-add").addEventListener("click",function(){
-    var title=document.getElementById("exp-title").value.trim();
-    if(!title) return;
-    if(S.experience.length>=5) return;
-    var desc=document.getElementById("exp-desc").value.trim();
-    S.experience.push({title:title,desc:desc});
-    document.getElementById("exp-title").value="";
-    document.getElementById("exp-desc").value="";
-    renderExpList();
+
+  // Experience add
+  var expAddBtn=document.getElementById("exp-add");
+  if(expAddBtn){
+    expAddBtn.addEventListener("click",function(){
+      var t=document.getElementById("exp-title").value.trim();
+      if(!t)return;
+      S.experience.push({title:t,desc:document.getElementById("exp-desc").value.trim()});
+      rSkills();
+    });
+    var expTitleEl=document.getElementById("exp-title");
+    if(expTitleEl)expTitleEl.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();expAddBtn.click();}});
+  }
+  document.querySelectorAll(".exp-pill-del").forEach(function(b){
+    b.addEventListener("click",function(){S.experience.splice(parseInt(this.dataset.ei),1);rSkills();});
   });
-  document.getElementById("exp-title").addEventListener("keydown",function(e){
-    if(e.key==="Enter"){e.preventDefault();document.getElementById("exp-add").click();}
-  });
+
+  // Award add
   document.getElementById("award-add").addEventListener("click",function(){
     var val=document.getElementById("award-inp").value.trim();
-    if(!val) return;
-    S.awards.push(val);
-    document.getElementById("award-inp").value="";
-    renderAwardList();
+    if(!val)return;
+    S.awards.push(val);rSkills();
   });
-  document.getElementById("award-inp").addEventListener("keydown",function(e){
-    if(e.key==="Enter"){e.preventDefault();document.getElementById("award-add").click();}
+  document.getElementById("award-inp").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("award-add").click();}});
+  document.querySelectorAll("[data-ai]").forEach(function(b){
+    b.addEventListener("click",function(){S.awards.splice(parseInt(this.dataset.ai),1);rSkills();});
   });
+
   document.getElementById("s4").addEventListener("click",step4);
   document.getElementById("bk").addEventListener("click",function(){goTo("track");});
   updSS();
 }
 
 function updSS(){
-  var el=document.getElementById("ssum");if(!el) return;
+  var el=document.getElementById("ssum");if(!el)return;
   var all=Object.keys(S.skillLevels);
   var total=all.length;
   var needLv=all.filter(function(k){
@@ -783,48 +836,9 @@ function updSS(){
 function skStr(){
   return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
-    if(lv==="studied"||lv==="noted") return skill;
+    if(lv==="studied"||lv==="noted")return skill;
     return skill+" ("+lv+")";
   }).join(", ");
-}
-
-
-
-function renderExpList(){
-  var el=document.getElementById("exp-list");if(!el) return;
-  el.innerHTML="";
-  S.experience.forEach(function(item,i){
-    var div=document.createElement("div");div.className="exp-item";
-    div.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;padding-right:24px;\">"+esc(item.title)+"</div>"+
-      (item.desc?"<div style=\"font-size:12px;color:#666;margin-top:3px;line-height:1.5;\">"+esc(item.desc)+"</div>":"")+
-      "<button class=\"exp-item-del\" data-idx=\""+i+"\"><i class=\"ti ti-x\" style=\"font-size:14px;\"></i></button>";
-    el.appendChild(div);
-  });
-  el.querySelectorAll(".exp-item-del").forEach(function(b){
-    b.addEventListener("click",function(){
-      S.experience.splice(parseInt(this.dataset.idx),1);renderExpList();
-    });
-  });
-  var addForm=document.getElementById("exp-form");
-  if(addForm) addForm.style.display=S.experience.length>=5?"none":"block";
-}
-
-function renderAwardList(){
-  var el=document.getElementById("award-list");if(!el) return;
-  el.innerHTML="";
-  S.awards.forEach(function(a,i){
-    var div=document.createElement("div");
-    div.style.cssText="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#EAF3DE;border-radius:8px;margin-bottom:6px;";
-    div.innerHTML="<i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;flex-shrink:0;\"></i>"+
-      "<span style=\"flex:1;font-size:13px;color:#1a1a1a;\">"+esc(a)+"</span>"+
-      "<button data-aidx=\""+i+"\" style=\"background:none;border:none;cursor:pointer;color:#aaa;font-size:14px;padding:0;line-height:1;\"><i class=\"ti ti-x\"></i></button>";
-    el.appendChild(div);
-  });
-  el.querySelectorAll("[data-aidx]").forEach(function(b){
-    b.addEventListener("click",function(){
-      S.awards.splice(parseInt(this.dataset.aidx),1);renderAwardList();
-    });
-  });
 }
 
 // ── Goals ───────────────────────────────────
@@ -897,19 +911,18 @@ function rGoals(){
   renderPills();
 }
 
-
 function doSearch(v){
-  var dd=document.getElementById("cdd");if(!dd) return;
+  var dd=document.getElementById("cdd");if(!dd)return;
   if(!v||v.length<1){dd.style.display="none";return;}
   var q=v.toLowerCase();
   var res=COMPS.filter(function(c){return c.n.toLowerCase().indexOf(q)>=0||c.cat.indexOf(q)>=0||c.desc.toLowerCase().indexOf(q)>=0;}).slice(0,8);
   dd.innerHTML="";
   res.forEach(function(c){
     var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
-    var cs=getCrossStyle(c.cross);
+    var xs=getCrossStyle(c.cross);
     var d=document.createElement("div");d.className="cddo";
     d.innerHTML="<div style=\"flex:1;min-width:0;\"><div style=\"font-size:13px;font-weight:500;\">"+c.n+"</div>"+
-      "<div style=\"font-size:11px;color:#888;margin-top:1px;\"><span style=\"background:"+cs.bg+";color:"+cs.tc+";padding:1px 6px;border-radius:10px;font-weight:500;\">"+cs.lbl+"</span> \u00b7 "+c.eli+"</div></div>"+
+      "<div style=\"font-size:11px;color:#888;margin-top:1px;\">"+xs.lbl+" \u00b7 "+c.eli+"</div></div>"+
       "<span style=\"font-size:10px;padding:2px 8px;border-radius:20px;background:"+cm.bg+";color:"+cm.tc+";font-weight:500;flex-shrink:0;\">"+cm.n+"</span>";
     d.addEventListener("click",function(){addComp(c);document.getElementById("ci").value="";dd.style.display="none";});
     dd.appendChild(d);
@@ -929,21 +942,21 @@ function doSearch(v){
 
 function renderCat(){
   var list=activeCats.length?COMPS.filter(function(c){return activeCats.indexOf(c.cat)>=0;}):COMPS;
-  var el=document.getElementById("clist");if(!el) return;
+  var el=document.getElementById("clist");if(!el)return;
   el.innerHTML="";
   list.forEach(function(c){
     var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
     var tm=TRC[c.tier]||TRC[2];
-    var cs=getCrossStyle(c.cross);
+    var xs=getCrossStyle(c.cross);
     var added=selComps.some(function(s){return s.n===c.n;});
     var d=document.createElement("div");d.className="citem";
     d.innerHTML="<div style=\"flex:1;min-width:0;\">"+
       "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.n+"</div>"+
       "<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+c.desc+"</div>"+
       "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
-        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
-        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+cs.bg+";color:"+cs.tc+";\"><i class=\"ti "+cs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+cs.lbl+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
       "</div>"+
       "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
@@ -964,18 +977,16 @@ function renderCat(){
 function addComp(c){if(selComps.some(function(s){return s.n===c.n;}))return;selComps.push(c);renderPills();if(exploreOpen)renderCat();}
 function removeComp(name){selComps=selComps.filter(function(c){return c.n!==name;});renderPills();if(exploreOpen)renderCat();}
 function renderPills(){
-  var el=document.getElementById("pills");if(!el) return;
+  var el=document.getElementById("pills");if(!el)return;
   el.innerHTML="";
   if(!selComps.length){
-    var msg=document.createElement("span");
-    msg.style.cssText="font-size:13px;color:#aaa;font-style:italic;";
+    var msg=document.createElement("span");msg.style.cssText="font-size:13px;color:#aaa;font-style:italic;";
     msg.textContent="None yet \u2014 search above or browse by category";
     el.appendChild(msg);return;
   }
   selComps.forEach(function(c){
     var cm=CM2[c.cat]||{bg:"#EEEDFE",tc:"#3C3489"};
-    var sp=document.createElement("span");
-    sp.className="pill";sp.style.background=cm.bg;sp.style.color=cm.tc;
+    var sp=document.createElement("span");sp.className="pill";sp.style.background=cm.bg;sp.style.color=cm.tc;
     var txt=document.createTextNode(c.n+" ");
     var btn=document.createElement("button");btn.textContent="\u00d7";
     var name=c.n;
@@ -984,8 +995,7 @@ function renderPills(){
   });
 }
 
-
-// ── Step validation functions ────────────────
+// ── Step validation ──────────────────────────
 function step2(){
   var n=document.getElementById("iname").value.trim();
   var e=document.getElementById("iemail").value.trim();
@@ -1009,8 +1019,7 @@ function step2(){
     if(!zipVal){showErr("izip","Please enter your zip / postal code");valid=false;}
   }
   if(!valid){scrollToFirstErr();return;}
-  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;
-  S.languages=langs;
+  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;
   goTo("track");
 }
 function step3(){
@@ -1021,8 +1030,7 @@ function step3(){
   if(!statusSel){showSecErr("status","Please select your current status");valid=false;}
   if(!valid){scrollToFirstErr();return;}
   S.status=statusSel;
-  var secSel=getChips("secondary");
-  S.secondary=secSel[0]||"";
+  S.secondary=getChips("secondary")[0]||"";
   goTo("skills");
 }
 function step4(){
@@ -1031,15 +1039,20 @@ function step4(){
     var cat=SKILL_CATS.find(function(c){return k.indexOf(c.id+":")===0;});
     return cat&&cat.type==="level"&&!S.skillLevels[k];
   });
-  if(!rated.length){showSecErr("skill-cats","Please select and rate at least one skill — open any category above");scrollToFirstErr();return;}
-  if(needLevel.length){showSecErr("ssum",""+needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level — tap Beginner, Intermediate, Advanced, or Expert");scrollToFirstErr();return;}
+  if(!rated.length){
+    showSecErr("skill-cats","Please select and rate at least one skill \u2014 open any category above");
+    scrollToFirstErr();return;
+  }
+  if(needLevel.length){
+    showSecErr("ssum",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level \u2014 tap Beginner, Intermediate, Advanced, or Expert");
+    scrollToFirstErr();return;
+  }
   var avail=getChips("avail")[0]||"";
   if(!avail){showSecErr("avail","Please select your weekly availability");scrollToFirstErr();return;}
   S.availability=avail;
   S.github=document.getElementById("igh").value.trim();
   goTo("goals");
 }
-
 function goFind(){
   var valid=true;
   if(!S.stage){showSecErr("stg","Please select your project stage");valid=false;}
@@ -1061,20 +1074,19 @@ function rLoading(){
   var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skill levels...","Building your results..."];
   var i=0;var iv=setInterval(function(){i++;var el=document.getElementById("lmsg");if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
 }
-
 async function doFetch(){
   var t=TR[S.track]||{n:S.track};var r=RO[S.role]||{n:S.role};
   var compInfo=selComps.map(function(c){
     var crossNote=c.cross===true?"(cross-school ok)":c.cross==="prep"?"(prep partner only)":"(same school required)";
     return c.n+" "+crossNote;
   }).join(", ")||"open";
-  var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none listed";
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nExperience: "+expStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+compInfo+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets complementary skill partner)\n- Match skill LEVELS carefully\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- At least 1 match from a different continent\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+compInfo+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- At least 1 match from a different continent\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
-    if(!res.ok) throw new Error("status "+res.status);
+    if(!res.ok)throw new Error("status "+res.status);
     var d=await res.json();
-    if(d.error) throw new Error("api error");
+    if(d.error)throw new Error("api error");
     var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
     var parsed=JSON.parse(txt);
     MATCHES=parsed.matches||[];PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
@@ -1082,18 +1094,18 @@ async function doFetch(){
   } catch(e){fallback();}
 }
 
-
-// ── Matches page ────────────────────────────
+// ── Matches page ─────────────────────────────
 function rMatches(){
-  R(logo()+
-    "<div style=\"background:#EEEDFE;border:1px solid #AFA9EC;border-radius:12px;padding:12px 14px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;\">"+
-      "<i class=\"ti ti-bell\" style=\"font-size:20px;color:#534AB7;flex-shrink:0;\"></i>"+
-      "<div style=\"flex:1;\">"+
-        "<div style=\"font-size:13px;font-weight:600;color:#3C3489;margin-bottom:1px;\">These are demo matches \u2014 real students are coming</div>"+
-        "<div style=\"font-size:12px;color:#534AB7;\">Enter your email to be notified when Partnr launches for real.</div>"+
-      "</div>"+
-      "<button id=\"wlbtn\" style=\"flex-shrink:0;padding:7px 12px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;\">Notify me</button>"+
+  // Waitlist banner
+  var wlBanner="<div class=\"wl-banner\">"+
+    "<i class=\"ti ti-users\" style=\"font-size:20px;color:#534AB7;flex-shrink:0;\"></i>"+
+    "<div style=\"flex:1;\">"+
+      "<div style=\"font-size:13px;font-weight:600;color:#534AB7;\">These are demo matches \u2014 real students coming soon</div>"+
+      "<div style=\"font-size:12px;color:#7068C2;margin-top:2px;\">Sign up to be notified when your city or region goes live.</div>"+
     "</div>"+
+    "<button id=\"wlbtn\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;\">Notify me</button>"+
+  "</div>";
+  R(logo()+wlBanner+
     "<div class=\"nav\">"+
       "<button class=\"nb on\" id=\"nb-matches\">Matches</button>"+
       "<button class=\"nb\" id=\"nb-recruit\">Recruiting me</button>"+
@@ -1113,8 +1125,44 @@ function rMatches(){
   showTab("matches");
 }
 
+// Waitlist modal (Google Form)
+function openWaitlist(){
+  R(logo()+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:6px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
+      "<div style=\"font-size:13px;color:#888;margin-bottom:1.25rem;line-height:1.6;\">Enter your email and we'll notify you when real students in your region join. No spam, just one email when you have real matches waiting.</div>"+
+      "<div class=\"fi\"><label>Email</label><input id=\"wl-email\" type=\"email\" placeholder=\"your@email.com\" value=\""+esc(S.email)+"\"/></div>"+
+      "<div class=\"fi\"><label>City / Region</label><input id=\"wl-city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\" value=\""+esc(S.city)+"\"/></div>"+
+      "<button class=\"bp\" id=\"wl-submit\">Join the waitlist \u2192</button>"+
+      "<button class=\"bkbtn\" id=\"wl-back\">\u2190 Back to matches</button>"+
+    "</div>"
+  );
+  document.getElementById("wl-submit").addEventListener("click",submitWaitlist);
+  document.getElementById("wl-back").addEventListener("click",function(){goTo("matches");});
+}
+function submitWaitlist(){
+  var email=document.getElementById("wl-email").value.trim();
+  var city=document.getElementById("wl-city").value.trim();
+  if(!email){showErr("wl-email","Please enter your email");return;}
+  // Submit to Google Form
+  var formUrl="https://docs.google.com/forms/d/e/1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ/formResponse";
+  var body=new FormData();
+  body.append("entry.1045781291",email+(city?" | "+city:""));
+  fetch(formUrl,{method:"POST",body:body,mode:"no-cors"}).catch(function(){});
+  // Show success
+  R(logo()+
+    "<div style=\"text-align:center;padding:3rem 1rem;\">"+
+      "<i class=\"ti ti-circle-check\" style=\"font-size:56px;color:#1D9E75;\"></i>"+
+      "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:16px 0 8px;\">You're on the list!</div>"+
+      "<div style=\"font-size:14px;color:#888;line-height:1.6;max-width:320px;margin:0 auto 1.5rem;\">We'll email you as soon as real students in your region sign up. Partnr is free, always.</div>"+
+      "<button class=\"bp\" id=\"wl-done\" style=\"max-width:260px;margin:0 auto;display:block;\">Back to matches \u2192</button>"+
+    "</div>"
+  );
+  document.getElementById("wl-done").addEventListener("click",function(){goTo("matches");});
+}
+
 function showTab(tab){
-  var el=document.getElementById("tc");if(!el) return;
+  var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
   else if(tab==="recruit"){el.innerHTML=pCards();bindPE();}
   else if(tab==="search"){el.innerHTML=sTab();bindSE();}
@@ -1124,7 +1172,7 @@ function showTab(tab){
 }
 
 function mCards(){
-  if(!MATCHES.length) return "<div style=\"text-align:center;padding:2rem;color:#888;\">No matches yet.</div>";
+  if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem;color:#888;\">No matches yet.</div>";
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Your AI matches</div>";
   MATCHES.forEach(function(m,i){
     var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
@@ -1162,7 +1210,7 @@ function bindME(){
 }
 
 function openProfile(i){
-  var m=MATCHES[i];if(!m) return;
+  var m=MATCHES[i];if(!m)return;
   var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
   var sw=m.skillsWithLevels||{};
   var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" \u00b7 "+lv+"</span>";}).join("");
@@ -1196,7 +1244,7 @@ function openProfile(i){
           "<div class=\"ac\"><div class=\"al2\">Weekly hours</div><div class=\"av2\">"+m.availability+"</div></div>"+
           "<div class=\"ac\"><div class=\"al2\">Timezone</div><div class=\"av2\">"+m.timezone+"</div></div>"+
           "<div class=\"ac\"><div class=\"al2\">Commitment</div><div class=\"av2\">"+m.commitment+"</div></div>"+
-          "<div class=\"ac\"><div class=\"al2\">Stage</div>"+getStageChip(m.stage)+"</div>"+
+          "<div class=\"ac\"><div class=\"al2\">Stage</div><div class=\"av2\">"+m.stage+"</div></div>"+
         "</div>"+
         "<div style=\"margin-top:8px;\"><div class=\"al2\" style=\"margin-bottom:4px;\">Languages</div><div class=\"tags\">"+ltags+"</div></div>"+
       "</div>"+
@@ -1239,7 +1287,6 @@ function openModal(idx){
   document.getElementById("sbtn").addEventListener("click",sendConn);
   document.getElementById("cbtn").addEventListener("click",function(){goTo("matches");});
 }
-
 function sendConn(){
   var msg=document.getElementById("mmsg").value.trim();
   if(!msg){showErr("mmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
@@ -1251,10 +1298,9 @@ function sendConn(){
   document.getElementById("dbn").addEventListener("click",function(){goTo("matches");});
 }
 
-
 function pCards(){
   var r=RO[S.role]||{n:S.role||"Partner"};
-  if(!PROJECTS.length) return "<div style=\"text-align:center;padding:2rem;color:#888;\">No projects matched your role yet.</div>";
+  if(!PROJECTS.length)return "<div style=\"text-align:center;padding:2rem;color:#888;\">No projects matched your role yet.</div>";
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Projects recruiting your role</div>";
   PROJECTS.forEach(function(p){
     var t=TR[p.track]||TR[S.track]||TR.research;
@@ -1292,7 +1338,7 @@ function bindSE(){
 }
 
 function dCards(){
-  if(!COMPS_DATA.length) return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#888;\">No competitions loaded yet.</div>";
+  if(!COMPS_DATA.length)return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#888;\">No competitions loaded yet.</div>";
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
   [].concat(COMPS_DATA).sort(function(a,b){return a.daysUntil-b.daysUntil;}).forEach(function(c){
     var t=TR[c.track]||TR.research;
@@ -1326,7 +1372,7 @@ function dCards(){
 
 function cCards(){
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Your connections</div>";
-  if(!CONNS.length) return h+"<p style=\"font-size:13px;color:#888;\">No connections yet \u2014 connect with matches to start collaborating.</p>";
+  if(!CONNS.length)return h+"<p style=\"font-size:13px;color:#888;\">No connections yet \u2014 connect with matches to start collaborating.</p>";
   h+="<p style=\"font-size:13px;color:#888;margin-bottom:1rem;\">Start a shared project board once both students accept.</p>";
   CONNS.forEach(function(cn){
     var cm=CM[cn.avatarColor]||CM.purple;var t=TR[cn.track]||TR.research;var r=RO[cn.role]||{n:cn.role||"Partner"};
@@ -1356,121 +1402,90 @@ function bindCE(){
   });
 }
 
+// ── My Profile tab with Edit Profile button ──
 function meTab(){
   var inits=S.name?S.name.split(" ").map(function(w){return w[0];}).join("").substring(0,2).toUpperCase():"?";
   var t=TR[S.track]||{};var r=RO[S.role]||{};
   var tags=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).slice(0,6).map(function(k){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
-    if(lv==="studied"||lv==="noted") return "<span class=\"tag\">"+skill+"</span>";
+    if(lv==="studied"||lv==="noted")return "<span class=\"tag\">"+skill+"</span>";
     return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+skill+" \u00b7 "+lv+"</span>";
   }).join("");
   tags+=(S.comps||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+(c||"")+"</span>";}).join("");
-  var expHtml=(S.experience||[]).map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div>"+(e.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(e.desc)+"</div>":"")+	"</div>";}).join("");
-  var awardHtml=(S.awards||[]).map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;\"></i>"+esc(a)+"</div>";}).join("");
+  var expHTML=S.experience.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Experience</div>"+
+    S.experience.map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div>"+(e.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(e.desc)+"</div>":"")+
+    "</div>";}).join(""):"";
+  var awdHTML=S.awards.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+
+    S.awards.map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;\"></i>"+esc(a)+"</div>";}).join(""):"";
   return "<div class=\"card\">"+
     "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
-      "<div style=\"flex:1;\"><div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+esc(S.name)+"</div><div style=\"font-size:12px;color:#888;\">"+esc(S.school)+", "+esc(S.city)+" \u00b7 "+esc(S.country)+" \u00b7 "+esc(S.grade)+"</div></div>"+
+      "<div style=\"flex:1;\">"+
+        "<div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+esc(S.name)+"</div>"+
+        "<div style=\"font-size:12px;color:#888;\">"+esc(S.school)+", "+esc(S.country)+" \u00b7 "+esc(S.grade)+"</div>"+
+      "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;margin-top:3px;display:inline-block;\">"+(r.n||"")+"</div>"+
       "</div>"+
     "</div>"+
     "<div class=\"tags\">"+tags+"</div>"+
-    "<div style=\"font-size:13px;color:#888;font-style:italic;margin-top:4px;margin-bottom:10px;\">"+(S.idea||"Open to ideas")+"</div>"+
-    (expHtml?"<div class=\"slabel\" style=\"margin-top:0;\">Experience</div><div>"+expHtml+"</div>":"")+
-    (awardHtml?"<div class=\"slabel\">Awards</div>"+awardHtml:"")+
+    "<div style=\"font-size:13px;color:#888;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
+    expHTML+awdHTML+
   "</div>"+
-  "<div style=\"display:flex;gap:8px;margin-top:1rem;\">"+
-    "<button id=\"edit-profile-btn\" class=\"bo\" style=\"flex:1;\"><i class=\"ti ti-edit\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;\"></i>Edit profile</button>"+
-    "<button id=\"rst\" class=\"bp\" style=\"flex:1;background:#f8f8f6;color:#666;border:1px solid #ddd;\">Start over</button>"+
-  "</div>";
+  // Edit Profile button
+  "<button class=\"bp\" id=\"edit-profile-btn\" style=\"margin-bottom:8px;\">Edit profile</button>"+
+  "<button class=\"bp\" id=\"rst\" style=\"background:#f8f8f6;color:#666;border:1px solid #ddd;\">Start over</button>";
 }
 
 function bindMeTab(){
   var rst=document.getElementById("rst");
   if(rst)rst.addEventListener("click",resetAll);
-  var edit=document.getElementById("edit-profile-btn");
-  if(edit)edit.addEventListener("click",function(){
-    R(logo()+
-      "<h2 style=\"margin-bottom:1rem;\">Edit your profile</h2>"+
-      "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;\">"+
-        "<button class=\"ep-btn bo\" data-step=\"signup\" style=\"padding:14px;text-align:left;\"><i class=\"ti ti-user\" style=\"font-size:16px;color:#534AB7;display:block;margin-bottom:6px;\"></i><div style=\"font-size:13px;font-weight:600;\">Profile</div><div style=\"font-size:11px;color:#888;\">Name, school, location</div></button>"+
-        "<button class=\"ep-btn bo\" data-step=\"track\" style=\"padding:14px;text-align:left;\"><i class=\"ti ti-compass\" style=\"font-size:16px;color:#0F6E56;display:block;margin-bottom:6px;\"></i><div style=\"font-size:13px;font-weight:600;\">Track & Role</div><div style=\"font-size:11px;color:#888;\">Your focus and role</div></button>"+
-        "<button class=\"ep-btn bo\" data-step=\"skills\" style=\"padding:14px;text-align:left;\"><i class=\"ti ti-code\" style=\"font-size:16px;color:#185FA5;display:block;margin-bottom:6px;\"></i><div style=\"font-size:13px;font-weight:600;\">Skills</div><div style=\"font-size:11px;color:#888;\">Your tools and abilities</div></button>"+
-        +
-        "<button class=\"ep-btn bo\" data-step=\"goals\" style=\"padding:14px;text-align:left;\"><i class=\"ti ti-target\" style=\"font-size:16px;color:#854F0B;display:block;margin-bottom:6px;\"></i><div style=\"font-size:13px;font-weight:600;\">Goals</div><div style=\"font-size:11px;color:#888;\">Project and competitions</div></button>"+
+  var epBtn=document.getElementById("edit-profile-btn");
+  if(epBtn)epBtn.addEventListener("click",function(){
+    var el=document.getElementById("tc");
+    if(!el)return;
+    el.innerHTML=
+      "<div class=\"slabel\" style=\"margin-top:0;\">What would you like to edit?</div>"+
+      "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+
+        "<button class=\"ep-step\" data-step=\"signup\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
+          "<i class=\"ti ti-user\" style=\"font-size:18px;color:#534AB7;display:block;margin-bottom:6px;\"></i>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Profile</div>"+
+          "<div style=\"font-size:11px;color:#888;margin-top:2px;\">Name, school, country</div>"+
+        "</button>"+
+        "<button class=\"ep-step\" data-step=\"track\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
+          "<i class=\"ti ti-compass\" style=\"font-size:18px;color:#0F6E56;display:block;margin-bottom:6px;\"></i>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Track & Role</div>"+
+          "<div style=\"font-size:11px;color:#888;margin-top:2px;\">Research, business, tech...</div>"+
+        "</button>"+
+        "<button class=\"ep-step\" data-step=\"skills\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
+          "<i class=\"ti ti-code\" style=\"font-size:18px;color:#185FA5;display:block;margin-bottom:6px;\"></i>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Skills</div>"+
+          "<div style=\"font-size:11px;color:#888;margin-top:2px;\">Your skills & experience</div>"+
+        "</button>"+
+        "<button class=\"ep-step\" data-step=\"goals\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
+          "<i class=\"ti ti-target\" style=\"font-size:18px;color:#993C1D;display:block;margin-bottom:6px;\"></i>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Goals</div>"+
+          "<div style=\"font-size:11px;color:#888;margin-top:2px;\">Stage, competitions, idea</div>"+
+        "</button>"+
       "</div>"+
-      "<button class=\"bkbtn\" id=\"ep-cancel\" style=\"margin-top:1rem;\">Cancel</button>"
-    );
-    document.querySelectorAll(".ep-btn").forEach(function(b){
+      "<button id=\"ep-cancel\" style=\"width:100%;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#888;cursor:pointer;font-family:inherit;\">Cancel</button>";
+    document.querySelectorAll(".ep-step").forEach(function(b){
       b.addEventListener("click",function(){goTo(this.dataset.step);});
     });
-    document.getElementById("ep-cancel").addEventListener("click",function(){goTo("matches");});
+    document.getElementById("ep-cancel").addEventListener("click",function(){showTab("me");});
   });
-}
-
-
-// ── Waitlist ────────────────────────────────
-var FORM_ID="1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ";
-var ENTRY_ID="entry.1045781291";
-
-function openWaitlist(){
-  R(logo()+
-    "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
-      "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;\">"+
-        "<div style=\"text-align:center;margin-bottom:1.25rem;\">"+
-          "<i class=\"ti ti-rocket\" style=\"font-size:40px;color:#7F77DD;\"></i>"+
-          "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-top:8px;\">Get notified when Partnr launches</div>"+
-          "<div style=\"font-size:13px;color:#888;margin-top:6px;line-height:1.5;\">Real students. Real matches. Real connections.<br>Be first to know when the real platform is live.</div>"+
-        "</div>"+
-        "<div class=\"fi\"><label>Your email</label><input id=\"wlemail\" type=\"email\" placeholder=\"you@school.edu\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;\"/></div>"+
-        "<div id=\"wlerr\" style=\"display:none;font-size:12px;color:#E53E3E;margin-bottom:8px;\"></div>"+
-        "<button class=\"bp\" id=\"wlsub\" style=\"margin-top:8px;\">Join the waitlist \u2192</button>"+
-        "<button class=\"bkbtn\" id=\"wlclose\">Back to matches</button>"+
-      "</div>"+
-    "</div>"
-  );
-  document.getElementById("wlsub").addEventListener("click",submitWaitlist);
-  document.getElementById("wlclose").addEventListener("click",function(){goTo("matches");});
-}
-
-async function submitWaitlist(){
-  var email=document.getElementById("wlemail").value.trim();
-  var errEl=document.getElementById("wlerr");
-  if(!email||!email.includes("@")){
-    errEl.textContent="Please enter a valid email address";
-    errEl.style.display="block";return;
-  }
-  errEl.style.display="none";
-  var btn=document.getElementById("wlsub");
-  btn.textContent="Submitting...";btn.disabled=true;
-  try{
-    var url="https://docs.google.com/forms/d/e/"+FORM_ID+"/formResponse";
-    var body=new FormData();
-    body.append(ENTRY_ID,email);
-    await fetch(url,{method:"POST",mode:"no-cors",body:body});
-  } catch(e){}
-  R(logo()+
-    "<div style=\"text-align:center;padding:3rem 1rem;\">"+
-      "<i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i>"+
-      "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">You're on the list!</div>"+
-      "<div style=\"font-size:14px;color:#888;margin-bottom:1.5rem;max-width:300px;margin-left:auto;margin-right:auto;line-height:1.5;\">We'll email <strong>"+esc(email)+"</strong> when real student matching goes live.</div>"+
-      "<button class=\"bp\" id=\"wldone\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button>"+
-    "</div>"
-  );
-  document.getElementById("wldone").addEventListener("click",function(){goTo("matches");});
 }
 
 // ── Skill search ────────────────────────────
 async function srchSkill(skill){
-  var el=document.getElementById("sr");if(!el) return;
+  var el=document.getElementById("sr");if(!el)return;
   el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#888;\">Searching for "+esc(skill)+"...</div></div>";
   try{
     var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:"Generate 4 fictional high school students globally who are strong in \""+skill+"\". Diverse countries. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),availability,status(has project|open to joining|has idea|exploring),bio(2 sentences),keySkill,keyLevel(Beginner/Intermediate/Advanced/Expert),otherSkills(array 2-3),competitions(array 1-2),portfolio(URL or null). Return ONLY valid JSON: {\"results\":[...]}"}]})});
-    if(!res.ok) throw new Error("api");
+    if(!res.ok)throw new Error("api");
     var d=await res.json();
-    if(d.error) throw new Error("api");
+    if(d.error)throw new Error("api");
     var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
     renderSR(JSON.parse(txt).results||[],skill);
   } catch(e){renderSR(demoSR(skill),skill);}
@@ -1482,33 +1497,33 @@ function demoSR(skill){
   var bio2=sl.indexOf("bio")>=0||sl.indexOf("chem")>=0||sl.indexOf("science")>=0||sl.indexOf("research")>=0||sl.indexOf("lab")>=0;
   var biz=sl.indexOf("business")>=0||sl.indexOf("market")>=0||sl.indexOf("ceo")>=0||sl.indexOf("startup")>=0||sl.indexOf("founder")>=0||sl.indexOf("finance")>=0;
   if(code) return[
-    {name:"Yuki Tanaka",school:"Kaisei High School",country:"Japan",grade:"11th grade",avatar:"YT",avatarColor:"blue",track:"tech",role:"tech_r",availability:"10 hrs/week",status:"has project",bio:"Builds ML models for environmental monitoring and won Japan's National Informatics Olympiad.",keySkill:skill,keyLevel:"Expert",otherSkills:["Data Analysis","TensorFlow","Mathematics"],competitions:["Regeneron ISEF","IOI"],portfolio:"github.com/yuki-tanaka-ml"},
-    {name:"Priya Sharma",school:"Delhi Public School",country:"India",grade:"12th grade",avatar:"PS",avatarColor:"teal",track:"research",role:"tech_r",availability:"12 hrs/week",status:"open to joining",bio:"Bioinformatics specialist who built a protein-folding model. Placed top 5 at India's Science Talent Search.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Bioinformatics","R","Biology"],competitions:["iGEM","Regeneron ISEF"],portfolio:"github.com/priya-bio-ml"},
-    {name:"Amir Hassan",school:"STEM High School",country:"Egypt",grade:"11th grade",avatar:"AH",avatarColor:"purple",track:"tech",role:"tech_r",availability:"8 hrs/week",status:"has idea",bio:"Full-stack developer who built a platform connecting 500+ students with tutors.",keySkill:skill,keyLevel:"Advanced",otherSkills:["React","Node.js","Product Design"],competitions:["Hackathon MLH","Congressional App Challenge"],portfolio:"github.com/amir-builds"},
-    {name:"Sofia Reyes",school:"UNAM Prepa",country:"Mexico",grade:"10th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"tech_r",availability:"6 hrs/week",status:"open to joining",bio:"Builds civic tech for underserved communities. Won a national coding competition.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["JavaScript","Community Research","Spanish"],competitions:["Hackathon MLH","Blue Ocean Competition"],portfolio:"github.com/sofia-civic-tech"}
+    {name:"Yuki Tanaka",school:"Kaisei High School",country:"Japan",grade:"11th grade",avatar:"YT",avatarColor:"blue",track:"tech",role:"tech_r",availability:"10 hrs/week",status:"has project",bio:"Builds ML models for environmental monitoring and won Japan's National Informatics Olympiad. Looking for a Vision/CEO partner for his ISEF project.",keySkill:skill,keyLevel:"Expert",otherSkills:["Data Analysis","TensorFlow","Mathematics"],competitions:["Regeneron ISEF","IOI"],portfolio:"github.com/yuki-tanaka-ml"},
+    {name:"Priya Sharma",school:"Delhi Public School",country:"India",grade:"12th grade",avatar:"PS",avatarColor:"teal",track:"research",role:"tech_r",availability:"12 hrs/week",status:"open to joining",bio:"Bioinformatics specialist who built a protein-folding model. Placed top 5 at India's Science Talent Search. Open to joining a strong research team.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Bioinformatics","R","Biology"],competitions:["iGEM","Regeneron ISEF"],portfolio:"github.com/priya-bio-ml"},
+    {name:"Amir Hassan",school:"STEM High School",country:"Egypt",grade:"11th grade",avatar:"AH",avatarColor:"purple",track:"tech",role:"tech_r",availability:"8 hrs/week",status:"has idea",bio:"Full-stack developer who built a platform connecting 500+ students with tutors. Has an EdTech startup idea and needs a business co-founder.",keySkill:skill,keyLevel:"Advanced",otherSkills:["React","Node.js","Product Design"],competitions:["Hackathon MLH","Congressional App Challenge"],portfolio:"github.com/amir-builds"},
+    {name:"Sofia Reyes",school:"UNAM Prepa",country:"Mexico",grade:"10th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"tech_r",availability:"6 hrs/week",status:"open to joining",bio:"Builds civic tech for underserved communities. Won a national coding competition. Looking for a social impact project to join.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["JavaScript","Community Research","Spanish"],competitions:["Hackathon MLH","Blue Ocean Competition"],portfolio:"github.com/sofia-civic-tech"}
   ];
   if(bio2) return[
     {name:"Amara Diallo",school:"Lycee Technique",country:"Senegal",grade:"12th grade",avatar:"AD",avatarColor:"green",track:"research",role:"res_r",availability:"10 hrs/week",status:"has project",bio:"Researching malaria drug resistance using CRISPR. Needs a data scientist to complete her iGEM team.",keySkill:skill,keyLevel:"Expert",otherSkills:["CRISPR","Lab Techniques","French"],competitions:["iGEM","Regeneron ISEF"],portfolio:null},
-    {name:"James Park",school:"Seoul Science High",country:"South Korea",grade:"11th grade",avatar:"JP",avatarColor:"blue",track:"research",role:"res_r",availability:"14 hrs/week",status:"has project",bio:"Co-authored a paper on antibiotic resistance at 16. Preparing an ISEF submission on gut microbiome diversity.",keySkill:skill,keyLevel:"Expert",otherSkills:["Biochemistry","Statistics","Korean"],competitions:["Regeneron ISEF","Science Olympiad"],portfolio:"github.com/james-park-bio"},
-    {name:"Fatima Al-Rashid",school:"King Abdullah Academy",country:"Saudi Arabia",grade:"11th grade",avatar:"FA",avatarColor:"purple",track:"impact",role:"res_r",availability:"8 hrs/week",status:"has idea",bio:"Environmental science researcher focused on water sustainability. Won her regional science fair.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Environmental Science","Arabic","Chemistry"],competitions:["Conrad Challenge","Regeneron ISEF"],portfolio:null},
-    {name:"Lena Mueller",school:"Max Planck Gymnasium",country:"Germany",grade:"12th grade",avatar:"LM",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Neuroscience enthusiast who shadowed at a research lab for two summers.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Neuroscience","German","Statistics"],competitions:["Regeneron STS Prep","Science Olympiad"],portfolio:null}
+    {name:"James Park",school:"Seoul Science High",country:"South Korea",grade:"11th grade",avatar:"JP",avatarColor:"blue",track:"research",role:"res_r",availability:"14 hrs/week",status:"has project",bio:"Co-authored a paper on antibiotic resistance at 16. Preparing an ISEF submission on gut microbiome diversity. Needs a data partner.",keySkill:skill,keyLevel:"Expert",otherSkills:["Biochemistry","Statistics","Korean"],competitions:["Regeneron ISEF","Science Olympiad"],portfolio:"github.com/james-park-bio"},
+    {name:"Fatima Al-Rashid",school:"King Abdullah Academy",country:"Saudi Arabia",grade:"11th grade",avatar:"FA",avatarColor:"purple",track:"impact",role:"res_r",availability:"8 hrs/week",status:"has idea",bio:"Environmental science researcher focused on water sustainability. Won her regional science fair. Looking for a partner for Conrad Challenge.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Environmental Science","Arabic","Chemistry"],competitions:["Conrad Challenge","Regeneron ISEF"],portfolio:null},
+    {name:"Lena Mueller",school:"Max Planck Gymnasium",country:"Germany",grade:"12th grade",avatar:"LM",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Neuroscience enthusiast who shadowed at a research lab for two summers. Looking for a co-researcher and project to apply her skills.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Neuroscience","German","Statistics"],competitions:["Regeneron STS Prep","Science Olympiad"],portfolio:null}
   ];
   if(biz) return[
-    {name:"Marcus Webb",school:"Design Tech HS",country:"United States",grade:"10th grade",avatar:"MW",avatarColor:"blue",track:"business",role:"vision",availability:"10 hrs/week",status:"has project",bio:"Launched a tutoring marketplace with 300+ users as a sophomore.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Product Strategy","Fundraising","Marketing"],competitions:["Conrad Challenge","Diamond Challenge"],portfolio:"linkedin.com/in/marcus-webb"},
-    {name:"Chioma Obi",school:"Corona Secondary School",country:"Nigeria",grade:"12th grade",avatar:"CO",avatarColor:"green",track:"business",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Grew her school's social enterprise from 10 to 500 customers.",keySkill:skill,keyLevel:"Expert",otherSkills:["Social Media","Brand Strategy","Yoruba"],competitions:["Blue Ocean Competition","SAGE World Cup"],portfolio:"instagram.com/chioma.creates"},
-    {name:"Arjun Mehta",school:"Delhi Public School",country:"India",grade:"11th grade",avatar:"AM",avatarColor:"purple",track:"business",role:"ops",availability:"12 hrs/week",status:"open to joining",bio:"Finance expert whose model portfolio outperformed the Sensex by 18%.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Financial Modeling","Operations","Hindi"],competitions:["Wharton Investment Competition","DECA ICDC"],portfolio:"github.com/arjun-fintech"},
-    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Expert writer who pitched to the French Senate at 16.",keySkill:skill,keyLevel:"Expert",otherSkills:["Public Speaking","French","Research"],competitions:["Diamond Challenge","Conrad Challenge"],portfolio:"leadubois.fr"}
+    {name:"Marcus Webb",school:"Design Tech HS",country:"United States",grade:"10th grade",avatar:"MW",avatarColor:"blue",track:"business",role:"vision",availability:"10 hrs/week",status:"has project",bio:"Launched a tutoring marketplace with 300+ users as a sophomore. Has a new startup idea and needs a technical co-founder.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Product Strategy","Fundraising","Marketing"],competitions:["Conrad Challenge","Diamond Challenge"],portfolio:"linkedin.com/in/marcus-webb"},
+    {name:"Chioma Obi",school:"Corona Secondary School",country:"Nigeria",grade:"12th grade",avatar:"CO",avatarColor:"green",track:"business",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Grew her school's social enterprise from 10 to 500 customers. Has an agri-tech startup idea and needs a technical co-founder.",keySkill:skill,keyLevel:"Expert",otherSkills:["Social Media","Brand Strategy","Yoruba"],competitions:["Blue Ocean Competition","SAGE World Cup"],portfolio:"instagram.com/chioma.creates"},
+    {name:"Arjun Mehta",school:"Delhi Public School",country:"India",grade:"11th grade",avatar:"AM",avatarColor:"purple",track:"business",role:"ops",availability:"12 hrs/week",status:"open to joining",bio:"Finance expert whose model portfolio outperformed the Sensex by 18%. Open to joining a strong founding team as the finance co-founder.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Financial Modeling","Operations","Hindi"],competitions:["Wharton Investment Competition","DECA ICDC"],portfolio:"github.com/arjun-fintech"},
+    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Expert writer who pitched to the French Senate at 16. Has a social enterprise idea and needs a technical co-founder to build the product.",keySkill:skill,keyLevel:"Expert",otherSkills:["Public Speaking","French","Research"],competitions:["Diamond Challenge","Conrad Challenge"],portfolio:"leadubois.fr"}
   ];
   return[
-    {name:"Nina Kovac",school:"Gimnazija Bezigrad",country:"Slovenia",grade:"12th grade",avatar:"NK",avatarColor:"purple",track:"arts",role:"creative",availability:"8 hrs/week",status:"has project",bio:"Award-winning designer who created the visual identity for her city's youth council.",keySkill:skill,keyLevel:"Expert",otherSkills:["Illustration","Branding","Slovenian"],competitions:["YoungArts","Scholastic Art Award"],portfolio:"ninakovac.design"},
-    {name:"David Osei",school:"Achimota School",country:"Ghana",grade:"12th grade",avatar:"DO",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Placed 2nd in the John Locke Essay Competition. Strong analytical writer looking for a research project.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Philosophy","Writing","Twi"],competitions:["John Locke Essay","Conrad Challenge"],portfolio:null},
-    {name:"Mei Lin",school:"Shanghai High School",country:"China",grade:"11th grade",avatar:"ML",avatarColor:"blue",track:"tech",role:"tech_r",availability:"12 hrs/week",status:"has idea",bio:"Builder with three apps on the app store who wants to work on something with real social impact.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Swift","UI Design","Mandarin"],competitions:["Congressional App Challenge","Hackathon MLH"],portfolio:"github.com/mei-builds"},
-    {name:"Rania Khalil",school:"AUC School",country:"Egypt",grade:"11th grade",avatar:"RK",avatarColor:"coral",track:"impact",role:"vision",availability:"6 hrs/week",status:"has idea",bio:"Social entrepreneur who launched a literacy program reaching 200+ students.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["Arabic","Community Organizing","Public Speaking"],competitions:["SAGE World Cup","Diamond Challenge Social"],portfolio:null}
+    {name:"Nina Kovac",school:"Gimnazija Bezigrad",country:"Slovenia",grade:"12th grade",avatar:"NK",avatarColor:"purple",track:"arts",role:"creative",availability:"8 hrs/week",status:"has project",bio:"Award-winning designer who created the visual identity for her city's youth council. Looking for a writer or researcher to collaborate with.",keySkill:skill,keyLevel:"Expert",otherSkills:["Illustration","Branding","Slovenian"],competitions:["YoungArts","Scholastic Art Award"],portfolio:"ninakovac.design"},
+    {name:"David Osei",school:"Achimota School",country:"Ghana",grade:"12th grade",avatar:"DO",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Placed 2nd in the John Locke Essay Competition. Strong analytical writer looking for a research project to join.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Philosophy","Writing","Twi"],competitions:["John Locke Essay","Conrad Challenge"],portfolio:null},
+    {name:"Mei Lin",school:"Shanghai High School",country:"China",grade:"11th grade",avatar:"ML",avatarColor:"blue",track:"tech",role:"tech_r",availability:"12 hrs/week",status:"has idea",bio:"Builder with three apps on the app store who wants to work on something with real social impact. Looking for a Vision partner.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Swift","UI Design","Mandarin"],competitions:["Congressional App Challenge","Hackathon MLH"],portfolio:"github.com/mei-builds"},
+    {name:"Rania Khalil",school:"AUC School",country:"Egypt",grade:"11th grade",avatar:"RK",avatarColor:"coral",track:"impact",role:"vision",availability:"6 hrs/week",status:"has idea",bio:"Social entrepreneur who launched a literacy program reaching 200+ students. Wants to scale it and needs a tech and ops partner.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["Arabic","Community Organizing","Public Speaking"],competitions:["SAGE World Cup","Diamond Challenge Social"],portfolio:null}
   ];
 }
 
 function renderSR(results,skill){
-  var el=document.getElementById("sr");if(!el) return;
+  var el=document.getElementById("sr");if(!el)return;
   var sbgs={"has project":"#EEEDFE","open to joining":"#EAF3DE","has idea":"#FAEEDA","exploring":"#F1EFE8"};
   var stcs={"has project":"#3C3489","open to joining":"#3B6D11","has idea":"#854F0B","exploring":"#5F5E5A"};
   if(!results||!results.length){el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#888;\">No results \u2014 try a different search.</div>";return;}
@@ -1541,7 +1556,6 @@ function renderSR(results,skill){
   });
   el.innerHTML=h;
 }
-
 
 // ── Fallback demo data ───────────────────────
 function fallback(){
