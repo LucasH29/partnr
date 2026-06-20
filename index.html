@@ -1129,48 +1129,15 @@ function rMatches(){
 function openWaitlist(){
   R(logo()+
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
-      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:6px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
-      "<div style=\"font-size:13px;color:#888;margin-bottom:1.25rem;line-height:1.6;\">Enter your email and we'll notify you when real students in your region join. No spam, just one email when you have real matches waiting.</div>"+
-      "<div class=\"fi\"><label>Email</label><input id=\"wl-email\" type=\"email\" placeholder=\"your@email.com\" value=\""+esc(S.email)+"\"/></div>"+
-      "<div class=\"fi\"><label>City / Region</label><input id=\"wl-city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\" value=\""+esc(S.city)+"\"/></div>"+
-      "<button class=\"bp\" id=\"wl-submit\">Join the waitlist \u2192</button>"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
+      "<div style=\"font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6;\">Fill in your details below \u2014 no spam, just one email when real matches are waiting.</div>"+
+      "<iframe src=\"https://docs.google.com/forms/d/e/1FAIpQLSeQ5CXCs8pzrpFO3QfpA8B2mYj72yD08Jki-C52YwXt6ukXEQ/viewform?embedded=true\" width=\"640\" height=\"556\" frameborder=\"0\" marginheight=\"0\" marginwidth=\"0\">Loading\u2026</iframe>"+
       "<button class=\"bkbtn\" id=\"wl-back\">\u2190 Back to matches</button>"+
     "</div>"
   );
-  document.getElementById("wl-submit").addEventListener("click",submitWaitlist);
   document.getElementById("wl-back").addEventListener("click",function(){goTo("matches");});
 }
-function submitWaitlist(){
-  var email=document.getElementById("wl-email").value.trim();
-  var city=document.getElementById("wl-city").value.trim();
-  if(!email){showErr("wl-email","Please enter your email");return;}
-  var btn=document.getElementById("wl-submit");
-  btn.textContent="Joining...";btn.disabled=true;
-  fetch("https://formspree.io/f/mkolwgkd",{
-    method:"POST",
-    headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded"},
-    body:"email="+encodeURIComponent(email)+"&city="+encodeURIComponent(city||"")
-  }).then(function(r){
-    if(r.ok){
-      R(logo()+
-        "<div style=\"text-align:center;padding:3rem 1rem;\">"+
-          "<i class=\"ti ti-circle-check\" style=\"font-size:56px;color:#1D9E75;\"></i>"+
-          "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:16px 0 8px;\">You're on the list!</div>"+
-          "<div style=\"font-size:14px;color:#888;line-height:1.6;max-width:320px;margin:0 auto 1.5rem;\">We'll reach out as soon as real students in your region join. Partnr is free, always.</div>"+
-          "<button class=\"bp\" id=\"wl-done\" style=\"max-width:260px;margin:0 auto;display:block;\">Back to matches \u2192</button>"+
-        "</div>"
-      );
-      document.getElementById("wl-done").addEventListener("click",function(){goTo("matches");});
-    } else {
-      btn.textContent="Join the waitlist \u2192";btn.disabled=false;
-      showErr("wl-email","Something went wrong \u2014 please try again");
-    }
-  }).catch(function(){
-    btn.textContent="Join the waitlist \u2192";btn.disabled=false;
-    showErr("wl-email","Something went wrong \u2014 please try again");
-  });
-}
-
+function submitWaitlist(){}
 function showTab(tab){
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
