@@ -1132,37 +1132,16 @@ function openWaitlist(){
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
       "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
       "<div style=\"font-size:13px;color:#888;margin-bottom:1.25rem;line-height:1.6;\">Enter your email and we'll notify you when real students in your region join. No spam.</div>"+
-      "<div data-fs-error style=\"color:#e53e3e;font-size:13px;margin-bottom:8px;display:none;\" id=\"fs-form-err\"></div>"+
-      "<div data-fs-success style=\"display:none;\" id=\"fs-success\"></div>"+
-      "<form id=\"fs-form\">"+
-        "<div class=\"fi\"><label>Email</label><input type=\"email\" id=\"wl-email\" name=\"email\" data-fs-field placeholder=\"your@email.com\" value=\""+esc(S.email)+"\"/><span data-fs-error=\"email\" style=\"color:#e53e3e;font-size:12px;\"></span></div>"+
-        "<div class=\"fi\"><label>City / Region</label><input type=\"text\" id=\"wl-city\" name=\"city\" data-fs-field placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\" value=\""+esc(S.city)+"\"/></div>"+
-        "<button type=\"submit\" class=\"bp\" data-fs-submit-btn>Join the waitlist \u2192</button>"+
+      "<form action=\"https://formspree.io/f/mkolwgkd\" method=\"POST\">"+
+        "<div class=\"fi\"><label>Email</label><input type=\"email\" name=\"email\" placeholder=\"your@email.com\" required/></div>"+
+        "<div class=\"fi\"><label>City / Region</label><input type=\"text\" name=\"city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\"/></div>"+
+        "<input type=\"hidden\" name=\"_subject\" value=\"New Partnr Waitlist Signup!\"/>"+
+        "<button type=\"submit\" class=\"bp\">Join the waitlist \u2192</button>"+
       "</form>"+
       "<button class=\"bkbtn\" id=\"wl-back\">\u2190 Back to matches</button>"+
     "</div>"
   );
   document.getElementById("wl-back").addEventListener("click",function(){goTo("matches");});
-  // Init Formspree AJAX
-  window.formspree = window.formspree || function(){(formspree.q=formspree.q||[]).push(arguments);};
-  formspree("initForm",{formElement:"#fs-form",formId:"mkolwgkd"});
-  // Watch for success
-  var obs=new MutationObserver(function(){
-    var s=document.getElementById("fs-success");
-    if(s&&s.style.display!=="none"&&s.style.display!==""){
-      R(logo()+
-        "<div style=\"text-align:center;padding:3rem 1rem;\">"+
-          "<i class=\"ti ti-circle-check\" style=\"font-size:56px;color:#1D9E75;\"></i>"+
-          "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:16px 0 8px;\">You're on the list!</div>"+
-          "<div style=\"font-size:14px;color:#888;line-height:1.6;max-width:320px;margin:0 auto 1.5rem;\">We'll reach out as soon as real students in your region join. Partnr is free, always.</div>"+
-          "<button class=\"bp\" id=\"wl-done\" style=\"max-width:260px;margin:0 auto;display:block;\">Back to matches \u2192</button>"+
-        "</div>"
-      );
-      document.getElementById("wl-done").addEventListener("click",function(){goTo("matches");});
-    }
-  });
-  var root=document.getElementById("ROOT");
-  if(root)obs.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:["style"]});
 }
 function submitWaitlist(){}
 function showTab(tab){
