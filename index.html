@@ -120,7 +120,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",experience:[],awards:[]};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
 // ── Countries WITHOUT zip/postal codes ─────
@@ -577,20 +577,33 @@ function rTrack(){
     "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
     "<div class=\"slabel\">Status</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
-    "<div class=\"slabel\">Secondary interest <span style=\"font-weight:400;color:#aaa;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
+    "<div class=\"slabel\">Secondary interests <span style=\"font-weight:400;color:#aaa;text-transform:none;font-size:12px;letter-spacing:0;\">(optional \u2014 pick up to 2)</span></div>"+
     "<div class=\"cgrow\" id=\"secondary\"></div>"+
     "<button class=\"bp\" id=\"s3\" style=\"opacity:"+(S.track&&S.role?"1":"0.4")+"\">Continue \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
   mkChips("status",["I have a project \u2014 need partners","I have skills \u2014 open to joining","I have an idea \u2014 need co-founders","Just exploring"],[S.status],true);
   var secTracks=Object.keys(TR).map(function(k){return TR[k].n;}).filter(function(n){return !S.track||n!==TR[S.track].n;});
-  mkChips("secondary",secTracks,[S.secondary||""],true);
+  mkChips("secondary",secTracks,Array.isArray(S.secondary)?S.secondary:[],false);
+  // Enforce max 2 secondary
+  document.querySelectorAll("#secondary .chip").forEach(function(c){
+    c.addEventListener("click",function(){
+      var sel=document.querySelectorAll("#secondary .chip.on");
+      if(sel.length>2){this.classList.remove("on");}
+    });
+  });
   document.querySelectorAll(".tc").forEach(function(el){
     el.addEventListener("click",function(){
       var newPrimary=this.dataset.val;
       var secOpts=Object.keys(TR).filter(function(k){return k!==newPrimary;}).map(function(k){return TR[k].n;});
-      if(S.secondary&&S.secondary===TR[newPrimary].n)S.secondary="";
-      mkChips("secondary",secOpts,[S.secondary||""],true);
+      if(Array.isArray(S.secondary))S.secondary=S.secondary.filter(function(s){return s!==TR[newPrimary].n;});
+      mkChips("secondary",secOpts,Array.isArray(S.secondary)?S.secondary:[],false);
+      document.querySelectorAll("#secondary .chip").forEach(function(c){
+        c.addEventListener("click",function(){
+          var sel=document.querySelectorAll("#secondary .chip.on");
+          if(sel.length>2){this.classList.remove("on");}
+        });
+      });
     });
   });
   if(S.track){var e=document.querySelector("[data-val=\""+S.track+"\"]");if(e){e.classList.add("on");e.style.background=TR[S.track].bg;}}
@@ -869,13 +882,30 @@ function rGoals(){
     "<div class=\"fi\"><label>Describe your idea or what you're looking for in a partner</label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app...\">"+esc(S.idea)+"</textarea></div>"+
     "<div class=\"slabel\">Commitment</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
-    "<div class=\"slabel\">Partner location</div>"+
-    "<div class=\"cgrow\" id=\"loc\"></div>"+
+    "<div class=\"slabel\">Who do you want to connect with?</div>"+
+    "<div style=\"font-size:13px;color:#888;margin-bottom:10px;\">You can change this anytime from your matches page.</div>"+
+    "<div id=\"loc-pref\" style=\"display:grid;gap:8px;margin-bottom:1rem;\">"+
+    ["\ud83c\udfe3 Students at my school","\ud83d\udccd Students in my city / region","\ud83c\udf0d Anyone in the world"].map(function(opt){
+      var sel=S.locationPref===opt;
+      return "<button class=\"loc-opt\" data-val=\""+esc(opt)+"\" style=\"width:100%;padding:12px 16px;border:2px solid "+(sel?"#7F77DD":"#e8e8e4")+";border-radius:10px;cursor:pointer;background:"+(sel?"#EEEDFE":"white")+";font-size:14px;font-weight:"+(sel?"600":"400")+";color:"+(sel?"#3C3489":"#444")+";text-align:left;font-family:inherit;\">"+ opt +"</button>";
+    }).join("")+
+    "</div>"+
     "<button class=\"bp\" id=\"gf\">Find my partners \u2192</button>"+
     "<button class=\"bkbtn\" id=\"bk\">\u2190 Back</button>"
   );
   mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
-  mkChips("loc",["Near me","Remote / global","Either"],[S.location],true);
+  document.querySelectorAll(".loc-opt").forEach(function(el){
+    el.addEventListener("click",function(){
+      S.locationPref=this.dataset.val;
+      document.querySelectorAll(".loc-opt").forEach(function(o){
+        var sel=o.dataset.val===S.locationPref;
+        o.style.borderColor=sel?"#7F77DD":"#e8e8e4";
+        o.style.background=sel?"#EEEDFE":"white";
+        o.style.fontWeight=sel?"600":"400";
+        o.style.color=sel?"#3C3489":"#444";
+      });
+    });
+  });
   document.querySelectorAll("#stg .stb").forEach(function(el){
     el.addEventListener("click",function(){document.querySelectorAll("#stg .stb").forEach(function(b){b.classList.remove("on");});this.classList.add("on");S.stage=this.dataset.val;});
   });
@@ -1031,7 +1061,7 @@ function step3(){
   if(!statusSel){showSecErr("status","Please select your current status");valid=false;}
   if(!valid){scrollToFirstErr();return;}
   S.status=statusSel;
-  S.secondary=getChips("secondary")[0]||"";
+  S.secondary=getChips("secondary").slice(0,2);
   goTo("skills");
 }
 function step4(){
@@ -1061,11 +1091,10 @@ function goFind(){
   if(!idea&&!selComps.length){showSecErr("iidea","Please describe your project or add at least one competition");valid=false;}
   var commit=getChips("commit")[0]||"";
   if(!commit){showSecErr("commit","Please select your commitment level");valid=false;}
-  var loc=getChips("loc")[0]||"";
-  if(!loc){showSecErr("loc","Please select your partner location preference");valid=false;}
+  if(!S.locationPref){showSecErr("loc-pref","Please select who you want to connect with");valid=false;}
   if(!valid){scrollToFirstErr();return;}
   S.comps=selComps.map(function(c){return c.n;});
-  S.idea=idea;S.commit=commit;S.location=loc;
+  S.idea=idea;S.commit=commit;S.location=S.locationPref;
   goTo("loading");doFetch();
 }
 
@@ -1082,7 +1111,8 @@ async function doFetch(){
     return c.n+" "+crossNote;
   }).join(", ")||"open";
   var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none";
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nTrack: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nCompetitions: "+compInfo+"\nIdea: "+(S.idea||"open")+"\nLocation: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- At least 1 match from a different continent\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
     if(!res.ok)throw new Error("status "+res.status);
@@ -1119,6 +1149,13 @@ function rMatches(){
     "<div id=\"tc\"></div>"
   );
   document.getElementById("wlbtn").addEventListener("click",openWaitlist);
+  var locBar=document.createElement("div");
+  locBar.style.cssText="display:flex;align-items:center;gap:8px;background:#f8f8f6;border-radius:10px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#555;";
+  locBar.innerHTML="<span style=\"flex:1;\">"+esc(S.locationPref||"Anyone in the world")+"</span><button id=\"loc-change\" style=\"background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;\">Change</button>";
+  var rootEl=document.getElementById("ROOT");
+  var navEl=rootEl?rootEl.querySelector(".nav"):null;
+  if(navEl)rootEl.insertBefore(locBar,navEl);
+  document.getElementById("loc-change").addEventListener("click",function(){goTo("goals");});
   ["matches","recruit","search","deadlines","conns","me"].forEach(function(t){
     var b=document.getElementById("nb-"+t);
     if(b)b.addEventListener("click",function(){document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});this.classList.add("on");showTab(t);});
@@ -1132,18 +1169,52 @@ function openWaitlist(){
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
       "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">\ud83d\udccd Get notified when Partnr launches near you</div>"+
       "<div style=\"font-size:13px;color:#888;margin-bottom:1.25rem;line-height:1.6;\">Enter your email and we'll notify you when real students in your region join. No spam.</div>"+
-      "<form action=\"https://formspree.io/f/mkolwgkd\" method=\"POST\">"+
-        "<div class=\"fi\"><label>Email</label><input type=\"email\" name=\"email\" placeholder=\"your@email.com\" required/></div>"+
-        "<div class=\"fi\"><label>City / Region</label><input type=\"text\" name=\"city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\"/></div>"+
-        "<input type=\"hidden\" name=\"_subject\" value=\"New Partnr Waitlist Signup!\"/>"+
-        "<button type=\"submit\" class=\"bp\">Join the waitlist \u2192</button>"+
-      "</form>"+
+      "<div id=\"wl-success\" style=\"display:none;text-align:center;padding:1.5rem 0;\">"+
+        "<i class=\"ti ti-circle-check\" style=\"font-size:48px;color:#1D9E75;\"></i>"+
+        "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">You're on the list!</div>"+
+        "<div style=\"font-size:13px;color:#888;\">We'll reach out when real students in your region join.</div>"+
+      "</div>"+
+      "<div id=\"wl-form-wrap\">"+
+        "<div class=\"fi\"><label>Email</label><input type=\"email\" id=\"wl-email\" placeholder=\"your@email.com\" required/><div id=\"wl-email-err\" style=\"color:#e53e3e;font-size:12px;margin-top:3px;display:none;\">Please enter a valid email</div></div>"+
+        "<div class=\"fi\"><label>City / Region</label><input type=\"text\" id=\"wl-city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\"/></div>"+
+        "<button class=\"bp\" id=\"wl-submit\">Join the waitlist \u2192</button>"+
+        "<div id=\"wl-err\" style=\"color:#e53e3e;font-size:12px;margin-top:8px;display:none;\">Something went wrong \u2014 please try again</div>"+
+      "</div>"+
       "<button class=\"bkbtn\" id=\"wl-back\">\u2190 Back to matches</button>"+
     "</div>"
   );
   document.getElementById("wl-back").addEventListener("click",function(){goTo("matches");});
+  document.getElementById("wl-submit").addEventListener("click",submitWaitlist);
 }
-function submitWaitlist(){}
+function submitWaitlist(){
+  var email=document.getElementById("wl-email").value.trim();
+  var city=document.getElementById("wl-city").value.trim();
+  var emailErr=document.getElementById("wl-email-err");
+  var formErr=document.getElementById("wl-err");
+  var btn=document.getElementById("wl-submit");
+  emailErr.style.display="none";
+  formErr.style.display="none";
+  if(!email||!email.includes("@")){emailErr.style.display="block";return;}
+  btn.textContent="Joining...";btn.disabled=true;
+  var xhr=new XMLHttpRequest();
+  xhr.open("POST","https://formspree.io/f/mkolwgkd",true);
+  xhr.setRequestHeader("Accept","application/json");
+  xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+  xhr.onload=function(){
+    if(xhr.status===200||xhr.status===302){
+      document.getElementById("wl-form-wrap").style.display="none";
+      document.getElementById("wl-success").style.display="block";
+    } else {
+      btn.textContent="Join the waitlist \u2192";btn.disabled=false;
+      formErr.style.display="block";
+    }
+  };
+  xhr.onerror=function(){
+    btn.textContent="Join the waitlist \u2192";btn.disabled=false;
+    formErr.style.display="block";
+  };
+  xhr.send("email="+encodeURIComponent(email)+"&city="+encodeURIComponent(city)+"&_subject="+encodeURIComponent("New Partnr Waitlist Signup!"));
+}
 function showTab(tab){
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
@@ -1305,19 +1376,97 @@ function pCards(){
 function bindPE(){document.querySelectorAll(".apb").forEach(function(b){b.addEventListener("click",function(){alert("Application sent for \""+this.dataset.title+"\"!\n\nYour role, skill levels, and portfolio will be shared. They will respond within 48 hours.");});});}
 
 function sTab(){
-  return "<div class=\"slabel\" style=\"margin-top:0;\">Search by skill, role, or interest</div>"+
-    "<div class=\"sub\">Find anyone globally \u2014 startup founders, researchers, artists, engineers. Even students without a project yet.</div>"+
-    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
-      "<input id=\"ss\" placeholder=\"Python, startup founder, biology, debate, CEO...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+  return "<div class=\"slabel\" style=\"margin-top:0;\">Find students by skill</div>"+
+    "<div class=\"sub\">Browse by category or search any skill, competition, or role.</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1.25rem;\">"+
+      "<input id=\"ss\" placeholder=\"Search \u2014 Python, ISEF, Figma, debate, nonprofit...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search \u2192</button>"+
     "</div>"+
-    "<div class=\"cgrow\" id=\"qs\"></div>"+
-    "<div id=\"sr\" style=\"margin-top:1rem;\"></div>";
+    "<div class=\"slabel\" style=\"margin-top:0;\">Browse by category</div>"+
+    "<div id=\"skill-browse\" style=\"margin-bottom:1rem;\"></div>"+
+    "<div id=\"skill-drill\" style=\"margin-bottom:1rem;display:none;\"></div>"+
+    "<div id=\"sr\" style=\"margin-top:0.5rem;\"></div>";
 }
 function bindSE(){
-  mkChips("qs",["Python","Machine Learning","Biology","Startup founder","CEO / Vision","CTO / Tech","Design / Figma","Marketing","Social Impact","Research","Debate","Model UN"],[],false);
-  document.querySelectorAll("#qs .chip").forEach(function(b){b.addEventListener("click",function(){document.getElementById("ss").value=this.textContent;srchSkill(this.textContent);});});
-  document.getElementById("ssb").addEventListener("click",function(){var q=document.getElementById("ss").value.trim();if(q)srchSkill(q);});
+  // Build category browser
+  var browsEl=document.getElementById("skill-browse");
+  if(!browsEl)return;
+  var catHTML=SKILL_CATS.map(function(cat){
+    var cc=SKILL_CAT_COLORS[cat.id]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    return "<button class=\"skill-browse-cat\" data-cat=\""+cat.id+"\" style=\"display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border:1px solid #e8e8e4;border-radius:10px;cursor:pointer;background:white;text-align:left;font-family:inherit;margin-bottom:8px;\">"+
+      "<div style=\"width:34px;height:34px;border-radius:8px;background:"+cc.bg+";display:flex;align-items:center;justify-content:center;flex-shrink:0;\">"+
+        "<i class=\"ti "+cat.icon+"\" style=\"font-size:17px;color:"+cc.color+";\"></i>"+
+      "</div>"+
+      "<div style=\"flex:1;text-align:left;\">"+
+        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cat.label+"</div>"+
+        "<div style=\"font-size:11px;color:#888;margin-top:1px;\">"+cat.items.length+" skills</div>"+
+      "</div>"+
+      "<i class=\"ti ti-chevron-right\" style=\"font-size:15px;color:#ccc;\"></i>"+
+    "</button>";
+  }).join("");
+  browsEl.innerHTML=catHTML;
+
+  document.querySelectorAll(".skill-browse-cat").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var catId=this.dataset.cat;
+      var cat=SKILL_CATS.find(function(c){return c.id===catId;});
+      if(!cat)return;
+      var cc=SKILL_CAT_COLORS[catId]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+      var drillEl=document.getElementById("skill-drill");
+      drillEl.style.display="block";
+      drillEl.innerHTML=
+        "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:10px;\">"+
+          "<button id=\"drill-back\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:13px;font-weight:600;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;\"><i class=\"ti ti-arrow-left\" style=\"font-size:13px;\"></i> All categories</button>"+
+        "</div>"+
+        "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:12px;\">"+
+          "<div style=\"width:32px;height:32px;border-radius:8px;background:"+cc.bg+";display:flex;align-items:center;justify-content:center;\">"+
+            "<i class=\"ti "+cat.icon+"\" style=\"font-size:16px;color:"+cc.color+";\"></i>"+
+          "</div>"+
+          "<div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+cat.label+"</div>"+
+        "</div>"+
+        "<div style=\"display:flex;flex-wrap:wrap;gap:7px;\">"+
+          cat.items.map(function(skill){
+            return "<button class=\"skill-drill-item\" data-skill=\""+esc(skill)+"\" style=\"padding:7px 14px;border:1px solid "+cc.color+";border-radius:20px;font-size:13px;cursor:pointer;color:"+cc.color+";background:"+cc.bg+";font-family:inherit;font-weight:500;\">"+skill+"</button>";
+          }).join("")+
+        "</div>";
+      document.getElementById("skill-browse").style.display="none";
+      document.getElementById("drill-back").addEventListener("click",function(){
+        drillEl.style.display="none";
+        document.getElementById("skill-browse").style.display="block";
+        document.getElementById("sr").innerHTML="";
+      });
+      document.querySelectorAll(".skill-drill-item").forEach(function(b){
+        b.addEventListener("click",function(){
+          var skill=this.dataset.skill;
+          document.getElementById("ss").value=skill;
+          srchSkill(skill);
+          // Highlight selected
+          document.querySelectorAll(".skill-drill-item").forEach(function(x){x.style.fontWeight="500";x.style.borderWidth="1px";});
+          this.style.fontWeight="700";this.style.borderWidth="2px";
+        });
+      });
+    });
+  });
+
+  // Search button
+  document.getElementById("ssb").addEventListener("click",function(){
+    var q=document.getElementById("ss").value.trim();
+    if(q){
+      document.getElementById("skill-browse").style.display="none";
+      document.getElementById("skill-drill").style.display="none";
+      srchSkill(q);
+    }
+  });
+  document.getElementById("ss").addEventListener("keydown",function(e){
+    if(e.key==="Enter"){
+      var q=this.value.trim();
+      if(q){
+        document.getElementById("skill-browse").style.display="none";
+        document.getElementById("skill-drill").style.display="none";
+        srchSkill(q);
+      }
+    }
+  });
 }
 
 function dCards(){
@@ -1544,8 +1693,8 @@ function renderSR(results,skill){
 function fallback(){
   var r2=RO[S.role]||RO.res_r;
   MATCHES=[
-    {name:"Priya Sharma",school:"Delhi Public School",country:"India",grade:"11th grade",avatar:"PS",avatarColor:"teal",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Expert","Machine Learning":"Advanced",Biology:"Intermediate","Data Analysis":"Advanced"},competitions:["Regeneron ISEF","iGEM"],matchScore:94,why:"Priya's Expert Python and Tech/CTO role directly complements your "+r2.n+". Her Advanced ML skills match your project needs exactly.",projectIdea:"ML model for early Alzheimers detection from EEG signals",commitment:"Competition-ready",availability:"12 hrs/week",timezone:"IST (UTC+5:30)",isNearby:false,languages:["English","Hindi"],status:"has project",stage:"building",bio:"Priya is a junior at Delhi Public School passionate about computational neuroscience. She interned at IIT Delhi and won India's National Science Fair.",experience:[{title:"IIT Delhi Bioinformatics Internship",desc:"Built protein-folding prediction models in Python and PyTorch."},{title:"India National Science Fair 1st Place",desc:"Research on microbiome diversity across 6 Indian cities."},{title:"Google Girls Code",desc:"Built a disease-prediction web app used by 200+ students."}],awards:["India National Science Fair 1st place 2024"],portfolio:"github.com/priya-sharma-ds",lookingFor:"I need a "+r2.n+" who can lead scientific direction and handle judge presentations. I build all the code."},
-    {name:"Marcus Webb",school:"Design Tech HS",country:"United States",grade:"10th grade",avatar:"MW",avatarColor:"blue",track:"tech",role:"ops",skillsWithLevels:{Engineering:"Advanced","Project Management":"Intermediate",CAD:"Advanced"},competitions:["Conrad Challenge","FIRST Robotics"],matchScore:89,why:"Marcus keeps projects on schedule while you lead. His Advanced engineering skills complement your analytical focus perfectly.",projectIdea:"IoT water quality sensor for rural schools",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English"],status:"has project",stage:"planning",bio:"Marcus taught himself CAD through maker spaces. Passionate about technology accessibility in under-resourced schools.",experience:[{title:"FIRST Robotics Regional 3rd place",desc:"Led team logistics and hardware assembly."},{title:"Conrad Challenge Semifinalist 2024",desc:"Solar-powered water purification device reached semifinal."},{title:"School Maker Space Lead",desc:"Organizes weekly build sessions for 30+ students."}],awards:["FIRST Robotics Regional 3rd place 2024"],portfolio:"github.com/marcus-webb-builds",lookingFor:"Need a Research or Vision partner for scientific writing and data analysis. Must be available weekends."},
+    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Tech/CTO role and Python skills directly complement your "+r2.n+". Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank — reached district finals."},{title:"Hackathon MLH — 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need a "+r2.n+" who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
+    {name:"Sofia Reyes",school:"Beverly Hills High School",country:"United States",grade:"12th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Public Speaking":"Expert","Social Media Marketing":"Advanced","Brand Strategy":"Advanced","Market Research":"Intermediate"},competitions:["Blue Ocean Competition","Diamond Challenge"],matchScore:91,why:"Sofia's Expert public speaking and marketing skills are exactly what a "+r2.n+" needs to pitch and win. LA-based so you can meet and prep together.",projectIdea:"Social enterprise connecting food-insecure students at LA schools with local restaurants",commitment:"Serious",availability:"8 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Spanish"],status:"has idea",stage:"planning",bio:"Senior at Beverly Hills High School who ran her school's social enterprise club and grew it from 12 to 200 members. Has a fully formed idea for a Conrad Challenge submission and needs a research and tech co-founder.",experience:[{title:"Conrad Challenge Regional Semifinalist 2024",desc:"Led pitch and marketing for a water conservation startup."},{title:"School Social Enterprise Club President",desc:"Grew membership from 12 to 200 students across two years."},{title:"TEDx Youth LA Speaker",desc:"Spoke on equity in student entrepreneurship programs."}],awards:["Conrad Challenge Regional Semifinalist 2024"],portfolio:null,lookingFor:"I need a "+r2.n+" who can handle the research and technical side. I pitch, promote, and close. Let's compete in Conrad and Blue Ocean this year."},
     {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills the gap a "+r2.n+" needs. She turns research into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a Research Lead or Tech partner. I handle all pitching in three languages."}
   ];
   PROJECTS=[
@@ -1564,7 +1713,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:"",status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",experience:[],awards:[]};
+  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   goTo("welcome");
 }
