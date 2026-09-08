@@ -113,7 +113,14 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .exp-pill{display:flex;align-items:flex-start;gap:8px;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:8px;}
 .exp-pill-del{background:none;border:none;cursor:pointer;color:#aaa;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;}
 .wl-banner{background:#EEEDFE;border-radius:12px;padding:12px 14px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;}
+.check-email-icon{font-size:40px;color:#534AB7;margin-bottom:14px;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  var SUPABASE_URL="https://dlbspwpxiavxpwvohamx.supabase.co";
+  var SUPABASE_KEY="sb_publishable_CElTyYebKKkTIk4nrZBveQ_q0X9_D0b";
+  var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+</script>
 </head>
 <body>
 <div id="ROOT" class="app"></div>
@@ -122,6 +129,132 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 // ── State ──────────────────────────────────
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
+
+// ── Auth ───────────────────────────────────
+async function sendMagicLink(email){
+  var res=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:window.location.href}});
+  return res.error;
+}
+async function getSession(){
+  var res=await sb.auth.getSession();
+  return res.data.session;
+}
+async function signOutUser(){
+  await sb.auth.signOut();
+}
+
+// ── Profile save / load ─────────────────────
+async function saveProfile(){
+  var session=await getSession();
+  if(!session)return {error:"no session"};
+  var uid=session.user.id;
+  var upsertRes=await sb.from("students").upsert({
+    id:uid,name:S.name,email:S.email,school:S.school,country:S.country,city:S.city,
+    zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
+    idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
+    location_pref:S.locationPref,experience:S.experience,awards:(S.awards||[]).join ? (S.awards||[]).join(", ") : S.awards,
+    stage:S.stage,onboarded:true
+  });
+  if(upsertRes.error)return upsertRes;
+
+  await sb.from("skills").delete().eq("student_id",uid);
+  var skillRows=Object.keys(S.skillLevels||{}).map(function(k){
+    var parts=k.split(":");
+    return {student_id:uid,category:parts[0],skill_name:parts[1]||parts[0],level:S.skillLevels[k]||null};
+  });
+  if(skillRows.length)await sb.from("skills").insert(skillRows);
+
+  await sb.from("languages").delete().eq("student_id",uid);
+  if((S.languages||[]).length){
+    await sb.from("languages").insert(S.languages.map(function(l){return {student_id:uid,language_name:l};}));
+  }
+
+  await sb.from("competitions").delete().eq("student_id",uid);
+  if((S.comps||[]).length){
+    await sb.from("competitions").insert(S.comps.map(function(c){
+      return {student_id:uid,competition_name:(c&&c.name)?c.name:c,cross_type:(c&&c.type)?c.type:null};
+    }));
+  }
+  return {error:null};
+}
+async function loadProfileIntoState(uid){
+  var pRes=await sb.from("students").select("*").eq("id",uid).single();
+  if(pRes.error||!pRes.data)return null;
+  var p=pRes.data;
+  S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
+  S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
+  S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
+  S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
+  S.experience=p.experience||[];S.awards=p.awards||"";S.stage=p.stage||"";
+
+  var skillsRes=await sb.from("skills").select("*").eq("student_id",uid);
+  S.skillLevels={};
+  (skillsRes.data||[]).forEach(function(row){S.skillLevels[row.category+":"+row.skill_name]=row.level;});
+
+  var langRes=await sb.from("languages").select("*").eq("student_id",uid);
+  S.languages=(langRes.data||[]).map(function(r){return r.language_name;});
+
+  var compRes=await sb.from("competitions").select("*").eq("student_id",uid);
+  S.comps=(compRes.data||[]).map(function(r){return r.competition_name;});
+
+  return p;
+}
+async function sendConnectionRequest(otherStudentId,message){
+  var session=await getSession();
+  if(!session)return {error:"no session"};
+  return await sb.from("connections").insert({
+    student_a_id:session.user.id,student_b_id:otherStudentId,message:message,status:"pending"
+  });
+}
+
+// ── Check-your-email screen ─────────────────
+function rCheckEmail(){
+  R(logo()+
+    "<div style=\"text-align:center;padding:2rem 1rem;\">"+
+      "<i class=\"ti ti-mail-opened check-email-icon\"></i>"+
+      "<h2 style=\"margin-bottom:0.5rem;\">Check your email</h2>"+
+      "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue \u2014 you'll come right back here.</div>"+
+      "<button class=\"bkbtn\" id=\"backToSignup\" style=\"margin-top:1rem;\">\u2190 Use a different email</button>"+
+    "</div>"
+  );
+  document.getElementById("backToSignup").addEventListener("click",function(){goTo("signup");});
+}
+
+// ── App boot ─────────────────────────────────
+async function boot(){
+  try{
+    var session=await getSession();
+    if(session){
+      var profile=await loadProfileIntoState(session.user.id);
+      if(profile&&profile.onboarded){
+        goTo("matches");
+        return;
+      }
+      if(profile){
+        goTo("track");
+        return;
+      }
+      // Session exists but no students row yet — this is a student
+      // returning from their magic-link email. Restore what they
+      // typed on the signup screen before the redirect.
+      try{
+        var pending=localStorage.getItem("partnr_pending_signup");
+        if(pending){
+          var restored=JSON.parse(pending);
+          Object.keys(restored).forEach(function(k){S[k]=restored[k];});
+          localStorage.removeItem("partnr_pending_signup");
+        }
+      }catch(ex){}
+      if(S.name&&S.email){
+        goTo("track");
+        return;
+      }
+    }
+  }catch(e){
+    console.error("Supabase session check failed",e);
+  }
+  goTo("welcome");
+}
 
 // ── Countries WITHOUT zip/postal codes ─────
 // Only require zip when student would realistically know their code
@@ -1051,7 +1184,24 @@ function step2(){
   }
   if(!valid){scrollToFirstErr();return;}
   S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;
-  goTo("track");
+  var btn=document.getElementById("s2");
+  if(btn){btn.disabled=true;btn.textContent="Sending link\u2026";}
+  try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
+  sendMagicLink(e).then(function(err){
+    if(err){
+      if(btn){btn.disabled=false;btn.textContent="Continue \u2192";}
+      console.error("Supabase magic link error:",err);
+      showErr("iemail","Couldn't send login link \u2014 "+(err.message||"check the email and try again"));
+      scrollToFirstErr();
+      return;
+    }
+    rCheckEmail();
+  }).catch(function(ex){
+    if(btn){btn.disabled=false;btn.textContent="Continue \u2192";}
+    console.error("Supabase magic link threw:",ex);
+    showErr("iemail","Something went wrong sending the login link \u2014 please try again");
+    scrollToFirstErr();
+  });
 }
 function step3(){
   var valid=true;
@@ -1095,7 +1245,9 @@ function goFind(){
   if(!valid){scrollToFirstErr();return;}
   S.comps=selComps.map(function(c){return c.n;});
   S.idea=idea;S.commit=commit;S.location=S.locationPref;
-  goTo("loading");doFetch();
+  goTo("loading");
+  saveProfile().catch(function(e){console.error("Profile save failed",e);});
+  doFetch();
 }
 
 // ── Loading + API ───────────────────────────
@@ -1680,13 +1832,29 @@ function renderSR(results,skill){
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "</div>"+
         "<div style=\"display:flex;gap:8px;\">"+
-          "<button class=\"bc\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\" onclick=\"alert('Connect with "+r.name+"')\">Connect \u2192</button>"+
+          "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect \u2192</button>"+
           (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
         "</div>"+
       "</div>"+
     "</div>";
   });
   el.innerHTML=h;
+  // NOTE: Skill Search results are demo/fictional profiles with no real
+  // student_id in the database, so this can't create a real connection
+  // row yet. Once Skill Search pulls from real students (a future Stage 2
+  // step), swap this handler for sendConnectionRequest(realStudentId,msg).
+  document.querySelectorAll(".sr-connect").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      showToast("Connect request sent to "+btn.dataset.name+" (demo)");
+    });
+  });
+}
+function showToast(msg){
+  var t=document.createElement("div");
+  t.textContent=msg;
+  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;padding:10px 18px;border-radius:20px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);";
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
 }
 
 // ── Fallback demo data ───────────────────────
@@ -1715,10 +1883,12 @@ function fallback(){
 function resetAll(){
   S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
+  try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
+  signOutUser().catch(function(){});
   goTo("welcome");
 }
 
-goTo("welcome");
+boot();
 </script>
 </body>
 </html>
