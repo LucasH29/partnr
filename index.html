@@ -119,7 +119,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
   var SUPABASE_URL="https://dlbspwpxiavxpwvohamx.supabase.co";
   var SUPABASE_KEY="sb_publishable_CElTyYebKKkTIk4nrZBveQ_q0X9_D0b";
-  var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  var sba=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 </script>
 </head>
 <body>
@@ -132,15 +132,15 @@ var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,
 
 // ── Auth ───────────────────────────────────
 async function sendMagicLink(email){
-  var res=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:window.location.href}});
+  var res=await sba.auth.signInWithOtp({email:email,options:{emailRedirectTo:window.location.href}});
   return res.error;
 }
 async function getSession(){
-  var res=await sb.auth.getSession();
+  var res=await sba.auth.getSession();
   return res.data.session;
 }
 async function signOutUser(){
-  await sb.auth.signOut();
+  await sba.auth.signOut();
 }
 
 // ── Profile save / load ─────────────────────
@@ -148,7 +148,7 @@ async function saveProfile(){
   var session=await getSession();
   if(!session)return {error:"no session"};
   var uid=session.user.id;
-  var upsertRes=await sb.from("students").upsert({
+  var upsertRes=await sba.from("students").upsert({
     id:uid,name:S.name,email:S.email,school:S.school,country:S.country,city:S.city,
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
@@ -157,28 +157,28 @@ async function saveProfile(){
   });
   if(upsertRes.error)return upsertRes;
 
-  await sb.from("skills").delete().eq("student_id",uid);
+  await sba.from("skills").delete().eq("student_id",uid);
   var skillRows=Object.keys(S.skillLevels||{}).map(function(k){
     var parts=k.split(":");
     return {student_id:uid,category:parts[0],skill_name:parts[1]||parts[0],level:S.skillLevels[k]||null};
   });
-  if(skillRows.length)await sb.from("skills").insert(skillRows);
+  if(skillRows.length)await sba.from("skills").insert(skillRows);
 
-  await sb.from("languages").delete().eq("student_id",uid);
+  await sba.from("languages").delete().eq("student_id",uid);
   if((S.languages||[]).length){
-    await sb.from("languages").insert(S.languages.map(function(l){return {student_id:uid,language_name:l};}));
+    await sba.from("languages").insert(S.languages.map(function(l){return {student_id:uid,language_name:l};}));
   }
 
-  await sb.from("competitions").delete().eq("student_id",uid);
+  await sba.from("competitions").delete().eq("student_id",uid);
   if((S.comps||[]).length){
-    await sb.from("competitions").insert(S.comps.map(function(c){
+    await sba.from("competitions").insert(S.comps.map(function(c){
       return {student_id:uid,competition_name:(c&&c.name)?c.name:c,cross_type:(c&&c.type)?c.type:null};
     }));
   }
   return {error:null};
 }
 async function loadProfileIntoState(uid){
-  var pRes=await sb.from("students").select("*").eq("id",uid).single();
+  var pRes=await sba.from("students").select("*").eq("id",uid).single();
   if(pRes.error||!pRes.data)return null;
   var p=pRes.data;
   S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
@@ -187,14 +187,14 @@ async function loadProfileIntoState(uid){
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.experience=p.experience||[];S.awards=p.awards||"";S.stage=p.stage||"";
 
-  var skillsRes=await sb.from("skills").select("*").eq("student_id",uid);
+  var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
   S.skillLevels={};
   (skillsRes.data||[]).forEach(function(row){S.skillLevels[row.category+":"+row.skill_name]=row.level;});
 
-  var langRes=await sb.from("languages").select("*").eq("student_id",uid);
+  var langRes=await sba.from("languages").select("*").eq("student_id",uid);
   S.languages=(langRes.data||[]).map(function(r){return r.language_name;});
 
-  var compRes=await sb.from("competitions").select("*").eq("student_id",uid);
+  var compRes=await sba.from("competitions").select("*").eq("student_id",uid);
   S.comps=(compRes.data||[]).map(function(r){return r.competition_name;});
 
   return p;
@@ -202,7 +202,7 @@ async function loadProfileIntoState(uid){
 async function sendConnectionRequest(otherStudentId,message){
   var session=await getSession();
   if(!session)return {error:"no session"};
-  return await sb.from("connections").insert({
+  return await sba.from("connections").insert({
     student_a_id:session.user.id,student_b_id:otherStudentId,message:message,status:"pending"
   });
 }
