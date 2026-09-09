@@ -131,8 +131,10 @@ var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 
 // ── Auth ───────────────────────────────────
-async function sendMagicLink(email){
-  var res=await sba.auth.signInWithOtp({email:email,options:{emailRedirectTo:window.location.href}});
+async function sendMagicLink(email,profileData){
+  var opts={emailRedirectTo:window.location.href};
+  if(profileData)opts.data=profileData;
+  var res=await sba.auth.signInWithOtp({email:email,options:opts});
   return res.error;
 }
 async function getSession(){
@@ -235,8 +237,20 @@ async function boot(){
         return;
       }
       // Session exists but no students row yet — this is a student
-      // returning from their magic-link email. Restore what they
-      // typed on the signup screen before the redirect.
+      // returning from their magic-link email, possibly in a totally
+      // different browser/app than the one they signed up in.
+      // First choice: metadata attached to the account itself at signup
+      // time (works everywhere, since it's stored server-side).
+      var meta=session.user.user_metadata||{};
+      if(meta.name){
+        S.name=meta.name;S.email=session.user.email;S.school=meta.school||"";
+        S.grade=meta.grade||"";S.country=meta.country||"";S.city=meta.city||"";
+        S.zip=meta.zip||"";S.languages=meta.languages||[];
+        goTo("track");
+        return;
+      }
+      // Fallback: local browser storage, in case metadata wasn't set
+      // (e.g. an older signup from before this fix).
       try{
         var pending=localStorage.getItem("partnr_pending_signup");
         if(pending){
@@ -1205,7 +1219,8 @@ function step2(){
   var btn=document.getElementById("s2");
   if(btn){btn.disabled=true;btn.textContent="Sending link\u2026";}
   try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
-  sendMagicLink(e).then(function(err){
+  var metaData={name:n,school:sc,grade:g,country:co,city:city,zip:zipVal,languages:langs};
+  sendMagicLink(e,metaData).then(function(err){
     if(err){
       if(btn){btn.disabled=false;btn.textContent="Continue \u2192";}
       console.error("Supabase magic link error:",err);
