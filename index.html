@@ -127,8 +127,24 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported"};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
+var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
+
+// Lazy-loads the school autocomplete data once, reused for every signup.
+async function loadSchoolList(){
+  if(SCHOOL_LIST)return SCHOOL_LIST;
+  if(schoolListLoading)return schoolListLoading;
+  schoolListLoading=fetch("ca_schools_autocomplete.json").then(function(r){return r.json();}).then(function(data){
+    SCHOOL_LIST=data;
+    return data;
+  }).catch(function(ex){
+    console.error("Could not load school autocomplete list",ex);
+    SCHOOL_LIST=[];
+    return SCHOOL_LIST;
+  });
+  return schoolListLoading;
+}
 
 // ── Auth ───────────────────────────────────
 async function sendMagicLink(email,profileData){
@@ -136,6 +152,52 @@ async function sendMagicLink(email,profileData){
   if(profileData)opts.data=profileData;
   var res=await sba.auth.signInWithOtp({email:email,options:opts});
   return res.error;
+}
+async function signInWithGoogle(){
+  var res=await sba.auth.signInWithOAuth({
+    provider:"google",
+    options:{redirectTo:window.location.href}
+  });
+  return res.error;
+}
+async function signInWithMicrosoft(){
+  var res=await sba.auth.signInWithOAuth({
+    provider:"azure",
+    options:{redirectTo:window.location.href}
+  });
+  return res.error;
+}
+// Google includes an "hd" (hosted domain) claim ONLY for real school/
+// work Google Workspace accounts — never for personal Gmail. This is
+// Google itself cryptographically confirming domain ownership, which
+// is stronger evidence than anything else in our verification system.
+function getGoogleHostedDomain(session){
+  if(!session||!session.user)return null;
+  var meta=session.user.user_metadata||{};
+  if(meta.hd)return meta.hd;
+  var identities=session.user.identities||[];
+  for(var i=0;i<identities.length;i++){
+    if(identities[i].provider==="google"&&identities[i].identity_data&&identities[i].identity_data.hd){
+      return identities[i].identity_data.hd;
+    }
+  }
+  return null;
+}
+// Checks BOTH Google and Microsoft SSO for a confirmed organizational
+// domain. Google gives us a direct "hd" claim. Microsoft doesn't
+// expose an equivalent claim through Supabase, so instead we check
+// the actual signed-in email's domain against the personal-provider
+// blocklist (which already includes outlook.com, hotmail.com, etc.)
+// — if it's NOT personal, it's a real Microsoft 365 organizational
+// account, which is just as trustworthy a signal.
+function getSSOConfirmedDomain(session){
+  var hd=getGoogleHostedDomain(session);
+  if(hd)return hd;
+  if(session&&session.user&&session.user.app_metadata&&session.user.app_metadata.provider==="azure"){
+    var msDomain=getEmailDomain(session.user.email);
+    if(msDomain&&PERSONAL_EMAIL_DOMAINS.indexOf(msDomain)<0)return msDomain;
+  }
+  return null;
 }
 async function getSession(){
   var res=await sba.auth.getSession();
@@ -145,17 +207,132 @@ async function signOutUser(){
   await sba.auth.signOut();
 }
 
+// ── School email verification ───────────────
+// Personal email providers = NOT a school, always "self-reported"
+var PERSONAL_EMAIL_DOMAINS=["gmail.com","yahoo.com","hotmail.com","outlook.com",
+  "icloud.com","aol.com","live.com","msn.com","protonmail.com","mail.com",
+  "gmx.com","yandex.com","qq.com","163.com","mail.ru","zoho.com"];
+
+function getEmailDomain(email){
+  var parts=(email||"").toLowerCase().split("@");
+  return parts.length===2?parts[1]:"";
+}
+
+// Checks the student's email against the personal-provider list and
+// the verified school_domains table. Returns:
+//   {tier:"verified", schoolName: "..."}   — domain matches a confirmed school
+//   {tier:"self_reported"}                  — personal email or unmatched domain
+async function checkSchoolVerification(email,ssoConfirmedDomain){
+  // SSO short-circuit: if Google or Microsoft itself confirmed this is
+  // a real organizational account (not personal Gmail/Outlook), that's
+  // stronger evidence than our own domain list — trust it directly,
+  // but still try to look up the real school name if we happen to have it.
+  if(ssoConfirmedDomain){
+    var schoolName=null;
+    try{
+      var ssoRes=await sba.from("school_domains").select("school_name").eq("domain",ssoConfirmedDomain).maybeSingle();
+      if(ssoRes.data)schoolName=ssoRes.data.school_name;
+    }catch(ex){/* ignore, fall through to generic label below */}
+    return {
+      tier:"verified",
+      schoolName:schoolName||("Verified via "+ssoConfirmedDomain),
+      viaSSO:true
+    };
+  }
+
+  var domain=getEmailDomain(email);
+  if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
+    return {tier:"self_reported"};
+  }
+  // Build every parent-domain candidate at real label (dot) boundaries only.
+  // e.g. mymail.lausd.net -> also checks "lausd.net", but NEVER matches
+  // via raw substring, so "evillausd.net" can never falsely match
+  // "lausd.net" just because the characters happen to line up.
+  var parts=domain.split(".");
+  var candidates=[domain];
+  for(var i=1;i<parts.length-1;i++){
+    candidates.push(parts.slice(i).join("."));
+  }
+  try{
+    var res=await sba.from("school_domains").select("domain,school_name,source").in("domain",candidates);
+    if(res.data&&res.data.length){
+      // If multiple candidates matched, prefer the most specific (longest) one.
+      var best=res.data.reduce(function(a,b){return b.domain.length>a.domain.length?b:a;});
+      // Hand-verified entries (manual/nais) get full "Verified" status.
+      // Bulk-imported entries (cde_bulk) are honestly labeled as a lower
+      // confidence tier, since the source data is a district's general
+      // public website, not a confirmed email domain — some districts
+      // (LAUSD, San Diego, Oak Park) turned out to use a totally
+      // different domain for actual student/staff email.
+      var isHighConfidence=(best.source==="manual"||best.source==="nais");
+      return {
+        tier:isHighConfidence?"verified":"likely_verified",
+        schoolName:best.school_name
+      };
+    }
+  }catch(ex){
+    console.error("School verification lookup failed",ex);
+  }
+  // Domain isn't a known personal provider, but also isn't in our
+  // verified table yet — treat as self-reported until it's added.
+  return {tier:"self_reported"};
+}
+
+// Counts OTHER students who self-reported the SAME school name with
+// the SAME email domain. This is a read-only trust signal only — it
+// never writes to school_domains, so it can't be gamed into fake
+// "verified" status the way an auto-write system could be.
+async function countPeerCorroboration(email,schoolName){
+  var domain=getEmailDomain(email);
+  if(!domain||!schoolName)return 0;
+  try{
+    var res=await sba.from("students").select("email,school")
+      .eq("school_verification","self_reported")
+      .ilike("school",schoolName.trim());
+    if(!res.data)return 0;
+    return res.data.filter(function(r){
+      return getEmailDomain(r.email)===domain;
+    }).length;
+  }catch(ex){
+    return 0;
+  }
+}
+
 // ── Profile save / load ─────────────────────
 async function saveProfile(){
   var session=await getSession();
   if(!session)return {error:"no session"};
   var uid=session.user.id;
+
+  var ssoDomain=getSSOConfirmedDomain(session);
+  var verification=await checkSchoolVerification(S.email,ssoDomain);
+  var savedSchoolName=S.school;
+  if(verification.tier==="verified"||verification.tier==="likely_verified"){
+    // Safety fix: the displayed school comes from the confirmed domain
+    // match, NOT from whatever the student typed — this is what stops
+    // someone claiming a school their email doesn't actually belong to.
+    // Applies to both tiers since the SCHOOL NAME is accurate either way
+    // (from official government data) — the tier only reflects how
+    // confident we are that this domain is actually used for email.
+    savedSchoolName=verification.schoolName;
+    S.school=verification.schoolName;
+  } else {
+    // Self-reported: check if others independently reported the same
+    // school + domain combo. 2+ others (3 total) upgrades the badge
+    // to a distinct "confirmed by multiple students" tier — still not
+    // fully "Verified", but more trustworthy than a lone self-report.
+    var peerCount=await countPeerCorroboration(S.email,S.school);
+    if(peerCount>=2){
+      verification.tier="self_reported_multiple";
+    }
+  }
+
   var upsertRes=await sba.from("students").upsert({
-    id:uid,name:S.name,email:S.email,school:S.school,country:S.country,city:S.city,
+    id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,experience:S.experience,awards:(S.awards||[]).join ? (S.awards||[]).join(", ") : S.awards,
-    stage:S.stage,onboarded:true
+    stage:S.stage,school_verification:verification.tier,onboarded:true
   });
   if(upsertRes.error)return upsertRes;
 
@@ -188,6 +365,7 @@ async function loadProfileIntoState(uid){
   S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.experience=p.experience||[];S.awards=p.awards||"";S.stage=p.stage||"";
+  S.schoolVerification=p.school_verification||"self_reported";
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
   S.skillLevels={};
@@ -236,11 +414,25 @@ async function boot(){
         goTo("track");
         return;
       }
-      // Session exists but no students row yet — this is a student
-      // returning from their magic-link email, possibly in a totally
-      // different browser/app than the one they signed up in.
-      // First choice: metadata attached to the account itself at signup
-      // time (works everywhere, since it's stored server-side).
+      // Session exists but no students row yet.
+      // Case 1: signed in via Google OR Microsoft directly from
+      // Welcome — neither gives us school/country/city/etc, so route
+      // to the full signup form (pre-filled) instead of skipping
+      // straight to Track & Role.
+      var provider=session.user.app_metadata&&session.user.app_metadata.provider;
+      if(provider==="google"||provider==="azure"){
+        var ssoMeta=session.user.user_metadata||{};
+        S.name=ssoMeta.full_name||ssoMeta.name||"";
+        S.email=session.user.email||"";
+        PENDING_GOOGLE_SESSION=session; // name kept for simplicity; covers either provider
+        goTo("signup");
+        return;
+      }
+      // Case 2: returning from a magic-link email, possibly in a
+      // totally different browser/app than the one they signed up
+      // in. First choice: our own metadata attached at signup time
+      // (works everywhere, since it's stored server-side, and always
+      // includes every field together — school, grade, country, etc).
       var meta=session.user.user_metadata||{};
       if(meta.name){
         S.name=meta.name;S.email=session.user.email;S.school=meta.school||"";
@@ -637,20 +829,48 @@ function rWelcome(){
       "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-cpu\" style=\"font-size:24px;color:#185FA5;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Engineering</div></div>"+
     "</div>"+
     "<button class=\"bp\" id=\"gs\">Get started \u2192</button>"+
+    "<button class=\"bp\" id=\"googleSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-google\"></i> Continue with school Google account</button>"+
+    "<button class=\"bp\" id=\"msSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-windows\"></i> Continue with school Microsoft account</button>"+
     "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#6b6b6b;\">School email required \u00b7 Free \u00b7 Beta</div>"
   );
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
+  var gBtn=document.getElementById("googleSignIn");
+  gBtn.addEventListener("click",async function(){
+    gBtn.disabled=true;gBtn.textContent="Redirecting to Google\u2026";
+    var err=await signInWithGoogle();
+    if(err){
+      gBtn.disabled=false;
+      gBtn.innerHTML="<i class=\"ti ti-brand-google\"></i> Continue with school Google account";
+      showToast("Couldn't start Google sign-in \u2014 please try again");
+    }
+    // On success, the browser redirects to Google and back — no
+    // further code runs here until the page reloads via boot().
+  });
+  var mBtn=document.getElementById("msSignIn");
+  mBtn.addEventListener("click",async function(){
+    mBtn.disabled=true;mBtn.textContent="Redirecting to Microsoft\u2026";
+    var err=await signInWithMicrosoft();
+    if(err){
+      mBtn.disabled=false;
+      mBtn.innerHTML="<i class=\"ti ti-brand-windows\"></i> Continue with school Microsoft account";
+      showToast("Couldn't start Microsoft sign-in \u2014 please try again");
+    }
+  });
 }
 
 // ── Signup ──────────────────────────────────
 function rSignup(){
   var co=S.country;
+  var viaGoogle=!!PENDING_GOOGLE_SESSION;
   R(logo()+sb(1)+
     "<h2>Create your profile</h2>"+
     "<div class=\"sub\">School email keeps the community verified and safe.</div>"+
+    (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google \u2014 email verified</div>":"")+
     "<div class=\"fi\"><label for=\"iname\">Full name</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"iemail\">School email</label><input id=\"iemail\" type=\"email\" placeholder=\"alex@school.edu\" value=\""+esc(S.email)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"ischool\">High school name</label><input id=\"ischool\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/></div>"+
+    "<div class=\"fi\"><label for=\"iemail\">School email</label><input id=\"iemail\" type=\"email\" placeholder=\"alex@school.edu\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">High school name</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
+      "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
+    "</div>"+
     "<div class=\"fi\"><label for=\"icountry\">Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
     "<div class=\"fi\"><label for=\"icity\">City</label><input id=\"icity\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/></div>"+
     "<div id=\"zipwrap\" style=\""+(co&&hasZip(co)?"":"display:none;")+"\">"+
@@ -698,6 +918,48 @@ function rSignup(){
   document.getElementById("langother").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("langaddbtn").click();}});
   document.getElementById("s2").addEventListener("click",step2);
   document.getElementById("bk").addEventListener("click",function(){goTo("welcome");});
+
+  // School name autocomplete
+  loadSchoolList();
+  var schoolInput=document.getElementById("ischool");
+  var suggestBox=document.getElementById("schoolSuggest");
+  schoolInput.addEventListener("input",async function(){
+    var q=schoolInput.value.trim().toLowerCase();
+    if(q.length<3){suggestBox.style.display="none";return;}
+    var list=await loadSchoolList();
+    var matches=list.filter(function(s){return s.name.toLowerCase().indexOf(q)>=0;}).slice(0,8);
+    if(!matches.length){suggestBox.style.display="none";return;}
+    suggestBox.setAttribute("role","listbox");
+    suggestBox.innerHTML=matches.map(function(s){
+      return "<div class=\"school-suggest-item\" role=\"option\" tabindex=\"0\" data-name=\""+esc(s.name)+"\" data-city=\""+esc(s.city)+"\" style=\"padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;\">"+
+        "<div style=\"font-weight:600;color:#1a1a1a;\">"+esc(s.name)+"</div>"+
+        "<div style=\"font-size:11px;color:#6b6b6b;\">"+esc(s.city)+", CA \u00b7 "+(s.type==="private"?"Private":"Public")+"</div>"+
+      "</div>";
+    }).join("");
+    suggestBox.style.display="block";
+    suggestBox.querySelectorAll(".school-suggest-item").forEach(function(item){
+      item.addEventListener("mouseenter",function(){item.style.background="#f8f8f6";});
+      item.addEventListener("mouseleave",function(){item.style.background="";});
+      addKbdActivation(item);
+      item.addEventListener("click",function(){
+        schoolInput.value=item.dataset.name;
+        var cityInput=document.getElementById("icity");
+        if(cityInput)cityInput.value=item.dataset.city;
+        var countrySelect=document.getElementById("icountry");
+        if(countrySelect){
+          countrySelect.value="United States";
+          countrySelect.dispatchEvent(new Event("change"));
+        }
+        suggestBox.style.display="none";
+        clearErr("ischool");clearErr("icity");
+      });
+    });
+  });
+  document.addEventListener("click",function(e){
+    if(e.target!==schoolInput&&!suggestBox.contains(e.target)){
+      suggestBox.style.display="none";
+    }
+  });
 }
 
 // ── Track ───────────────────────────────────
@@ -1216,6 +1478,15 @@ function step2(){
   }
   if(!valid){scrollToFirstErr();return;}
   S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;
+
+  if(PENDING_GOOGLE_SESSION){
+    // Already authenticated via Google — no magic link needed, just
+    // save what they typed and continue straight to Track & Role.
+    try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
+    goTo("track");
+    return;
+  }
+
   var btn=document.getElementById("s2");
   if(btn){btn.disabled=true;btn.textContent="Sending link\u2026";}
   try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
@@ -1740,6 +2011,13 @@ function meTab(){
       "<div style=\"flex:1;\">"+
         "<div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+esc(S.name)+"</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc(S.school)+", "+esc(S.country)+" \u00b7 "+esc(S.grade)+"</div>"+
+        "<div style=\"margin-top:3px;\">"+(S.schoolVerification==="verified"?
+          "<span style=\"font-size:11px;font-weight:600;color:#1D9E75;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;\"></i> Verified School Email</span>":
+          S.schoolVerification==="likely_verified"?
+          "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;\"></i> Likely Verified (auto-detected)</span>":
+          S.schoolVerification==="self_reported_multiple"?
+          "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-users\" style=\"font-size:12px;\"></i> Self-Reported (confirmed by multiple students)</span>":
+          "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"reqVerifyBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Request verification</button>")+"</div>"+
       "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
@@ -1758,6 +2036,33 @@ function meTab(){
 function bindMeTab(){
   var rst=document.getElementById("rst");
   if(rst)rst.addEventListener("click",resetAll);
+  var reqBtn=document.getElementById("reqVerifyBtn");
+  if(reqBtn)reqBtn.addEventListener("click",function(){
+    var wrap=reqBtn.parentNode;
+    var inputId="verifyUrlInput";
+    var box=document.createElement("div");
+    box.style.cssText="margin-top:6px;display:flex;gap:6px;align-items:center;";
+    box.innerHTML="<input id=\""+inputId+"\" type=\"text\" placeholder=\"Your school's website (optional)\" style=\"font-size:12px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;flex:1;\"/>"+
+      "<button id=\"submitVerifyReq\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">Send</button>";
+    reqBtn.style.display="none";
+    wrap.appendChild(box);
+    document.getElementById(inputId).focus();
+    document.getElementById("submitVerifyReq").addEventListener("click",async function(){
+      var url=document.getElementById(inputId).value.trim();
+      var btn=this;btn.disabled=true;btn.textContent="Sending\u2026";
+      try{
+        var session=await getSession();
+        await sba.from("students").update({
+          verification_requested:true,
+          verification_request_note:url
+        }).eq("id",session.user.id);
+        box.innerHTML="<span style=\"font-size:12px;color:#1D9E75;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Request sent</span>";
+      }catch(ex){
+        console.error("Verification request failed",ex);
+        btn.disabled=false;btn.textContent="Send";
+      }
+    });
+  });
   var epBtn=document.getElementById("edit-profile-btn");
   if(epBtn)epBtn.addEventListener("click",function(){
     var el=document.getElementById("tc");
