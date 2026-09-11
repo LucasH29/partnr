@@ -299,6 +299,21 @@ async function countPeerCorroboration(email,schoolName){
 }
 
 // ── Profile save / load ─────────────────────
+// ── Signup lead capture ──────────────────────
+// Fire-and-forget: saves whatever the student has entered so far into
+// signup_leads, a separate table that doesn't require an authenticated
+// session (unlike students). This runs at Step 2, updates at Step 3,
+// and gets marked converted:true once the real students row is saved
+// in saveProfile(). Lets us re-engage anyone who drops off partway
+// through — "Come back and finish your profile" emails.
+function saveSignupLead(fields){
+  if(!fields||!fields.email)return;
+  var row=Object.assign({email:fields.email,updated_at:new Date().toISOString()},fields);
+  sba.from("signup_leads").upsert(row,{onConflict:"email"}).then(function(res){
+    if(res.error)console.error("Lead capture failed",res.error);
+  }).catch(function(ex){console.error("Lead capture threw",ex);});
+}
+
 async function saveProfile(){
   var session=await getSession();
   if(!session)return {error:"no session"};
@@ -1524,6 +1539,8 @@ function step2(){
   if(!valid){scrollToFirstErr();return;}
   S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;
 
+  saveSignupLead({email:e,name:n,school:sc,country:co,city:city,zip:zipVal,grade:g,languages:langs,stage:"profile"});
+
   if(PENDING_GOOGLE_SESSION){
     // Already authenticated via Google — no magic link needed, just
     // save what they typed and continue straight to Track & Role.
@@ -1561,6 +1578,7 @@ function step3(){
   if(!valid){scrollToFirstErr();return;}
   S.status=statusSel;
   S.secondary=getChips("secondary").slice(0,2);
+  saveSignupLead({email:S.email,track:S.track,role:S.role,stage:"track_role"});
   goTo("skills");
 }
 function step4(){
@@ -1595,7 +1613,11 @@ function goFind(){
   S.comps=selComps.map(function(c){return c.n;});
   S.idea=idea;S.commit=commit;S.location=S.locationPref;
   goTo("loading");
-  saveProfile().catch(function(e){console.error("Profile save failed",e);});
+  saveProfile().then(function(res){
+    if(!res||!res.error){
+      saveSignupLead({email:S.email,stage:"completed",converted:true});
+    }
+  }).catch(function(e){console.error("Profile save failed",e);});
   doFetch();
 }
 
