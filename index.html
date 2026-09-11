@@ -394,6 +394,7 @@ function rCheckEmail(){
       "<i class=\"ti ti-mail-opened check-email-icon\"></i>"+
       "<h2 style=\"margin-bottom:0.5rem;\">Check your email</h2>"+
       "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue — you'll come right back here.</div>"+
+      "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely — if it still doesn't show up after a few minutes, try signing up again with a personal email instead. You can still tell us your school, and you won't lose any progress.</div>"+
       "<button class=\"bkbtn\" id=\"backToSignup\" style=\"margin-top:1rem;\">← Use a different email</button>"+
     "</div>"
   );
@@ -838,7 +839,7 @@ function rWelcome(){
     "</div>"+
     "<button class=\"bp\" id=\"gs\">Get started →</button>"+
     "<button class=\"bkbtn\" id=\"toSignin\">Already have an account? Sign in</button>"+
-    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#6b6b6b;\">School email required · Free · Beta</div>"
+    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#6b6b6b;\">Free · Beta</div>"
   );
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
   document.getElementById("toSignin").addEventListener("click",function(){goTo("signin");});
@@ -849,7 +850,7 @@ function rSignIn(){
   R(logo()+
     "<h2>Sign in</h2>"+
     "<div class=\"sub\">For students who already created a Partnr account.</div>"+
-    "<div class=\"fi\"><label for=\"siEmail\">Email</label><input id=\"siEmail\" type=\"email\" placeholder=\"you@school.edu\"/></div>"+
+    "<div class=\"fi\"><label for=\"siEmail\">Email</label><input id=\"siEmail\" type=\"email\" placeholder=\"you@email.com\"/></div>"+
     "<button class=\"bp\" id=\"siSend\">Send sign-in link →</button>"+
     "<div style=\"display:flex;align-items:center;gap:10px;margin:1.1rem 0;color:#aaa;font-size:12px;\">"+
       "<div style=\"flex:1;height:1px;background:#e8e8e4;\"></div>or<div style=\"flex:1;height:1px;background:#e8e8e4;\"></div>"+
@@ -908,10 +909,10 @@ function rSignup(){
   var viaGoogle=!!PENDING_GOOGLE_SESSION;
   R(logo()+sb(1)+
     "<h2>Create your profile</h2>"+
-    "<div class=\"sub\">School email keeps the community verified and safe.</div>"+
+    "<div class=\"sub\">Any email works. We recommend a personal one so you never lose access if your school blocks automated messages — you can still tell us your school below.</div>"+
     (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google — email verified</div>":"")+
     "<div class=\"fi\"><label for=\"iname\">Full name</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"iemail\">School email</label><input id=\"iemail\" type=\"email\" placeholder=\"alex@school.edu\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
+    "<div class=\"fi\"><label for=\"iemail\">Email</label><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
     "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">High school name</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
       "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
