@@ -402,6 +402,75 @@ async function sendConnectionRequest(otherStudentId,message){
   });
 }
 
+// ── Real student search ──────────────────────
+// Searches the real students table by skill/category, competition name,
+// and free-text idea — instead of asking Claude to invent fictional
+// people. Returns an array shaped to match what renderSR() expects,
+// plus a hidden _realId on each result so Connect can send a real
+// connection request instead of a demo toast.
+var AVATAR_COLORS=["purple","teal","coral","blue","green"];
+function colorForId(id){
+  var sum=(id||"").split("").reduce(function(a,c){return a+c.charCodeAt(0);},0);
+  return AVATAR_COLORS[sum%AVATAR_COLORS.length];
+}
+function initialsFor(name){
+  return (name||"?").trim().split(/\s+/).map(function(w){return w[0];}).join("").substring(0,2).toUpperCase();
+}
+async function searchRealStudents(query,excludeId){
+  var q="%"+query.trim()+"%";
+  if(!query.trim())return [];
+  var ids={};
+  var skillMatch={};
+  try{
+    var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
+      .or("skill_name.ilike."+q+",category.ilike."+q);
+    (skillsRes.data||[]).forEach(function(r){
+      ids[r.student_id]=true;
+      if(!skillMatch[r.student_id])skillMatch[r.student_id]={skill:r.skill_name,level:r.level};
+    });
+    var compRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",q);
+    (compRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
+    var ideaRes=await sba.from("students").select("id").ilike("idea",q);
+    (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
+  }catch(ex){console.error("Real student search query failed",ex);return [];}
+  if(excludeId)delete ids[excludeId];
+  var idList=Object.keys(ids).slice(0,20);
+  if(!idList.length)return [];
+
+  var studentsRes=await sba.from("students").select("*").in("id",idList).eq("onboarded",true);
+  var students=studentsRes.data||[];
+  if(!students.length)return [];
+
+  var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",idList);
+  var skillsByStudent={};
+  (allSkillsRes.data||[]).forEach(function(r){(skillsByStudent[r.student_id]=skillsByStudent[r.student_id]||[]).push(r);});
+
+  var allCompsRes=await sba.from("competitions").select("student_id,competition_name").in("student_id",idList);
+  var compsByStudent={};
+  (allCompsRes.data||[]).forEach(function(r){(compsByStudent[r.student_id]=compsByStudent[r.student_id]||[]).push(r.competition_name);});
+
+  return students.map(function(s){
+    var mySkills=skillsByStudent[s.id]||[];
+    var matched=skillMatch[s.id];
+    var keySkill=matched?matched.skill:(mySkills[0]?mySkills[0].skill_name:query);
+    var keyLevel=(matched&&matched.level)||(mySkills[0]&&mySkills[0].level)||"Intermediate";
+    var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
+    return {
+      name:s.name,school:s.school,country:s.country,grade:s.grade,
+      avatar:initialsFor(s.name),avatarColor:colorForId(s.id),
+      track:s.track,role:s.role,
+      availability:s.availability||"Not specified",
+      status:s.status||"Open to connecting",
+      bio:s.idea||"Hasn't added a bio yet.",
+      keySkill:keySkill||query,keyLevel:keyLevel,
+      otherSkills:otherSkills,
+      competitions:compsByStudent[s.id]||[],
+      portfolio:s.github||null,
+      _realId:s.id
+    };
+  });
+}
+
 // ── Check-your-email screen ─────────────────
 function rCheckEmail(){
   R(logo()+
@@ -2171,13 +2240,15 @@ async function srchSkill(skill){
   var el=document.getElementById("sr");if(!el)return;
   el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Searching for "+esc(skill)+"...</div></div>";
   try{
-    var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:"Generate 4 fictional high school students globally who are strong in \""+skill+"\". Diverse countries. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),availability,status(has project|open to joining|has idea|exploring),bio(2 sentences),keySkill,keyLevel(Beginner/Intermediate/Advanced/Expert),otherSkills(array 2-3),competitions(array 1-2),portfolio(URL or null). Return ONLY valid JSON: {\"results\":[...]}"}]})});
-    if(!res.ok)throw new Error("api");
-    var d=await res.json();
-    if(d.error)throw new Error("api");
-    var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
-    renderSR(JSON.parse(txt).results||[],skill);
-  } catch(e){renderSR(demoSR(skill),skill);}
+    var session=await getSession();
+    var myId=session&&session.user?session.user.id:null;
+    var real=await searchRealStudents(skill,myId);
+    if(real.length){renderSR(real,skill,false);return;}
+  }catch(ex){console.error("Real student search failed",ex);}
+  // No real students matched (or the query failed) — show demo
+  // profiles instead, clearly labeled so nobody mistakes them for
+  // real matches.
+  renderSR(demoSR(skill),skill,true);
 }
 
 function demoSR(skill){
@@ -2211,12 +2282,13 @@ function demoSR(skill){
   ];
 }
 
-function renderSR(results,skill){
+function renderSR(results,skill,isDemo){
   var el=document.getElementById("sr");if(!el)return;
   var sbgs={"has project":"#EEEDFE","open to joining":"#EAF3DE","has idea":"#FAEEDA","exploring":"#F1EFE8"};
   var stcs={"has project":"#3C3489","open to joining":"#3B6D11","has idea":"#854F0B","exploring":"#5F5E5A"};
   if(!results||!results.length){el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No results — try a different search.</div>";return;}
-  var h="<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\"><strong style=\"color:#1a1a1a;\">"+results.length+"</strong> students found matching <strong style=\"color:#1a1a1a;\">"+esc(skill)+"</strong></div>";
+  var h="<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\"><strong style=\"color:#1a1a1a;\">"+results.length+"</strong> student"+(results.length>1?"s":"")+" found matching <strong style=\"color:#1a1a1a;\">"+esc(skill)+"</strong></div>"+
+    (isDemo?"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>No real students matched yet — showing example profiles so you can see how search works.</div>":"");
   results.forEach(function(r){
     var cm=CM[r.avatarColor]||CM.purple;var t=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
     var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().indexOf(k)>=0;})||"exploring";
@@ -2237,21 +2309,59 @@ function renderSR(results,skill){
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "</div>"+
         "<div style=\"display:flex;gap:8px;\">"+
-          "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
+          "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId||"")+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
           (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
         "</div>"+
       "</div>"+
     "</div>";
   });
   el.innerHTML=h;
-  // NOTE: Skill Search results are demo/fictional profiles with no real
-  // student_id in the database, so this can't create a real connection
-  // row yet. Once Skill Search pulls from real students (a future Stage 2
-  // step), swap this handler for sendConnectionRequest(realStudentId,msg).
   document.querySelectorAll(".sr-connect").forEach(function(btn){
     btn.addEventListener("click",function(){
-      showToast("Connect request sent to "+btn.dataset.name+" (demo)");
+      var realId=this.dataset.realid;
+      if(realId){openSearchConnectModal(realId,btn.dataset.name);}
+      else{showToast("Connect request sent to "+btn.dataset.name+" (demo)");}
     });
+  });
+}
+
+// Lightweight connect modal specifically for real Skill Search
+// results — separate from openModal() since search results aren't
+// indexed into the MATCHES array the way AI matches are.
+function openSearchConnectModal(realId,name){
+  R(logo()+
+    "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
+      "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
+        "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro — tell them why you want to collaborate.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>No private messages until both students accept and parent / teacher is notified.</div>"+
+        "<textarea id=\"srmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
+        "<div style=\"display:flex;gap:8px;\">"+
+          "<button id=\"srsbtn\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
+          "<button id=\"srcbtn\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Cancel</button>"+
+        "</div>"+
+      "</div>"+
+    "</div>"
+  );
+  document.getElementById("srcbtn").addEventListener("click",function(){showTab("search");});
+  document.getElementById("srsbtn").addEventListener("click",async function(){
+    var msg=document.getElementById("srmsg").value.trim();
+    if(!msg){showErr("srmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
+    var btn=this;btn.disabled=true;btn.textContent="Sending…";
+    try{
+      var res=await sendConnectionRequest(realId,msg);
+      if(res.error){
+        btn.disabled=false;btn.textContent="Send request →";
+        showToast("Couldn't send request — please try again");
+        return;
+      }
+      R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
+      document.getElementById("srdbn").addEventListener("click",function(){showTab("search");});
+    }catch(ex){
+      console.error("Search connect failed",ex);
+      btn.disabled=false;btn.textContent="Send request →";
+      showToast("Something went wrong — please try again");
+    }
   });
 }
 function showToast(msg){
