@@ -1986,7 +1986,12 @@ function showTab(tab){
 }
 
 function mCards(){
-  if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No matches yet.</div>";
+  if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem 1rem;\">"+
+    "<i class=\"ti ti-users-group\" style=\"font-size:38px;color:#AFA9EC;\"></i>"+
+    "<div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;\">No matches loaded</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">Matches aren't saved between visits yet. Run matching again to see partner suggestions, or head to Skill search to find real students directly.</div>"+
+    "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find my partners \u2192</button>"+
+  "</div>";
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Your AI matches</div>";
   MATCHES.forEach(function(m,i){
     var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
@@ -2018,6 +2023,19 @@ function mCards(){
   return h;
 }
 function bindME(){
+  var rematch=document.getElementById("rematch-btn");
+  if(rematch)rematch.addEventListener("click",function(){
+    // Rebuild selComps from the saved profile so the AI prompt has the
+    // student's real target competitions, not an empty list.
+    if(!selComps.length&&(S.comps||[]).length){
+      selComps=S.comps.map(function(name){
+        var known=COMPS.find(function(c){return c.n===name;});
+        return known||{n:name,cat:"custom",team:"Varies",eli:"Local / Regional",tier:3,cross:true,desc:"Custom competition",why:"Find a partner for your specific competition"};
+      });
+    }
+    goTo("loading");
+    doFetch();
+  });
   document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){openModal(parseInt(this.dataset.idx));});});
   document.querySelectorAll(".pfb").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(this.dataset.idx));});});
   document.querySelectorAll(".psb").forEach(function(b){b.addEventListener("click",function(){this.closest(".card").style.opacity="0.3";});});
