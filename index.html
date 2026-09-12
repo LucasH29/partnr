@@ -569,11 +569,11 @@ async function searchRealStudents(query,excludeId){
   if(!query.trim())return [];
   var ids={};
   var skillMatch={};
-  // Errors here used to be swallowed, which made a permissions problem
-  // look identical to an empty result. Now they throw so the caller can
-  // tell the student something useful instead of silently showing demos.
+  // PostgREST filter strings inside .or() use * as the wildcard, not %.
+  // Using % here matches nothing and fails silently.
+  var wc=query.trim();
   var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
-    .or("skill_name.ilike."+q+",category.ilike."+q);
+    .or("skill_name.ilike.*"+wc+"*,category.ilike.*"+wc+"*");
   if(skillsRes.error)throw skillsRes.error;
   (skillsRes.data||[]).forEach(function(r){
     ids[r.student_id]=true;
