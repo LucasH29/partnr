@@ -569,28 +569,38 @@ async function searchRealStudents(query,excludeId){
   if(!query.trim())return [];
   var ids={};
   var skillMatch={};
-  try{
-    var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
-      .or("skill_name.ilike."+q+",category.ilike."+q);
-    (skillsRes.data||[]).forEach(function(r){
-      ids[r.student_id]=true;
-      if(!skillMatch[r.student_id])skillMatch[r.student_id]={skill:r.skill_name,level:r.level};
-    });
-    var compRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",q);
-    (compRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
-    var ideaRes=await sba.from("students").select("id").ilike("idea",q);
-    (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
-  }catch(ex){console.error("Real student search query failed",ex);return [];}
+  // Errors here used to be swallowed, which made a permissions problem
+  // look identical to an empty result. Now they throw so the caller can
+  // tell the student something useful instead of silently showing demos.
+  var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
+    .or("skill_name.ilike."+q+",category.ilike."+q);
+  if(skillsRes.error)throw skillsRes.error;
+  (skillsRes.data||[]).forEach(function(r){
+    ids[r.student_id]=true;
+    if(!skillMatch[r.student_id])skillMatch[r.student_id]={skill:r.skill_name,level:r.level};
+  });
+
+  var compRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",q);
+  if(compRes.error)throw compRes.error;
+  (compRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
+
+  var ideaRes=await sba.from("students").select("id").ilike("idea",q);
+  if(ideaRes.error)throw ideaRes.error;
+  (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
+
   if(excludeId)delete ids[excludeId];
   // Server-side RLS already hides blocked students, but filtering here
   // too keeps the UI consistent immediately after a block, before any
   // refetch happens.
   Object.keys(BLOCKED_IDS).forEach(function(b){delete ids[b];});
   var idList=Object.keys(ids).slice(0,20);
+  console.log("[Partnr search] query:",query,"| matched student ids:",idList.length);
   if(!idList.length)return [];
 
   var studentsRes=await sba.from("students").select("*").in("id",idList).eq("onboarded",true);
+  if(studentsRes.error)throw studentsRes.error;
   var students=studentsRes.data||[];
+  console.log("[Partnr search] of those, onboarded:",students.length);
   if(!students.length)return [];
 
   var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",idList);
@@ -2598,7 +2608,15 @@ async function srchSkill(skill){
     var myId=session&&session.user?session.user.id:null;
     var real=await searchRealStudents(skill,myId);
     if(real.length){renderSR(real,skill,false);return;}
-  }catch(ex){console.error("Real student search failed",ex);}
+  }catch(ex){
+    console.error("[Partnr search] failed:",ex);
+    el.innerHTML="<div style=\"text-align:center;padding:2rem 1rem;\">"+
+      "<i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i>"+
+      "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">Search didn't work</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Something went wrong reaching the student database. Check your connection and try again.</div>"+
+    "</div>";
+    return;
+  }
   // No real students matched (or the query failed) — show demo
   // profiles instead, clearly labeled so nobody mistakes them for
   // real matches.
