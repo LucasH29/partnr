@@ -36,7 +36,8 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .why strong{color:#1a1a1a;font-weight:600;}
 .bc{padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:white;font-family:inherit;}
 .bo{padding:9px 14px;background:white;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;color:#666;font-family:inherit;}
-.bg2{padding:9px 10px;background:none;border:none;font-size:13px;cursor:pointer;color:#6b6b6b;font-family:inherit;}
+.bg2{padding:9px 12px;background:white;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;color:#666;font-family:inherit;}
+.bg2:hover{background:#f8f8f6;border-color:#bbb;color:#444;}
 .nav{display:flex;border-bottom:1px solid #e8e8e4;margin-bottom:1.5rem;overflow-x:auto;}
 .nb{padding:9px 11px;font-size:12px;cursor:pointer;color:#6b6b6b;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:inherit;}
 .nb.on{color:#534AB7;border-bottom-color:#7F77DD;font-weight:600;}
@@ -1886,8 +1887,7 @@ function rMatches(){
       "<button class=\"nb\" id=\"nb-recruit\">Recruiting me</button>"+
       "<button class=\"nb\" id=\"nb-search\">Skill search</button>"+
       "<button class=\"nb\" id=\"nb-deadlines\">Deadlines</button>"+
-      "<button class=\"nb\" id=\"nb-conns\">Connections"+(CONNS.length?" <span style=\"background:#7F77DD;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;\">"+CONNS.length+"</span>":"")+
-      "</button>"+
+      "<button class=\"nb\" id=\"nb-conns\">Connections<span id=\"conn-badge\"></span></button>"+
       "<button class=\"nb\" id=\"nb-me\">My profile</button>"+
     "</div>"+
     "<div id=\"tc\"></div>"
@@ -1905,6 +1905,22 @@ function rMatches(){
     if(b)b.addEventListener("click",function(){document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});this.classList.add("on");showTab(t);});
   });
   showTab("matches");
+  updateConnBadge();
+}
+
+// Counts real pending requests addressed to this student, so the
+// Connections tab shows a badge without opening the tab.
+async function updateConnBadge(){
+  try{
+    var session=await getSession();
+    if(!session)return;
+    var res=await sba.from("connections").select("id",{count:"exact",head:true})
+      .eq("student_b_id",session.user.id).eq("status","pending");
+    var n=res.count||0;
+    var el=document.getElementById("conn-badge");
+    if(!el)return;
+    el.innerHTML=n?" <span style=\"background:#7F77DD;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;\">"+n+"</span>":"";
+  }catch(ex){/* badge is cosmetic — never block the UI on it */}
 }
 
 // Waitlist modal (Google Form)
@@ -1965,7 +1981,7 @@ function showTab(tab){
   else if(tab==="recruit"){el.innerHTML=pCards();bindPE();}
   else if(tab==="search"){el.innerHTML=sTab();bindSE();}
   else if(tab==="deadlines"){el.innerHTML=dCards();}
-  else if(tab==="conns"){el.innerHTML=cCards();bindCE();}
+  else if(tab==="conns"){renderConnections();}
   else if(tab==="me"){el.innerHTML=meTab();bindMeTab();}
 }
 
@@ -2246,34 +2262,147 @@ function dCards(){
   return h;
 }
 
-function cCards(){
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Your connections</div>";
-  if(!CONNS.length)return h+"<p style=\"font-size:13px;color:#6b6b6b;\">No connections yet — connect with matches to start collaborating.</p>";
-  h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Start a shared project board once both students accept.</p>";
-  CONNS.forEach(function(cn){
-    var cm=CM[cn.avatarColor]||CM.purple;var t=TR[cn.track]||TR.research;var r=RO[cn.role]||{n:cn.role||"Partner"};
-    h+="<div class=\"pit\">"+
-      "<div class=\"av\" style=\"width:40px;height:40px;font-size:13px;background:"+cm.bg+";color:"+cm.c+";\">"+cn.avatar+"</div>"+
-      "<div style=\"flex:1;\">"+
-        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cn.name+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;\">"+cn.school+" · "+cn.country+"</div>"+
-        (cn.status==="accepted"?"<div style=\"font-size:11px;color:#3B6D11;margin-top:3px;font-weight:600;\">✓ Connected</div>":
-          "<div style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;margin-top:3px;font-weight:500;\">Pending</div>")+
-      "</div>"+
-      "<div style=\"text-align:right;\">"+
-        "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+r.n+"</span>"+
-        (cn.status!=="accepted"?"<div style=\"margin-top:5px;\"><button class=\"simb\" data-name=\""+esc(cn.name)+"\" style=\"font-size:11px;padding:4px 10px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;\">Simulate accept</button></div>":"")+
-      "</div>"+
-    "</div>";
+// ── Connections: real inbox ──────────────────
+// Reads real rows from the connections table in both directions.
+// Incoming pending requests are what matter most — this is the only
+// place today where one real student sends another real student
+// free text, so accept / decline / report all live here.
+async function loadRealConnections(){
+  var session=await getSession();
+  if(!session)return {incoming:[],outgoing:[],accepted:[],me:null};
+  var me=session.user.id;
+  var res=await sba.from("connections").select("*").or("student_a_id.eq."+me+",student_b_id.eq."+me).order("created_at",{ascending:false});
+  var rows=res.data||[];
+  if(!rows.length)return {incoming:[],outgoing:[],accepted:[],me:me};
+
+  var otherIds=rows.map(function(r){return r.student_a_id===me?r.student_b_id:r.student_a_id;});
+  var pplRes=await sba.from("students").select("id,name,school,country,track,role").in("id",otherIds);
+  var ppl={};
+  (pplRes.data||[]).forEach(function(p){ppl[p.id]=p;});
+
+  var incoming=[],outgoing=[],accepted=[];
+  rows.forEach(function(r){
+    var otherId=r.student_a_id===me?r.student_b_id:r.student_a_id;
+    // A blocked student's profile is hidden by RLS, so ppl[otherId]
+    // comes back undefined — skip those rows entirely rather than
+    // rendering a ghost entry.
+    if(!ppl[otherId])return;
+    var item={row:r,other:ppl[otherId],otherId:otherId};
+    if(r.status==="accepted")accepted.push(item);
+    else if(r.student_b_id===me&&r.status==="pending")incoming.push(item);
+    else if(r.student_a_id===me&&r.status==="pending")outgoing.push(item);
   });
-  return h;
+  return {incoming:incoming,outgoing:outgoing,accepted:accepted,me:me};
 }
-function bindCE(){
-  document.querySelectorAll(".simb").forEach(function(b){
+
+async function respondToConnection(connId,newStatus){
+  return await sba.from("connections").update({status:newStatus}).eq("id",connId);
+}
+
+function connPersonRow(item,extraHtml){
+  var p=item.other;
+  var t=TR[p.track]||TR.research;
+  var r=RO[p.role]||{n:p.role||"Partner"};
+  return "<div class=\"card\">"+
+    "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:8px;\">"+
+      "<div class=\"av\" style=\"width:40px;height:40px;font-size:13px;background:"+t.bg+";color:"+t.tc+";\">"+esc(initialsFor(p.name))+"</div>"+
+      "<div style=\"flex:1;min-width:0;\">"+
+        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(p.name)+"</div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc(p.school||"")+(p.country?" · "+esc(p.country):"")+"</div>"+
+      "</div>"+
+      "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(r.n)+"</span>"+
+    "</div>"+
+    (item.row.message?"<div class=\"why\" style=\"margin-bottom:10px;\">"+esc(item.row.message)+"</div>":"")+
+    extraHtml+
+  "</div>";
+}
+
+async function renderConnections(){
+  var el=document.getElementById("tc");
+  if(!el)return;
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Loading your connections\u2026</div></div>";
+  var data;
+  try{data=await loadRealConnections();}
+  catch(ex){
+    console.error("Could not load connections",ex);
+    el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;font-size:13px;\">Couldn't load your connections. Check your internet and try again.</div>";
+    return;
+  }
+
+  var h="";
+
+  h+="<div class=\"slabel\" style=\"margin-top:0;\">Requests for you"+(data.incoming.length?" ("+data.incoming.length+")":"")+"</div>";
+  if(!data.incoming.length){
+    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">No one has asked to connect with you yet. When a student sends you a request, it shows up here with their message.</p>";
+  } else {
+    data.incoming.forEach(function(item){
+      h+=connPersonRow(item,
+        "<div style=\"display:flex;gap:8px;align-items:center;\">"+
+          "<button class=\"bc conn-accept\" data-id=\""+esc(item.row.id)+"\" data-name=\""+esc(item.other.name)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button>"+
+          "<button class=\"bo conn-decline\" data-id=\""+esc(item.row.id)+"\">Decline</button>"+
+          "<button class=\"bg2 conn-report\" data-id=\""+esc(item.otherId)+"\" data-name=\""+esc(item.other.name)+"\" data-conn=\""+esc(item.row.id)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(item.other.name)+"\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>"+
+        "</div>"
+      );
+    });
+    h+="<div style=\"height:0.5rem;\"></div>";
+  }
+
+  h+="<div class=\"slabel\">Connected"+(data.accepted.length?" ("+data.accepted.length+")":"")+"</div>";
+  if(!data.accepted.length){
+    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">Once you and another student both accept, you'll both show up here.</p>";
+  } else {
+    data.accepted.forEach(function(item){
+      h+=connPersonRow(item,
+        "<div style=\"display:flex;gap:8px;align-items:center;\">"+
+          "<span style=\"flex:1;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\" style=\"font-size:13px;vertical-align:-2px;margin-right:3px;\"></i>Connected</span>"+
+          "<button class=\"bg2 conn-report\" data-id=\""+esc(item.otherId)+"\" data-name=\""+esc(item.other.name)+"\" data-conn=\""+esc(item.row.id)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(item.other.name)+"\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>"+
+        "</div>"
+      );
+    });
+    h+="<div style=\"height:0.5rem;\"></div>";
+  }
+
+  h+="<div class=\"slabel\">Requests you sent"+(data.outgoing.length?" ("+data.outgoing.length+")":"")+"</div>";
+  if(!data.outgoing.length){
+    h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't sent any requests yet. Find someone in Skill search and tap Connect.</p>";
+  } else {
+    data.outgoing.forEach(function(item){
+      h+=connPersonRow(item,
+        "<div style=\"font-size:11px;padding:3px 10px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;font-weight:500;\">Waiting for them to accept</div>"
+      );
+    });
+  }
+
+  el.innerHTML=h;
+
+  document.querySelectorAll(".conn-accept").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var btn=this;btn.disabled=true;btn.textContent="\u2026";
+      var res=await respondToConnection(this.dataset.id,"accepted");
+      if(res.error){
+        btn.disabled=false;btn.textContent="Accept";
+        showToast("Couldn't accept \u2014 please try again");
+        return;
+      }
+      showToast("You're connected with "+btn.dataset.name);
+      renderConnections();
+    });
+  });
+  document.querySelectorAll(".conn-decline").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var btn=this;btn.disabled=true;btn.textContent="\u2026";
+      var res=await respondToConnection(this.dataset.id,"declined");
+      if(res.error){
+        btn.disabled=false;btn.textContent="Decline";
+        showToast("Couldn't decline \u2014 please try again");
+        return;
+      }
+      renderConnections();
+    });
+  });
+  document.querySelectorAll(".conn-report").forEach(function(b){
     b.addEventListener("click",function(){
-      var n=this.dataset.name;var cn=CONNS.find(function(c){return c.name===n;});
-      if(cn)cn.status="accepted";showTab("conns");
-      alert(n+" accepted!\n\nIn the full app you would both get a shared project board with tasks, milestones, and a verified message thread.");
+      openReportModal(this.dataset.id,this.dataset.name,"connection",this.dataset.conn,function(){showTab("conns");});
     });
   });
 }
