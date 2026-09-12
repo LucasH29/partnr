@@ -357,18 +357,23 @@ async function saveProfile(){
     var parts=k.split(":");
     return {student_id:uid,category:parts[0],skill_name:parts[1]||parts[0],level:S.skillLevels[k]||null};
   });
-  if(skillRows.length)await sba.from("skills").insert(skillRows);
+  if(skillRows.length){
+    var skillsIns=await sba.from("skills").insert(skillRows);
+    if(skillsIns.error)return skillsIns;
+  }
 
   await sba.from("languages").delete().eq("student_id",uid);
   if((S.languages||[]).length){
-    await sba.from("languages").insert(S.languages.map(function(l){return {student_id:uid,language_name:l};}));
+    var langIns=await sba.from("languages").insert(S.languages.map(function(l){return {student_id:uid,language_name:l};}));
+    if(langIns.error)return langIns;
   }
 
   await sba.from("competitions").delete().eq("student_id",uid);
   if((S.comps||[]).length){
-    await sba.from("competitions").insert(S.comps.map(function(c){
+    var compIns=await sba.from("competitions").insert(S.comps.map(function(c){
       return {student_id:uid,competition_name:(c&&c.name)?c.name:c,cross_type:(c&&c.type)?c.type:null};
     }));
+    if(compIns.error)return compIns;
   }
   return {error:null};
 }
@@ -1845,12 +1850,48 @@ function goFind(){
   S.comps=selComps.map(function(c){return c.n;});
   S.idea=idea;S.commit=commit;S.location=S.locationPref;
   goTo("loading");
+  // The profile save is the most important write in the app. It used to
+  // fail silently and send the student to the matches page anyway, which
+  // meant a broken save looked identical to a working one. Now a failure
+  // stops the flow and shows the real reason.
   saveProfile().then(function(res){
-    if(!res||!res.error){
-      saveSignupLead({email:S.email,stage:"completed",converted:true});
+    if(res&&res.error){
+      showSaveError(res.error);
+      return;
     }
-  }).catch(function(e){console.error("Profile save failed",e);});
-  doFetch();
+    saveSignupLead({email:S.email,stage:"completed",converted:true});
+    doFetch();
+  }).catch(function(e){
+    showSaveError(e);
+  });
+}
+
+// Shown when the profile can't be written to the database. Gives the
+// student a way forward and puts the real error where it can be read,
+// rather than hiding it in the console.
+function showSaveError(err){
+  console.error("[Partnr] profile save failed:",err);
+  var msg=(err&&(err.message||err.details||err.hint))||"Unknown error";
+  var code=(err&&err.code)?" (code "+err.code+")":"";
+  R(logo()+
+    "<div style=\"padding:2rem 1rem;text-align:center;\">"+
+      "<i class=\"ti ti-alert-circle\" style=\"font-size:44px;color:#C53030;\"></i>"+
+      "<h2 style=\"margin:12px 0 6px;\">We couldn't save your profile</h2>"+
+      "<div class=\"sub\" style=\"max-width:380px;margin:0 auto 1rem;\">Nothing you entered was lost. Try again \u2014 if it keeps failing, send this message to whoever runs Partnr.</div>"+
+      "<div style=\"font-size:12px;color:#C53030;background:#FFF5F5;border:1px solid #FEB2B2;border-radius:8px;padding:10px 12px;margin-bottom:1.25rem;text-align:left;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;\">"+esc(msg)+esc(code)+"</div>"+
+      "<button class=\"bp\" id=\"save-retry\" style=\"max-width:280px;margin:0 auto;display:block;\">Try saving again</button>"+
+      "<button class=\"bkbtn\" id=\"save-back\" style=\"max-width:280px;margin:8px auto 0;display:block;\">\u2190 Back to my goals</button>"+
+    "</div>"
+  );
+  document.getElementById("save-retry").addEventListener("click",function(){
+    goTo("loading");
+    saveProfile().then(function(res){
+      if(res&&res.error){showSaveError(res.error);return;}
+      saveSignupLead({email:S.email,stage:"completed",converted:true});
+      doFetch();
+    }).catch(showSaveError);
+  });
+  document.getElementById("save-back").addEventListener("click",function(){goTo("goals");});
 }
 
 // ── Loading + API ───────────────────────────
