@@ -402,6 +402,153 @@ async function sendConnectionRequest(otherStudentId,message){
   });
 }
 
+// ── Safety: blocks & reports ─────────────────
+// BLOCKED_IDS is a convenience cache for hiding people in the UI.
+// It is NOT the security boundary — blocking is enforced server-side
+// by restrictive RLS policies in Supabase, so a blocked student can't
+// reach around the interface by calling the API directly.
+var BLOCKED_IDS={};
+
+async function loadBlockedIds(){
+  try{
+    var session=await getSession();
+    if(!session)return;
+    var res=await sba.from("blocks").select("blocked_id").eq("blocker_id",session.user.id);
+    BLOCKED_IDS={};
+    (res.data||[]).forEach(function(r){BLOCKED_IDS[r.blocked_id]=true;});
+  }catch(ex){console.error("Could not load blocks",ex);}
+}
+
+async function blockStudent(otherId){
+  var session=await getSession();
+  if(!session)return {error:"no session"};
+  if(!otherId||otherId===session.user.id)return {error:"invalid target"};
+  var res=await sba.from("blocks").insert({blocker_id:session.user.id,blocked_id:otherId});
+  // A duplicate block isn't a failure from the student's point of
+  // view — they wanted this person blocked, and they are.
+  if(res.error&&res.error.code!=="23505")return res;
+  BLOCKED_IDS[otherId]=true;
+  return {error:null};
+}
+
+async function unblockStudent(otherId){
+  var session=await getSession();
+  if(!session)return {error:"no session"};
+  var res=await sba.from("blocks").delete().eq("blocker_id",session.user.id).eq("blocked_id",otherId);
+  if(!res.error)delete BLOCKED_IDS[otherId];
+  return res;
+}
+
+async function submitReport(reportedId,reason,details,context,contextId){
+  var session=await getSession();
+  if(!session)return {error:"no session"};
+  if(!reportedId||reportedId===session.user.id)return {error:"invalid target"};
+  return await sba.from("reports").insert({
+    reporter_id:session.user.id,
+    reported_id:reportedId,
+    reason:reason,
+    details:details||null,
+    context:context||"profile",
+    context_id:contextId||null
+  });
+}
+
+var REPORT_REASONS=[
+  "Inappropriate or sexual content",
+  "Harassment or bullying",
+  "Asking to move off Partnr (Snap, Discord, etc.)",
+  "Adult pretending to be a student",
+  "Spam or scam",
+  "Something else"
+];
+
+// Report + block flow. Blocking is offered inside the report screen
+// (checked by default) so a student never has to take two separate
+// actions to both flag someone and make them go away.
+function openReportModal(reportedId,name,context,contextId,onDone){
+  if(!reportedId){showToast("Can't report a demo profile");return;}
+  var backFn=typeof onDone==="function"?onDone:function(){goTo("matches");};
+  R(logo()+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Report "+esc(name)+"</div>"+
+      "<div class=\"sub\" style=\"margin-bottom:1rem;\">Tell us what happened. Reports are private \u2014 "+esc(name)+" is never told who reported them.</div>"+
+      "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;line-height:1.5;\"><i class=\"ti ti-shield-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>If you're in danger or someone is threatening you, tell a parent, teacher, or another trusted adult right away. Reporting here is important, but it isn't the same as getting help from someone nearby.</div>"+
+      "<div class=\"slabel\" style=\"margin-top:0;\">What happened?</div>"+
+      "<div class=\"cgrow\" id=\"rep-reasons\"></div>"+
+      "<div class=\"fi\" style=\"margin-top:0.5rem;\"><label for=\"rep-details\">Anything else we should know? <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><textarea id=\"rep-details\" placeholder=\"Add any detail that would help us understand what happened.\"></textarea></div>"+
+      "<label style=\"display:flex;align-items:flex-start;gap:8px;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;cursor:pointer;\">"+
+        "<input type=\"checkbox\" id=\"rep-block\" checked style=\"margin-top:2px;flex-shrink:0;\"/>"+
+        "<span style=\"font-size:13px;color:#444;line-height:1.5;\">Also block "+esc(name)+". They won't be able to see your profile or contact you, and you won't see them. They aren't told.</span>"+
+      "</label>"+
+      "<button class=\"bp\" id=\"rep-submit\">Submit report</button>"+
+      "<button class=\"bkbtn\" id=\"rep-blockonly\">Just block, don't report</button>"+
+      "<button class=\"bkbtn\" id=\"rep-cancel\">Cancel</button>"+
+    "</div>"
+  );
+  mkChips("rep-reasons",REPORT_REASONS,[],true);
+  document.getElementById("rep-cancel").addEventListener("click",backFn);
+  document.getElementById("rep-blockonly").addEventListener("click",function(){
+    openBlockConfirm(reportedId,name,backFn);
+  });
+  document.getElementById("rep-submit").addEventListener("click",async function(){
+    var reason=getChips("rep-reasons")[0]||"";
+    if(!reason){showSecErr("rep-reasons","Please choose what happened");scrollToFirstErr();return;}
+    var btn=this;btn.disabled=true;btn.textContent="Submitting\u2026";
+    var alsoBlock=document.getElementById("rep-block").checked;
+    var details=document.getElementById("rep-details").value.trim();
+    try{
+      var res=await submitReport(reportedId,reason,details,context,contextId);
+      if(res.error){
+        btn.disabled=false;btn.textContent="Submit report";
+        showToast("Couldn't submit report \u2014 please try again");
+        return;
+      }
+      if(alsoBlock)await blockStudent(reportedId);
+      R(logo()+
+        "<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;max-width:360px;\">"+
+          "<i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i>"+
+          "<div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Report submitted</div>"+
+          "<div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1rem;line-height:1.5;\">Thank you for telling us. A person will review this."+(alsoBlock?" "+esc(name)+" has been blocked.":"")+"</div>"+
+          "<div style=\"font-size:13px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1.25rem;line-height:1.5;text-align:left;\">If this involves your safety, please also tell a parent, teacher, or another adult you trust.</div>"+
+          "<button id=\"rep-done\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Done</button>"+
+        "</div></div>"
+      );
+      document.getElementById("rep-done").addEventListener("click",backFn);
+    }catch(ex){
+      console.error("Report failed",ex);
+      btn.disabled=false;btn.textContent="Submit report";
+      showToast("Something went wrong \u2014 please try again");
+    }
+  });
+}
+
+// Standalone block confirmation, for blocking without reporting.
+function openBlockConfirm(otherId,name,onDone){
+  if(!otherId){showToast("Can't block a demo profile");return;}
+  var backFn=typeof onDone==="function"?onDone:function(){goTo("matches");};
+  R(logo()+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Block "+esc(name)+"?</div>"+
+      "<div class=\"sub\">They won't be able to see your profile or send you anything, and they won't appear in your search or matches. They are not told that you blocked them.</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;line-height:1.5;\">You can undo this anytime from My Profile \u2192 Blocked students.</div>"+
+      "<button class=\"bp\" id=\"blk-yes\" style=\"background:#C53030;\">Block "+esc(name)+"</button>"+
+      "<button class=\"bkbtn\" id=\"blk-no\">Cancel</button>"+
+    "</div>"
+  );
+  document.getElementById("blk-no").addEventListener("click",backFn);
+  document.getElementById("blk-yes").addEventListener("click",async function(){
+    var btn=this;btn.disabled=true;btn.textContent="Blocking\u2026";
+    var res=await blockStudent(otherId);
+    if(res.error){
+      btn.disabled=false;btn.textContent="Block "+name;
+      showToast("Couldn't block \u2014 please try again");
+      return;
+    }
+    showToast(name+" has been blocked");
+    backFn();
+  });
+}
+
 // ── Real student search ──────────────────────
 // Searches the real students table by skill/category, competition name,
 // and free-text idea — instead of asking Claude to invent fictional
@@ -434,6 +581,10 @@ async function searchRealStudents(query,excludeId){
     (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
   }catch(ex){console.error("Real student search query failed",ex);return [];}
   if(excludeId)delete ids[excludeId];
+  // Server-side RLS already hides blocked students, but filtering here
+  // too keeps the UI consistent immediately after a block, before any
+  // refetch happens.
+  Object.keys(BLOCKED_IDS).forEach(function(b){delete ids[b];});
   var idList=Object.keys(ids).slice(0,20);
   if(!idList.length)return [];
 
@@ -490,6 +641,7 @@ async function boot(){
   try{
     var session=await getSession();
     if(session){
+      await loadBlockedIds();
       var profile=await loadProfileIntoState(session.user.id);
       if(profile&&profile.onboarded){
         goTo("matches");
@@ -2166,12 +2318,67 @@ function meTab(){
   "</div>"+
   // Edit Profile button
   "<button class=\"bp\" id=\"edit-profile-btn\" style=\"margin-bottom:8px;\">Edit profile</button>"+
+  "<button class=\"bp\" id=\"blocked-btn\" style=\"background:#f8f8f6;color:#666;border:1px solid #ddd;margin-bottom:8px;\">Blocked students</button>"+
   "<button class=\"bp\" id=\"rst\" style=\"background:#f8f8f6;color:#666;border:1px solid #ddd;\">Start over</button>";
+}
+
+// Blocked students list, with unblock. Names are looked up through a
+// SECURITY DEFINER-free path: the blocker can always see who they
+// blocked because they own those rows, but the restrictive RLS policy
+// hides the student profile itself — so we show whatever we can and
+// fall back to a neutral label rather than leaking anything.
+async function renderBlockedList(){
+  var el=document.getElementById("tc");
+  if(!el)return;
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Loading\u2026</div></div>";
+  var rows=[];
+  try{
+    var session=await getSession();
+    if(session){
+      var res=await sba.from("blocks").select("blocked_id,created_at").eq("blocker_id",session.user.id).order("created_at",{ascending:false});
+      rows=res.data||[];
+    }
+  }catch(ex){console.error("Could not load blocked list",ex);}
+
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Blocked students</div>";
+  if(!rows.length){
+    h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't blocked anyone. If someone makes you uncomfortable, you can block them from their profile or from any search result \u2014 they're never told.</p>";
+  } else {
+    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;line-height:1.6;\">These students can't see your profile or contact you, and they don't appear in your search or matches. They aren't told they're blocked.</p>";
+    rows.forEach(function(r){
+      h+="<div class=\"pit\">"+
+        "<div class=\"av\" style=\"width:38px;height:38px;font-size:13px;background:#F1EFE8;color:#5F5E5A;\"><i class=\"ti ti-user-off\" style=\"font-size:16px;\"></i></div>"+
+        "<div style=\"flex:1;\">"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Blocked student</div>"+
+          "<div style=\"font-size:11px;color:#6b6b6b;\">Blocked "+new Date(r.created_at).toLocaleDateString()+"</div>"+
+        "</div>"+
+        "<button class=\"bo unblk\" data-id=\""+esc(r.blocked_id)+"\">Unblock</button>"+
+      "</div>";
+    });
+  }
+  h+="<button class=\"bkbtn\" id=\"blk-back\" style=\"margin-top:1rem;\">\u2190 Back to my profile</button>";
+  el.innerHTML=h;
+  document.getElementById("blk-back").addEventListener("click",function(){showTab("me");});
+  document.querySelectorAll(".unblk").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var btn=this;btn.disabled=true;btn.textContent="\u2026";
+      var res=await unblockStudent(this.dataset.id);
+      if(res.error){
+        btn.disabled=false;btn.textContent="Unblock";
+        showToast("Couldn't unblock \u2014 please try again");
+        return;
+      }
+      showToast("Unblocked");
+      renderBlockedList();
+    });
+  });
 }
 
 function bindMeTab(){
   var rst=document.getElementById("rst");
   if(rst)rst.addEventListener("click",resetAll);
+  var blkBtn=document.getElementById("blocked-btn");
+  if(blkBtn)blkBtn.addEventListener("click",renderBlockedList);
   var reqBtn=document.getElementById("reqVerifyBtn");
   if(reqBtn)reqBtn.addEventListener("click",function(){
     var wrap=reqBtn.parentNode;
@@ -2308,9 +2515,10 @@ function renderSR(results,skill,isDemo){
           "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+ro.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+ro.n+"</span>"+
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "</div>"+
-        "<div style=\"display:flex;gap:8px;\">"+
+        "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId||"")+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
           (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
+          (r._realId?"<button class=\"bg2 sr-report\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(r.name)+"\" style=\"margin-left:auto;\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>":"")+
         "</div>"+
       "</div>"+
     "</div>";
@@ -2321,6 +2529,11 @@ function renderSR(results,skill,isDemo){
       var realId=this.dataset.realid;
       if(realId){openSearchConnectModal(realId,btn.dataset.name);}
       else{showToast("Connect request sent to "+btn.dataset.name+" (demo)");}
+    });
+  });
+  document.querySelectorAll(".sr-report").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      openReportModal(this.dataset.realid,this.dataset.name,"profile",null,function(){showTab("search");});
     });
   });
 }
