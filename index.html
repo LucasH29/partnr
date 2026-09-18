@@ -131,6 +131,90 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported"};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
+var WORLD_CITIES=null,worldCitiesLoading=null;
+
+// ISO 3166-1 alpha-2 codes for every country in COUNTRIES — used only to
+// call the Zippopotam.us postal-code API, which is keyed by ISO code.
+var COUNTRY_ISO={
+  "Afghanistan":"AF","Albania":"AL","Algeria":"DZ","Angola":"AO","Argentina":"AR",
+  "Armenia":"AM","Australia":"AU","Austria":"AT","Azerbaijan":"AZ","Bahrain":"BH",
+  "Bangladesh":"BD","Belarus":"BY","Belgium":"BE","Benin":"BJ","Bolivia":"BO",
+  "Bosnia":"BA","Botswana":"BW","Brazil":"BR","Burkina Faso":"BF","Burundi":"BI",
+  "Cambodia":"KH","Cameroon":"CM","Canada":"CA","Cape Verde":"CV",
+  "Central African Republic":"CF","Chad":"TD","Chile":"CL","China":"CN",
+  "Colombia":"CO","Comoros":"KM","Congo (DRC)":"CD","Congo (Republic)":"CG",
+  "Costa Rica":"CR","Croatia":"HR","Cuba":"CU","Cyprus":"CY","Czech Republic":"CZ",
+  "Denmark":"DK","Djibouti":"DJ","Dominican Republic":"DO","Ecuador":"EC",
+  "Egypt":"EG","El Salvador":"SV","Equatorial Guinea":"GQ","Eritrea":"ER",
+  "Eswatini":"SZ","Estonia":"EE","Ethiopia":"ET","Finland":"FI","France":"FR",
+  "Gabon":"GA","Gambia":"GM","Georgia":"GE","Germany":"DE","Ghana":"GH",
+  "Greece":"GR","Guatemala":"GT","Guinea":"GN","Guinea-Bissau":"GW","Haiti":"HT",
+  "Honduras":"HN","Hong Kong":"HK","Hungary":"HU","Iceland":"IS","India":"IN",
+  "Indonesia":"ID","Iran":"IR","Iraq":"IQ","Ireland":"IE","Israel":"IL",
+  "Italy":"IT","Ivory Coast":"CI","Jamaica":"JM","Japan":"JP","Jordan":"JO",
+  "Kazakhstan":"KZ","Kenya":"KE","Kosovo":"XK","Kuwait":"KW","Kyrgyzstan":"KG",
+  "Latvia":"LV","Lebanon":"LB","Lesotho":"LS","Liberia":"LR","Libya":"LY",
+  "Lithuania":"LT","Luxembourg":"LU","Macau":"MO","Madagascar":"MG","Malawi":"MW",
+  "Malaysia":"MY","Mali":"ML","Malta":"MT","Mauritania":"MR","Mauritius":"MU",
+  "Mexico":"MX","Moldova":"MD","Mongolia":"MN","Montenegro":"ME","Morocco":"MA",
+  "Mozambique":"MZ","Myanmar":"MM","Namibia":"NA","Nepal":"NP","Netherlands":"NL",
+  "New Zealand":"NZ","Nicaragua":"NI","Niger":"NE","Nigeria":"NG",
+  "North Macedonia":"MK","Norway":"NO","Oman":"OM","Pakistan":"PK",
+  "Palestine":"PS","Panama":"PA","Paraguay":"PY","Peru":"PE","Philippines":"PH",
+  "Poland":"PL","Portugal":"PT","Qatar":"QA","Romania":"RO","Russia":"RU",
+  "Rwanda":"RW","Sao Tome and Principe":"ST","Saudi Arabia":"SA","Senegal":"SN",
+  "Serbia":"RS","Seychelles":"SC","Sierra Leone":"SL","Singapore":"SG",
+  "Slovakia":"SK","Slovenia":"SI","Somalia":"SO","South Africa":"ZA",
+  "South Korea":"KR","South Sudan":"SS","Spain":"ES","Sri Lanka":"LK","Sudan":"SD",
+  "Sweden":"SE","Switzerland":"CH","Syria":"SY","Taiwan":"TW","Tajikistan":"TJ",
+  "Tanzania":"TZ","Thailand":"TH","Togo":"TG","Trinidad and Tobago":"TT",
+  "Tunisia":"TN","Turkey":"TR","Turkmenistan":"TM","Uganda":"UG","Ukraine":"UA",
+  "United Arab Emirates":"AE","United Kingdom":"GB","United States":"US",
+  "Uruguay":"UY","Uzbekistan":"UZ","Venezuela":"VE","Vietnam":"VN","Yemen":"YE",
+  "Zambia":"ZM","Zimbabwe":"ZW"
+};
+
+// Lazy-loads the world cities autocomplete data once (name + country +
+// population, ~48k entries limited to real, medium-or-larger places).
+// This is a suggestion list, not a whitelist — free text always stays
+// allowed, since a global list this size can't include every small town
+// and rejecting a real student's real hometown would work directly
+// against why Partnr exists.
+async function loadWorldCities(){
+  if(WORLD_CITIES)return WORLD_CITIES;
+  if(worldCitiesLoading)return worldCitiesLoading;
+  worldCitiesLoading=fetch("world_cities.json").then(function(r){return r.json();}).then(function(data){
+    WORLD_CITIES=data;
+    return data;
+  }).catch(function(ex){
+    console.error("Could not load world cities list",ex);
+    WORLD_CITIES=[];
+    return WORLD_CITIES;
+  });
+  return worldCitiesLoading;
+}
+
+// Zip → city autofill via Zippopotam.us (free, no API key, ~60 countries,
+// GeoNames-backed). Never blocks or errors the form — if the lookup fails,
+// times out, or the country isn't covered, the student just keeps typing
+// their city normally. Only fills the city field if it's currently empty,
+// so it never overwrites something the student already entered.
+async function autofillCityFromZip(country,zip,cityInputEl){
+  var iso=COUNTRY_ISO[country];
+  if(!iso||!zip||!cityInputEl||cityInputEl.value.trim())return;
+  try{
+    var res=await fetch("https://api.zippopotam.us/"+iso.toLowerCase()+"/"+encodeURIComponent(zip.trim()));
+    if(!res.ok)return;
+    var data=await res.json();
+    var place=data&&data.places&&data.places[0]&&data.places[0]["place name"];
+    if(place&&!cityInputEl.value.trim()){
+      cityInputEl.value=place;
+      cityInputEl.dispatchEvent(new Event("input"));
+    }
+  }catch(ex){
+    // Silent — this is a convenience, not a requirement.
+  }
+}
 
 // Lazy-loads the school autocomplete data once, reused for every signup.
 async function loadSchoolList(){
@@ -347,7 +431,7 @@ async function saveProfile(){
     id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
-    location_pref:S.locationPref,experience:S.experience,awards:(S.awards||[]).join ? (S.awards||[]).join(", ") : S.awards,
+    location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true
   });
   if(upsertRes.error)return upsertRes;
@@ -385,7 +469,7 @@ async function loadProfileIntoState(uid){
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
   S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
-  S.experience=p.experience||[];S.awards=p.awards||"";S.stage=p.stage||"";
+  S.experience=p.experience||[];S.awards=p.awards||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
@@ -1066,9 +1150,15 @@ function getChips(id){
   return Array.from(document.querySelectorAll("#"+id+" .chip.on")).map(function(c){return c.textContent;});
 }
 function countryOpts(){
-  return COUNTRIES.map(function(c){
-    return "<option value=\""+c+"\""+(S.country===c&&c?" selected":"")+">"+(c||"Select country")+"</option>";
+  var rest=COUNTRIES.filter(function(c){return c&&c!=="United States"&&c!=="Other";});
+  var h="<option value=\"\">Select country</option>";
+  h+="<option value=\"United States\""+(S.country==="United States"?" selected":"")+">United States</option>";
+  h+="<option disabled>──────────</option>";
+  h+=rest.map(function(c){
+    return "<option value=\""+c+"\""+(S.country===c?" selected":"")+">"+c+"</option>";
   }).join("");
+  h+="<option value=\"Other\""+(S.country==="Other"?" selected":"")+">Other</option>";
+  return h;
 }
 function gradeOpts(){
   return ["","9th grade","10th grade","11th grade","12th grade","IB Year 1","IB Year 2","A-Level Year 1","A-Level Year 2"].map(function(g){
@@ -1169,7 +1259,9 @@ function rSignup(){
       "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"icountry\">Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
-    "<div class=\"fi\"><label for=\"icity\">City</label><input id=\"icity\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/></div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"icity\">City</label><input id=\"icity\" autocomplete=\"off\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/>"+
+      "<div id=\"citySuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
+    "</div>"+
     "<div id=\"zipwrap\" style=\""+(co&&hasZip(co)?"":"display:none;")+"\">"+
       "<div class=\"fi\"><label for=\"izip\">Zip / Postal code</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
     "</div>"+
@@ -1199,6 +1291,12 @@ function rSignup(){
     if(zipEl&&!hasZip(this.value))zipEl.value="";
     renderLangSections(this.value,getAllSelectedLangs());
   });
+  var zipInputEl=document.getElementById("izip");
+  if(zipInputEl){
+    zipInputEl.addEventListener("blur",function(){
+      autofillCityFromZip(document.getElementById("icountry").value,this.value,document.getElementById("icity"));
+    });
+  }
   document.getElementById("langaddbtn").addEventListener("click",function(){
     var inp=document.getElementById("langother");
     var val=inp.value.trim();if(!val)return;
@@ -1255,6 +1353,43 @@ function rSignup(){
   document.addEventListener("click",function(e){
     if(e.target!==schoolInput&&!suggestBox.contains(e.target)){
       suggestBox.style.display="none";
+    }
+  });
+
+  // City autocomplete — suggestions only, never a hard requirement.
+  // Filtered to the currently selected country so "Los Angeles" can't
+  // show up as a suggestion while Uganda is selected. If a student's
+  // real town isn't in the list (a global dataset this size can't cover
+  // every small town), they can still just type it — nothing blocks that.
+  loadWorldCities();
+  var cityInput=document.getElementById("icity");
+  var citySuggestBox=document.getElementById("citySuggest");
+  cityInput.addEventListener("input",async function(){
+    var q=cityInput.value.trim().toLowerCase();
+    var country=document.getElementById("icountry").value;
+    if(q.length<2||!country){citySuggestBox.style.display="none";return;}
+    var list=await loadWorldCities();
+    var matches=list.filter(function(c){return c.c===country&&c.n.toLowerCase().indexOf(q)===0;}).slice(0,8);
+    if(!matches.length){citySuggestBox.style.display="none";return;}
+    citySuggestBox.setAttribute("role","listbox");
+    citySuggestBox.innerHTML=matches.map(function(c){
+      return "<div class=\"city-suggest-item\" role=\"option\" tabindex=\"0\" data-name=\""+esc(c.n)+"\" style=\"padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;\">"+esc(c.n)+"</div>";
+    }).join("");
+    citySuggestBox.style.display="block";
+    citySuggestBox.querySelectorAll(".city-suggest-item").forEach(function(item){
+      item.addEventListener("mouseenter",function(){item.style.background="#f8f8f6";});
+      item.addEventListener("mouseleave",function(){item.style.background="";});
+      addKbdActivation(item);
+      item.addEventListener("click",function(){
+        cityInput.value=item.dataset.name;
+        citySuggestBox.style.display="none";
+        clearErr("icity");
+      });
+    });
+  });
+  document.addEventListener("click",function(e){
+    if(e.target!==cityInput&&!citySuggestBox.contains(e.target)){
+      citySuggestBox.style.display="none";
     }
   });
 }
