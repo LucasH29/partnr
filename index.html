@@ -128,7 +128,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported"};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported",skillsNeeded:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
 var WORLD_CITIES=null,worldCitiesLoading=null;
@@ -432,7 +432,7 @@ async function saveProfile(){
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],
-    stage:S.stage,school_verification:verification.tier,onboarded:true
+    stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||""
   });
   if(upsertRes.error)return upsertRes;
 
@@ -471,6 +471,7 @@ async function loadProfileIntoState(uid){
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.experience=p.experience||[];S.awards=p.awards||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
+  S.skillsNeeded=p.skills_needed||"";
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
   S.skillLevels={};
@@ -1739,6 +1740,7 @@ function rGoals(){
       "<div id=\"clist\"></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner</label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div class=\"fi\"><label for=\"iskillsneeded\">What kind of partner are you looking for? <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><input id=\"iskillsneeded\" placeholder=\"e.g. a biology partner, someone who can build an app, someone to help write a research paper...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
     "<div class=\"slabel\">Commitment</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
     "<div class=\"slabel\">Who do you want to connect with?</div>"+
@@ -1984,6 +1986,7 @@ function goFind(){
   if(!valid){scrollToFirstErr();return;}
   S.comps=selComps.map(function(c){return c.n;});
   S.idea=idea;S.commit=commit;S.location=S.locationPref;
+  S.skillsNeeded=document.getElementById("iskillsneeded").value.trim();
   goTo("loading");
   // The profile save is the most important write in the app. It used to
   // fail silently and send the student to the matches page anyway, which
@@ -2043,7 +2046,9 @@ async function doFetch(){
   }).join(", ")||"open";
   var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none";
   var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Match COMPLEMENTARY roles (CEO gets CTO, researcher gets engineer)\n- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by intellectual interest\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var neededStr=S.skillsNeeded||"open — infer from idea and role";
+  var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
     if(!res.ok)throw new Error("status "+res.status);
@@ -2626,6 +2631,7 @@ function meTab(){
     "</div>";}).join(""):"";
   var awdHTML=S.awards.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+
     S.awards.map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;\"></i>"+esc(a)+"</div>";}).join(""):"";
+  var neededHTML=S.skillsNeeded?"<div class=\"slabel\" style=\"margin-top:1rem;\">Looking for</div><div style=\"font-size:13px;color:#666;line-height:1.5;\">"+esc(S.skillsNeeded)+"</div>":"";
   return "<div class=\"card\">"+
     "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
@@ -2647,7 +2653,7 @@ function meTab(){
     "</div>"+
     "<div class=\"tags\">"+tags+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
-    expHTML+awdHTML+
+    expHTML+awdHTML+neededHTML+
   "</div>"+
   // Edit Profile button
   "<button class=\"bp\" id=\"edit-profile-btn\" style=\"margin-bottom:8px;\">Edit profile</button>"+
@@ -2950,7 +2956,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[]};
+  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],skillsNeeded:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
   signOutUser().catch(function(){});
