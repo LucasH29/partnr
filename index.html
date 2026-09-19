@@ -128,7 +128,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported",skillsNeeded:""};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 var REMATCH_FEEDBACK="";
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
@@ -443,7 +443,7 @@ async function saveProfile(){
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],
-    stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||""
+    stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null
   });
   if(upsertRes.error)return upsertRes;
 
@@ -482,6 +482,7 @@ async function loadProfileIntoState(uid){
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.experience=p.experience||[];S.awards=p.awards||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
+  S.dob=p.dob||"";
   S.skillsNeeded=p.skills_needed||"";
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
@@ -664,6 +665,16 @@ function colorForId(id){
 }
 function initialsFor(name){
   return (name||"?").trim().split(/\s+/).map(function(w){return w[0];}).join("").substring(0,2).toUpperCase();
+}
+// Shown to OTHER students — "Lucas H." instead of a full last name. The
+// full name is still collected and stored (needed for verification and
+// safety review), this only affects how it's rendered in the app to
+// people who aren't the profile's own owner. A single-word name (or one
+// already this short) is returned unchanged rather than truncated oddly.
+function displayName(name){
+  var parts=(name||"").trim().split(/\s+/);
+  if(parts.length<2)return name||"";
+  return parts[0]+" "+parts[parts.length-1][0]+".";
 }
 // Accepts either a plain string (old free-text call sites keep working)
 // or an options object: {query, city, school, competition}. Filters
@@ -876,6 +887,31 @@ var NO_ZIP=[
   "Tonga","Fiji","Maldives","East Timor"
 ];
 function hasZip(co){return co&&NO_ZIP.indexOf(co)<0;}
+
+// Calculates age in whole years from a YYYY-MM-DD date-of-birth string.
+function calculateAge(dobStr){
+  var dob=new Date(dobStr+"T00:00:00");
+  var now=new Date();
+  var age=now.getFullYear()-dob.getFullYear();
+  var hasHadBirthdayThisYear=(now.getMonth()>dob.getMonth())||(now.getMonth()===dob.getMonth()&&now.getDate()>=dob.getDate());
+  if(!hasHadBirthdayThisYear)age--;
+  return age;
+}
+
+// COPPA screen: Partnr is not available to anyone under 13. Nothing
+// entered on the signup form up to this point is saved anywhere — this
+// is a hard stop, not a soft warning, and there's no path past it.
+function rUnderageBlock(){
+  R(logo()+
+    "<div style=\"text-align:center;padding:2rem 1rem;\">"+
+      "<i class=\"ti ti-shield-check\" style=\"font-size:44px;color:#534AB7;\"></i>"+
+      "<h2 style=\"margin:12px 0 6px;\">Partnr is for students 13 and up</h2>"+
+      "<div class=\"sub\" style=\"max-width:380px;margin:0 auto 1.25rem;\">Based on the date of birth entered, we're not able to create an account right now. Nothing you entered has been saved.</div>"+
+      "<button class=\"bp\" id=\"underage-back\" style=\"max-width:280px;margin:0 auto;display:block;\">← Back</button>"+
+    "</div>"
+  );
+  document.getElementById("underage-back").addEventListener("click",function(){goTo("welcome");});
+}
 
 // ── Country → language mapping (all 54 African + rest of world) ──
 var COUNTRY_LANGS={
@@ -1276,22 +1312,71 @@ function gradeOpts(){
 // ── Welcome ─────────────────────────────────
 function rWelcome(){
   R(logo()+
-    "<div style=\"display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;\">startups · research · nonprofits · competitions · global</div>"+
+    "<div style=\"display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;\">startups · research · nonprofits · robotics · coding · finance · global</div>"+
     "<h2 style=\"font-size:24px;margin-bottom:0.5rem;\">Find the right student partner</h2>"+
     "<div class=\"sub\">Whether you're building a startup, launching a nonprofit, doing research, or competing globally — find the right partner matched by goal, role, and skill level. Not just who you already know.</div>"+
-    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.5rem;\">"+
-      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-microscope\" style=\"font-size:24px;color:#0F6E56;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Research</div></div>"+
-      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-chart-line\" style=\"font-size:24px;color:#3B6D11;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Startups</div></div>"+
-      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-world\" style=\"font-size:24px;color:#1D9E75;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Nonprofits</div></div>"+
-      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-pencil\" style=\"font-size:24px;color:#993C1D;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Arts & Writing</div></div>"+
-      "<div style=\"padding:16px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;\"><i class=\"ti ti-cpu\" style=\"font-size:24px;color:#185FA5;\"></i><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-top:7px;\">Engineering</div></div>"+
+    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:0.75rem;\">"+
+      "<div class=\"welcome-cat\" data-cats=\"science\" data-label=\"Research & Science\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-microscope\" style=\"font-size:21px;color:#0F6E56;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Research & Science</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Startups\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-chart-line\" style=\"font-size:21px;color:#3B6D11;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Startups</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Investment & Finance\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-coin\" style=\"font-size:21px;color:#854F0B;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Investment & Finance</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"impact\" data-label=\"Nonprofit & Impact\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-world\" style=\"font-size:21px;color:#1D9E75;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Nonprofit & Impact</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Robotics\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-robot\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Robotics</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Coding\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-code\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Coding</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Engineering\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:21px;color:#993C1D;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Arts & Writing</div></div>"+
     "</div>"+
+    "<div style=\"text-align:center;font-size:11px;color:#6b6b6b;margin-bottom:1rem;\">Tap any category to browse real competitions — no account needed</div>"+
+    "<div style=\"text-align:center;font-size:12px;color:#6b6b6b;margin-bottom:1.5rem;\"><i class=\"ti ti-trophy\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;color:#854F0B;\"></i>"+COMPS.length+"+ competitions — from ISEF and DECA to Congressional App Challenge</div>"+
     "<button class=\"bp\" id=\"gs\">Get started →</button>"+
     "<button class=\"bkbtn\" id=\"toSignin\">Already have an account? Sign in</button>"+
     "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#6b6b6b;\">Free · Beta</div>"
   );
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
   document.getElementById("toSignin").addEventListener("click",function(){goTo("signin");});
+  document.querySelectorAll(".welcome-cat").forEach(function(tile){
+    tile.setAttribute("role","button");tile.setAttribute("tabindex","0");
+    addKbdActivation(tile);
+    tile.addEventListener("click",function(){
+      rCompPreview(tile.dataset.cats.split(","),tile.dataset.label);
+    });
+  });
+}
+
+// Lets a visitor browse real competitions before creating an account —
+// this is public, non-personal data (just the static competition list),
+// so there's no reason to gate it behind signup. Ends with a CTA that
+// carries the competition they were looking at straight into signup.
+function rCompPreview(catIds,label){
+  var list=COMPS.filter(function(c){return catIds.indexOf(c.cat)>=0;});
+  var h=logo()+
+    "<button id=\"preview-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
+    "<h2 style=\"margin-bottom:0.25rem;\">"+esc(label)+" competitions</h2>"+
+    "<div class=\"sub\">"+list.length+" real competition"+(list.length===1?"":"s")+" on Partnr right now. Sign up to find a partner for any of these.</div>";
+  list.forEach(function(c){
+    var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    var tm=TRC[c.tier]||TRC[2];
+    var xs=getCrossStyle(c.cross);
+    h+="<div class=\"card\">"+
+      "<div class=\"comp-detail-open\" data-name=\""+esc(c.n)+"\" style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;\">"+c.n+"</div>"+
+      "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.4;\">"+c.desc+"</div>"+
+      "<div style=\"display:flex;gap:5px;flex-wrap:wrap;\">"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
+        deadlineChipHtml(c.deadline)+
+      "</div>"+
+    "</div>";
+  });
+  h+="<button class=\"bp\" id=\"preview-signup\">Sign up to find a partner →</button>";
+  R(h);
+  document.getElementById("preview-back").addEventListener("click",function(){goTo("welcome");});
+  document.getElementById("preview-signup").addEventListener("click",function(){goTo("signup");});
+  document.querySelectorAll(".comp-detail-open").forEach(function(el){
+    el.addEventListener("click",function(){
+      var c=COMPS.find(function(x){return x.n===el.dataset.name;});
+      if(c)openCompDetail(c,true);
+    });
+  });
 }
 
 // ── Sign in (returning users only) ───────────
@@ -1373,6 +1458,7 @@ function rSignup(){
       "<div class=\"fi\"><label for=\"izip\">Zip / Postal code</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"igrade\">Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
+    "<div class=\"fi\"><label for=\"idob\">Date of birth</label><input id=\"idob\" type=\"date\" value=\""+esc(S.dob)+"\"/></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Your country's languages appear first. Select all that apply.</div>"+
     "<div id=\"lang-suggested\" style=\""+(COUNTRY_LANGS[co]?"":"display:none;")+"\">"+
@@ -1943,11 +2029,11 @@ function doSearch(v){
 // Click-through detail view — before this, the only way to learn about a
 // competition was the one-line 'why' text on the card itself. This gives
 // a real answer to 'what is this, exactly' before committing to add it.
-function openCompDetail(c){
+function openCompDetail(c,previewMode){
   var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
   var tm=TRC[c.tier]||TRC[2];
   var xs=getCrossStyle(c.cross);
-  var added=selComps.some(function(s){return s.n===c.n;});
+  var added=!previewMode&&selComps.some(function(s){return s.n===c.n;});
   var backFn=exploreOpen?function(){renderCat();closeCompDetailOverlay();}:function(){closeCompDetailOverlay();};
   var overlay=document.createElement("div");
   overlay.id="comp-detail-overlay";
@@ -1969,7 +2055,7 @@ function openCompDetail(c){
     (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet — search the name directly to confirm details.</div>")+
     "<div style=\"display:flex;gap:8px;\">"+
       (added?"<button style=\"flex:1;padding:10px;background:#3B6D11;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Added</button>":
-            "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add to my targets</button>")+
+            "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">"+(previewMode?"Sign up to target this →":"+ Add to my targets")+"</button>")+
       "<button id=\"comp-detail-close\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Close</button>"+
     "</div>"+
   "</div>";
@@ -1980,6 +2066,7 @@ function openCompDetail(c){
   if(addBtn)addBtn.addEventListener("click",function(){
     addComp(c);
     closeCompDetailOverlay();
+    if(previewMode){goTo("signup");return;}
     if(exploreOpen)renderCat();
     var pillsEl=document.getElementById("pills");if(pillsEl)renderPills();
   });
@@ -2194,6 +2281,7 @@ function step2(){
   var sc=document.getElementById("ischool").value.trim();
   var g=document.getElementById("igrade").value;
   var co=document.getElementById("icountry").value;
+  var dob=document.getElementById("idob").value;
   var valid=true;
   if(!n){showErr("iname","Please enter your name");valid=false;}
   if(!e){showErr("iemail","Please enter your school email");valid=false;}
@@ -2201,6 +2289,7 @@ function step2(){
   if(!sc){showErr("ischool","Please enter your school name");valid=false;}
   if(!g){showErr("igrade","Please select your grade");valid=false;}
   if(!co){showErr("icountry","Please select your country");valid=false;}
+  if(!dob){showErr("idob","Please enter your date of birth");valid=false;}
   var langs=getAllSelectedLangs();
   if(!langs.length){showSecErr("lang-other-wrap","Please select at least one language you speak");valid=false;}
   var city=document.getElementById("icity").value.trim();
@@ -2211,7 +2300,14 @@ function step2(){
     if(!zipVal){showErr("izip","Please enter your zip / postal code");valid=false;}
   }
   if(!valid){scrollToFirstErr();return;}
-  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;
+  // COPPA age screen: this stops signup outright for under-13 — it does
+  // not gate 13-18 behind anything, per Partnr's own policy. Nothing
+  // typed so far is saved anywhere if this triggers.
+  if(calculateAge(dob)<13){
+    rUnderageBlock();
+    return;
+  }
+  S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;S.dob=dob;
 
   saveSignupLead({email:e,name:n,school:sc,country:co,city:city,zip:zipVal,grade:g,languages:langs,stage:"profile"});
 
@@ -2574,7 +2670,7 @@ function mCards(){
     h+="<div class=\"card\">"+
       "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
         "<div class=\"av\" style=\"width:44px;height:44px;font-size:15px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
-        "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+m.name+"</div>"+
+        "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;\">"+m.school+" · "+m.country+" · "+m.timezone+"</div></div>"+
         "<div style=\"font-size:16px;font-weight:700;color:"+t.c+";\">"+m.matchScore+"%</div>"+
       "</div>"+
@@ -2628,7 +2724,7 @@ function openProfile(i){
         "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:12px;\">"+
           "<div class=\"av\" style=\"width:54px;height:54px;font-size:18px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
           "<div style=\"flex:1;\">"+
-            "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;\">"+m.name+"</div>"+
+            "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
             "<div style=\"font-size:13px;color:#6b6b6b;\">"+m.school+" · "+m.country+" · "+m.grade+"</div>"+
             "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
               "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
@@ -2671,7 +2767,7 @@ function openProfile(i){
 function openModal(idx){
   modalTarget=idx;
   var m=idx>=0&&idx<MATCHES.length?MATCHES[idx]:null;
-  var name=m?m.name:"";var t=m?TR[m.track]||TR.research:TR.research;
+  var name=m?displayName(m.name):"";var t=m?TR[m.track]||TR.research:TR.research;
   R(logo()+
     "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
@@ -2696,7 +2792,7 @@ function sendConn(){
   var name=m?m.name:"Partner";
   if(m&&!CONNS.some(function(c){return c.name===name;}))
     CONNS.push({name:name,school:m.school,country:m.country,avatar:m.avatar,avatarColor:m.avatarColor,role:m.role,track:m.track,msg:msg,status:"pending"});
-  R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"dbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button></div></div>");
+  R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(displayName(name))+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"dbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button></div></div>");
   document.getElementById("dbn").addEventListener("click",function(){goTo("matches");});
 }
 
@@ -2921,7 +3017,7 @@ function connPersonRow(item,extraHtml){
     "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:8px;\">"+
       "<div class=\"av\" style=\"width:40px;height:40px;font-size:13px;background:"+t.bg+";color:"+t.tc+";\">"+esc(initialsFor(p.name))+"</div>"+
       "<div style=\"flex:1;min-width:0;\">"+
-        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(p.name)+"</div>"+
+        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(p.name))+"</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc(p.school||"")+(p.country?" · "+esc(p.country):"")+"</div>"+
       "</div>"+
       "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(r.n)+"</span>"+
@@ -2981,6 +3077,8 @@ async function renderConnections(){
       h+=connPersonRow(item,
         "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<span style=\"flex:1;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\" style=\"font-size:13px;vertical-align:-2px;margin-right:3px;\"></i>Connected</span>"+
+          "<button class=\"bo conn-chat\" data-conn=\""+esc(item.row.id)+"\" data-name=\""+esc(item.other.name)+"\">Chat</button>"+
+          "<button class=\"bo conn-workspace\" data-conn=\""+esc(item.row.id)+"\" data-name=\""+esc(item.other.name)+"\">Workspace</button>"+
           "<button class=\"bg2 conn-report\" data-id=\""+esc(item.otherId)+"\" data-name=\""+esc(item.other.name)+"\" data-conn=\""+esc(item.row.id)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(item.other.name)+"\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>"+
         "</div>"
       );
@@ -3030,6 +3128,16 @@ async function renderConnections(){
   document.querySelectorAll(".conn-report").forEach(function(b){
     b.addEventListener("click",function(){
       openReportModal(this.dataset.id,this.dataset.name,"connection",this.dataset.conn,function(){showTab("conns");});
+    });
+  });
+  document.querySelectorAll(".conn-workspace").forEach(function(b){
+    b.addEventListener("click",function(){
+      rWorkspace(this.dataset.conn,this.dataset.name);
+    });
+  });
+  document.querySelectorAll(".conn-chat").forEach(function(b){
+    b.addEventListener("click",function(){
+      rChat(this.dataset.conn,this.dataset.name);
     });
   });
 }
@@ -3084,6 +3192,289 @@ function meTab(){
 // blocked because they own those rows, but the restrictive RLS policy
 // hides the student profile itself — so we show whatever we can and
 // fall back to a neutral label rather than leaking anything.
+// ── Shared workspace (per accepted connection) ────────────
+// Files and links shared between two connected students. Files are
+// documents only (PDF/Word/PowerPoint/Excel/text/CSV) — no images yet,
+// since image content needs real screening before it's safe to host
+// directly, and that isn't built. A document is a meaningfully lower-risk
+// category and covers the overwhelming majority of what two students
+// actually need to share to collaborate on a project.
+var WORKSPACE_ALLOWED_EXT=["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","csv"];
+var WORKSPACE_MAX_BYTES=10*1024*1024;
+
+async function rWorkspace(connectionId,otherName){
+  R(logo()+
+    "<button id=\"ws-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
+    "<h2 style=\"margin-bottom:0.25rem;\">Workspace with "+esc(otherName)+"</h2>"+
+    "<div class=\"sub\">Share links and documents for your project. No photos yet — that's coming once we've built real screening for it.</div>"+
+    "<div id=\"ws-list\" style=\"margin:1rem 0;\"><div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div></div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Add a link</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:0.5rem;\">"+
+      "<input id=\"ws-link-title\" placeholder=\"Title (e.g. Our slide deck)\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+    "</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
+      "<input id=\"ws-link-url\" placeholder=\"https://... (GitHub repo, Google Doc, Figma, portfolio site...)\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+      "<button id=\"ws-link-add\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
+    "</div>"+
+    "<div class=\"slabel\">Upload a document</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">PDF, Word, PowerPoint, Excel, text, or CSV — up to 10MB.</div>"+
+    "<input id=\"ws-file-input\" type=\"file\" accept=\".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv\" style=\"margin-bottom:1rem;\"/>"+
+    "<div id=\"ws-upload-status\" style=\"font-size:12px;color:#6b6b6b;\"></div>"
+  );
+  document.getElementById("ws-back").addEventListener("click",function(){showTab("conns");});
+  document.getElementById("ws-link-add").addEventListener("click",function(){addWorkspaceLink(connectionId);});
+  document.getElementById("ws-file-input").addEventListener("change",function(){uploadWorkspaceFile(connectionId,this);});
+  loadWorkspaceItems(connectionId);
+}
+
+async function loadWorkspaceItems(connectionId){
+  var el=document.getElementById("ws-list");if(!el)return;
+  try{
+    var res=await sba.from("workspace_items").select("*").eq("connection_id",connectionId).order("created_at",{ascending:false});
+    if(res.error)throw res.error;
+    var items=res.data||[];
+    if(!items.length){
+      el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Nothing shared yet — add a link or upload a document below.</p>";
+      return;
+    }
+    var session=await getSession();
+    var myId=session&&session.user?session.user.id:null;
+    var rows=[];
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      var mine=it.student_id===myId;
+      var icon=it.type==="link"?"ti-link":"ti-file";
+      var actionHtml;
+      if(it.type==="link"){
+        actionHtml="<a href=\""+esc(it.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Open →</a>";
+      } else {
+        var signed=await sba.storage.from("workspace-files").createSignedUrl(it.storage_path,3600);
+        var dlUrl=(signed&&signed.data&&signed.data.signedUrl)||"#";
+        actionHtml="<a href=\""+esc(dlUrl)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Download →</a>";
+      }
+      rows.push("<div class=\"pit\">"+
+        "<i class=\"ti "+icon+"\" style=\"font-size:18px;color:#6b6b6b;\"></i>"+
+        "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(it.title)+"</div>"+actionHtml+"</div>"+
+        (mine?"<button class=\"ws-delete\" data-id=\""+esc(it.id)+"\" style=\"background:none;border:none;cursor:pointer;color:#6b6b6b;font-size:15px;\">×</button>":"")+
+      "</div>");
+    }
+    el.innerHTML=rows.join("");
+    document.querySelectorAll(".ws-delete").forEach(function(btn){
+      btn.addEventListener("click",async function(){
+        await sba.from("workspace_items").delete().eq("id",this.dataset.id);
+        loadWorkspaceItems(connectionId);
+      });
+    });
+  }catch(ex){
+    console.error("[Partnr] workspace load failed:",ex);
+    el.innerHTML="<p style=\"font-size:13px;color:#C53030;\">Couldn't load workspace items — please try again.</p>";
+  }
+}
+
+async function addWorkspaceLink(connectionId){
+  var title=document.getElementById("ws-link-title").value.trim();
+  var url=document.getElementById("ws-link-url").value.trim();
+  if(!title||!url){showToast("Please add both a title and a link");return;}
+  if(!/^https?:\/\//i.test(url)){showToast("Links must start with http:// or https://");return;}
+  var session=await getSession();
+  if(!session)return;
+  var res=await sba.from("workspace_items").insert({
+    connection_id:connectionId,student_id:session.user.id,type:"link",title:title,url:url
+  });
+  if(res.error){showToast("Couldn't add link — please try again");return;}
+  document.getElementById("ws-link-title").value="";
+  document.getElementById("ws-link-url").value="";
+  loadWorkspaceItems(connectionId);
+}
+
+async function uploadWorkspaceFile(connectionId,inputEl){
+  var file=inputEl.files[0];
+  if(!file)return;
+  var ext=file.name.split(".").pop().toLowerCase();
+  var statusEl=document.getElementById("ws-upload-status");
+  if(WORKSPACE_ALLOWED_EXT.indexOf(ext)<0){
+    statusEl.textContent="That file type isn't supported — documents only (PDF, Word, PowerPoint, Excel, text, CSV).";
+    statusEl.style.color="#C53030";
+    inputEl.value="";
+    return;
+  }
+  if(file.size>WORKSPACE_MAX_BYTES){
+    statusEl.textContent="That file is too large — 10MB max.";
+    statusEl.style.color="#C53030";
+    inputEl.value="";
+    return;
+  }
+  statusEl.textContent="Uploading…";
+  statusEl.style.color="#6b6b6b";
+  var session=await getSession();
+  if(!session)return;
+  var path=connectionId+"/"+Date.now()+"_"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+  try{
+    var uploadRes=await sba.storage.from("workspace-files").upload(path,file);
+    if(uploadRes.error)throw uploadRes.error;
+    var insertRes=await sba.from("workspace_items").insert({
+      connection_id:connectionId,student_id:session.user.id,type:"file",title:file.name,storage_path:path
+    });
+    if(insertRes.error)throw insertRes.error;
+    statusEl.textContent="Uploaded.";
+    statusEl.style.color="#3B6D11";
+    inputEl.value="";
+    loadWorkspaceItems(connectionId);
+  }catch(ex){
+    console.error("[Partnr] file upload failed:",ex);
+    statusEl.textContent="Upload failed — please try again.";
+    statusEl.style.color="#C53030";
+  }
+}
+
+// ── Chat (per accepted connection) ────────────
+// Text-only by design — files and images live in Workspace, not here.
+// Messages are immutable once sent (no edit/delete policy exists at
+// all), so a real, untampered conversation history is always available
+// if a report is ever filed. Real-time via Supabase's built-in
+// postgres_changes subscription — no separate infrastructure needed.
+var CHAT_CHANNEL=null;
+
+// Soft, non-blocking nudge — never prevents sending, just asks once.
+// Off-platform contact means the conversation can no longer be
+// reviewed if something goes wrong, which is the whole safety value
+// of keeping it on Partnr in the first place.
+function looksLikeContactInfo(text){
+  var phonePattern=/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+  var emailPattern=/\b[\w.+-]+@[\w-]+\.[a-z]{2,}\b/i;
+  var socialPattern=/\b(snap(chat)?|insta(gram)?|discord|whatsapp|telegram|kik)\b/i;
+  return phonePattern.test(text)||emailPattern.test(text)||socialPattern.test(text);
+}
+
+// Shows a crisis resource to the person who just typed the message —
+// modeled on how a search engine surfaces a resource banner to a
+// searcher, not a report routed to anyone for review. The message
+// still sends normally either way: never blocked, never delayed, and
+// this card is never seen by the recipient or stored anywhere. No
+// queue, no notification to anyone else, nothing for a human on the
+// other end to catch or act on in real time.
+var SELF_HARM_PATTERNS=[
+  /kill myself/i,/killing myself/i,/want to die/i,/wanted to die/i,
+  /end my life/i,/ending my life/i,/i'?m suicidal/i,
+  /hurt myself/i,/hurting myself/i,
+  /don'?t want to (live|be alive)/i,/no reason to live/i
+];
+function matchesSelfHarmConcern(text){
+  return SELF_HARM_PATTERNS.some(function(p){return p.test(text);});
+}
+
+async function rChat(connectionId,otherName){
+  R(logo()+
+    "<button id=\"chat-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:0.5rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
+    "<h2 style=\"margin-bottom:2px;\">Chat with "+esc(otherName)+"</h2>"+
+    "<div style=\"font-size:11px;color:#6b6b6b;margin-bottom:1rem;\"><i class=\"ti ti-shield-check\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;color:#3B6D11;\"></i>Text only — for files and links, use your Workspace.</div>"+
+    "<div id=\"chat-messages\" style=\"background:#f8f8f6;border-radius:12px;padding:12px;height:340px;overflow-y:auto;margin-bottom:0.75rem;display:flex;flex-direction:column;gap:8px;\"><div style=\"text-align:center;padding:1rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div></div>"+
+    "<div id=\"chat-warning\" style=\"display:none;font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:8px;\">Sharing contact info off Partnr means this conversation can't be reviewed if something goes wrong. Send anyway?</div>"+
+    "<div id=\"chat-selfharm-card\" style=\"display:none;font-size:13px;color:#1a1a1a;background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:8px;line-height:1.5;\">"+
+      "It sounds like you might be going through something hard. You don't have to deal with it alone.<br>"+
+      "<a href=\"tel:988\" style=\"color:#534AB7;font-weight:600;text-decoration:none;\">Call or text 988</a> — free, confidential, any time. "+
+      "<button id=\"chat-selfharm-dismiss\" style=\"background:none;border:none;color:#6b6b6b;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;font-family:inherit;\">Dismiss</button>"+
+    "</div>"+
+    "<div style=\"display:flex;gap:8px;\">"+
+      "<input id=\"chat-input\" placeholder=\"Type a message...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;\"/>"+
+      "<button id=\"chat-send\" style=\"padding:10px 16px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send</button>"+
+    "</div>"
+  );
+  document.getElementById("chat-back").addEventListener("click",function(){
+    unsubscribeChatChannel();
+    showTab("conns");
+  });
+  var pendingSend=false;
+  function doSend(force){
+    var input=document.getElementById("chat-input");
+    var text=input.value.trim();
+    if(!text)return;
+    if(!force&&looksLikeContactInfo(text)){
+      document.getElementById("chat-warning").style.display="block";
+      pendingSend=true;
+      return;
+    }
+    document.getElementById("chat-warning").style.display="none";
+    pendingSend=false;
+    if(matchesSelfHarmConcern(text)){
+      document.getElementById("chat-selfharm-card").style.display="block";
+    }
+    sendChatMessage(connectionId,text);
+    input.value="";
+  }
+  document.getElementById("chat-send").addEventListener("click",function(){doSend(pendingSend);});
+  document.getElementById("chat-input").addEventListener("keydown",function(e){
+    if(e.key==="Enter"){e.preventDefault();doSend(pendingSend);}
+  });
+  var shDismiss=document.getElementById("chat-selfharm-dismiss");
+  if(shDismiss)shDismiss.addEventListener("click",function(){
+    document.getElementById("chat-selfharm-card").style.display="none";
+  });
+  await loadChatMessages(connectionId);
+  subscribeChatChannel(connectionId);
+}
+
+async function sendChatMessage(connectionId,text){
+  var session=await getSession();
+  if(!session)return;
+  var res=await sba.from("messages").insert({connection_id:connectionId,sender_id:session.user.id,body:text});
+  if(res.error){showToast("Couldn't send — please try again");console.error("[Partnr] send message failed:",res.error);}
+}
+
+async function loadChatMessages(connectionId){
+  var el=document.getElementById("chat-messages");if(!el)return;
+  try{
+    var res=await sba.from("messages").select("*").eq("connection_id",connectionId).order("created_at",{ascending:true});
+    if(res.error)throw res.error;
+    var session=await getSession();
+    var myId=session&&session.user?session.user.id:null;
+    renderChatMessages(res.data||[],myId);
+    markMessagesRead(connectionId,myId);
+  }catch(ex){
+    console.error("[Partnr] loading messages failed:",ex);
+    el.innerHTML="<p style=\"font-size:13px;color:#C53030;text-align:center;\">Couldn't load messages — please try again.</p>";
+  }
+}
+
+function renderChatMessages(msgs,myId){
+  var el=document.getElementById("chat-messages");if(!el)return;
+  if(!msgs.length){
+    el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;text-align:center;margin:auto;\">Say hi — this is the start of your conversation.</p>";
+    return;
+  }
+  el.innerHTML=msgs.map(function(m){
+    var mine=m.sender_id===myId;
+    return "<div style=\"align-self:"+(mine?"flex-end":"flex-start")+";max-width:75%;background:"+(mine?"#7F77DD":"white")+";color:"+(mine?"white":"#1a1a1a")+";padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;word-break:break-word;\">"+esc(m.body)+"</div>";
+  }).join("");
+  el.scrollTop=el.scrollHeight;
+}
+
+async function markMessagesRead(connectionId,myId){
+  try{
+    await sba.from("messages").update({read_at:new Date().toISOString()})
+      .eq("connection_id",connectionId).is("read_at",null).neq("sender_id",myId);
+  }catch(ex){/* cosmetic — never block chat on this */}
+}
+
+// Real-time: on any new message in this connection, re-fetch and
+// re-render. Simpler and more robust than trying to append just the
+// one new row (also self-corrects if a message was somehow missed).
+function subscribeChatChannel(connectionId){
+  unsubscribeChatChannel();
+  CHAT_CHANNEL=sba.channel("messages-"+connectionId)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"connection_id=eq."+connectionId},async function(){
+      var session=await getSession();
+      var myId=session&&session.user?session.user.id:null;
+      var res=await sba.from("messages").select("*").eq("connection_id",connectionId).order("created_at",{ascending:true});
+      renderChatMessages(res.data||[],myId);
+      markMessagesRead(connectionId,myId);
+    })
+    .subscribe();
+}
+function unsubscribeChatChannel(){
+  if(CHAT_CHANNEL){sba.removeChannel(CHAT_CHANNEL);CHAT_CHANNEL=null;}
+}
+
 async function renderBlockedList(){
   var el=document.getElementById("tc");
   if(!el)return;
@@ -3295,7 +3686,7 @@ function renderSR(results,skill,isDemo){
       "<div class=\"av\" style=\"width:42px;height:42px;font-size:13px;background:"+cm.bg+";color:"+cm.c+";flex-shrink:0;\">"+r.avatar+"</div>"+
       "<div style=\"flex:1;min-width:0;\">"+
         "<div style=\"display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:3px;\">"+
-          "<span style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+r.name+"</span>"+
+          "<span style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(r.name))+"</span>"+
           "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+r.status+"</span>"+
         "</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;\">"+r.school+" · "+r.country+" · "+r.grade+"</div>"+
