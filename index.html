@@ -130,6 +130,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 // ── State ──────────────────────────────────
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported",skillsNeeded:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
+var REMATCH_FEEDBACK="";
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
 var WORLD_CITIES=null,worldCitiesLoading=null;
 
@@ -204,7 +205,7 @@ async function autofillCityFromZip(country,zip,cityInputEl){
   if(!iso||!zip||!cityInputEl||cityInputEl.value.trim())return;
   try{
     var res=await fetch("https://api.zippopotam.us/"+iso.toLowerCase()+"/"+encodeURIComponent(zip.trim()));
-    if(!res.ok)return;
+    if(!res.ok){console.warn("[Partnr] zip lookup returned",res.status,"for",iso,zip);return;}
     var data=await res.json();
     var place=data&&data.places&&data.places[0]&&data.places[0]["place name"];
     if(place&&!cityInputEl.value.trim()){
@@ -212,7 +213,10 @@ async function autofillCityFromZip(country,zip,cityInputEl){
       cityInputEl.dispatchEvent(new Event("input"));
     }
   }catch(ex){
-    // Silent — this is a convenience, not a requirement.
+    // Never shown to the user — this is a convenience, not a requirement —
+    // but logged so a failure is actually diagnosable via DevTools instead
+    // of just "the zip thing isn't working" with no way to tell why.
+    console.warn("[Partnr] zip autofill failed (non-fatal):",ex);
   }
 }
 
@@ -231,9 +235,16 @@ async function loadSchoolList(){
   return schoolListLoading;
 }
 
-// ── Auth ───────────────────────────────────
+// Hardcoded, not window.location.href — the old version baked in
+// whatever URL happened to be open at signup time. If that was a local
+// file:// path (e.g. double-clicking the downloaded index.html instead
+// of visiting the real site), the magic link would try to send someone
+// back to a file that doesn't exist anywhere else, which is exactly
+// the "took me to who knows what page" bug. This is now always the
+// real, stable production URL no matter where signup was started from.
+var PRODUCTION_URL="https://lucash29.github.io/partnr/";
 async function sendMagicLink(email,profileData){
-  var opts={emailRedirectTo:window.location.href};
+  var opts={emailRedirectTo:PRODUCTION_URL};
   if(profileData)opts.data=profileData;
   var res=await sba.auth.signInWithOtp({email:email,options:opts});
   return res.error;
@@ -241,14 +252,14 @@ async function sendMagicLink(email,profileData){
 async function signInWithGoogle(){
   var res=await sba.auth.signInWithOAuth({
     provider:"google",
-    options:{redirectTo:window.location.href}
+    options:{redirectTo:PRODUCTION_URL}
   });
   return res.error;
 }
 async function signInWithMicrosoft(){
   var res=await sba.auth.signInWithOAuth({
     provider:"azure",
-    options:{redirectTo:window.location.href}
+    options:{redirectTo:PRODUCTION_URL}
   });
   return res.error;
 }
@@ -654,57 +665,89 @@ function colorForId(id){
 function initialsFor(name){
   return (name||"?").trim().split(/\s+/).map(function(w){return w[0];}).join("").substring(0,2).toUpperCase();
 }
-async function searchRealStudents(query,excludeId){
-  var q="%"+query.trim()+"%";
-  if(!query.trim())return [];
-  var ids={};
+// Accepts either a plain string (old free-text call sites keep working)
+// or an options object: {query, city, school, competition}. Filters
+// combine with AND — e.g. city + competition finds students in that city
+// targeting that exact competition. city/school are plain columns on
+// students, so they're applied directly; competition and free-text query
+// narrow via a candidate-id set first, same as the original approach.
+async function searchRealStudents(opts,excludeId){
+  if(typeof opts==="string")opts={query:opts};
+  opts=opts||{};
+  var query=(opts.query||"").trim();
+  var city=(opts.city||"").trim();
+  var school=(opts.school||"").trim();
+  var competition=(opts.competition||"").trim();
+  if(!query&&!city&&!school&&!competition)return [];
+
+  var idList=null; // null = no id-narrowing needed (pure city/school filter)
   var skillMatch={};
-  // PostgREST filter strings inside .or() use * as the wildcard, not %.
-  // Using % here matches nothing and fails silently.
-  var wc=query.trim();
-  var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
-    .or("skill_name.ilike.*"+wc+"*,category.ilike.*"+wc+"*");
-  if(skillsRes.error)throw skillsRes.error;
-  (skillsRes.data||[]).forEach(function(r){
-    ids[r.student_id]=true;
-    if(!skillMatch[r.student_id])skillMatch[r.student_id]={skill:r.skill_name,level:r.level};
-  });
 
-  var compRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",q);
-  if(compRes.error)throw compRes.error;
-  (compRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
+  if(query||competition){
+    var ids={};
+    if(query){
+      var wc=query;
+      var skillsRes=await sba.from("skills").select("student_id,category,skill_name,level")
+        .or("skill_name.ilike.*"+wc+"*,category.ilike.*"+wc+"*");
+      if(skillsRes.error)throw skillsRes.error;
+      (skillsRes.data||[]).forEach(function(r){
+        ids[r.student_id]=true;
+        if(!skillMatch[r.student_id])skillMatch[r.student_id]={skill:r.skill_name,level:r.level};
+      });
+      var qp="%"+query+"%";
+      var compTextRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",qp);
+      if(compTextRes.error)throw compTextRes.error;
+      (compTextRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
+      var ideaRes=await sba.from("students").select("id").ilike("idea",qp);
+      if(ideaRes.error)throw ideaRes.error;
+      (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
+    }
+    if(competition){
+      var compExactRes=await sba.from("competitions").select("student_id").eq("competition_name",competition);
+      if(compExactRes.error)throw compExactRes.error;
+      var compIds={};
+      (compExactRes.data||[]).forEach(function(r){compIds[r.student_id]=true;});
+      if(query){
+        var narrowed={};
+        Object.keys(ids).forEach(function(id){if(compIds[id])narrowed[id]=true;});
+        ids=narrowed;
+      } else {
+        ids=compIds;
+      }
+    }
+    idList=Object.keys(ids);
+    if(!idList.length)return [];
+  }
 
-  var ideaRes=await sba.from("students").select("id").ilike("idea",q);
-  if(ideaRes.error)throw ideaRes.error;
-  (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
+  var studentsQuery=sba.from("students").select("*").eq("onboarded",true).limit(40);
+  if(idList!==null)studentsQuery=studentsQuery.in("id",idList);
+  if(city)studentsQuery=studentsQuery.ilike("city",city);
+  if(school)studentsQuery=studentsQuery.ilike("school",school);
+  if(excludeId)studentsQuery=studentsQuery.neq("id",excludeId);
 
-  if(excludeId)delete ids[excludeId];
+  var studentsRes=await studentsQuery;
+  if(studentsRes.error)throw studentsRes.error;
   // Server-side RLS already hides blocked students, but filtering here
   // too keeps the UI consistent immediately after a block, before any
   // refetch happens.
-  Object.keys(BLOCKED_IDS).forEach(function(b){delete ids[b];});
-  var idList=Object.keys(ids).slice(0,20);
-  console.log("[Partnr search] query:",query,"| matched student ids:",idList.length);
-  if(!idList.length)return [];
-
-  var studentsRes=await sba.from("students").select("*").in("id",idList).eq("onboarded",true);
-  if(studentsRes.error)throw studentsRes.error;
-  var students=studentsRes.data||[];
-  console.log("[Partnr search] of those, onboarded:",students.length);
+  var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
+  console.log("[Partnr search] filters:",{query:query,city:city,school:school,competition:competition},"| matched:",students.length);
   if(!students.length)return [];
 
-  var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",idList);
+  var finalIds=students.map(function(s){return s.id;});
+  var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",finalIds);
   var skillsByStudent={};
   (allSkillsRes.data||[]).forEach(function(r){(skillsByStudent[r.student_id]=skillsByStudent[r.student_id]||[]).push(r);});
 
-  var allCompsRes=await sba.from("competitions").select("student_id,competition_name").in("student_id",idList);
+  var allCompsRes=await sba.from("competitions").select("student_id,competition_name").in("student_id",finalIds);
   var compsByStudent={};
   (allCompsRes.data||[]).forEach(function(r){(compsByStudent[r.student_id]=compsByStudent[r.student_id]||[]).push(r.competition_name);});
 
+  var fallbackLabel=query||competition||"Partner";
   return students.map(function(s){
     var mySkills=skillsByStudent[s.id]||[];
     var matched=skillMatch[s.id];
-    var keySkill=matched?matched.skill:(mySkills[0]?mySkills[0].skill_name:query);
+    var keySkill=matched?matched.skill:(mySkills[0]?mySkills[0].skill_name:fallbackLabel);
     var keyLevel=(matched&&matched.level)||(mySkills[0]&&mySkills[0].level)||"Intermediate";
     var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
     return {
@@ -714,7 +757,7 @@ async function searchRealStudents(query,excludeId){
       availability:s.availability||"Not specified",
       status:s.status||"Open to connecting",
       bio:s.idea||"Hasn't added a bio yet.",
-      keySkill:keySkill||query,keyLevel:keyLevel,
+      keySkill:keySkill||fallbackLabel,keyLevel:keyLevel,
       otherSkills:otherSkills,
       competitions:compsByStudent[s.id]||[],
       portfolio:s.github||null,
@@ -1005,38 +1048,101 @@ function getStageChip(stage){
   return "<span class=\"tag\" style=\"background:"+sc.bg+";color:"+sc.tc+";font-weight:500;\">"+lbl+"</span>";
 }
 
+// Only competitions with a real, independently-verified deadline (month-day)
+// get a status shown at all — no field means no claim. Compares month-day
+// only (not year), since these deadlines recur annually and we don't track
+// which exact year each one was last confirmed for. Once passed, this says
+// so plainly rather than showing a stale date as if it were still current —
+// matches the honest-by-default approach used everywhere else in Partnr.
+var MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function deadlineStatus(mmdd){
+  if(!mmdd)return null;
+  var parts=mmdd.split("-");
+  var m=parseInt(parts[0],10),d=parseInt(parts[1],10);
+  var now=new Date();
+  var thisYear=new Date(now.getFullYear(),m-1,d);
+  var passed=now>thisYear;
+  var label=MONTH_NAMES[m-1]+" "+d;
+  return {label:label,passed:passed};
+}
+function deadlineChipHtml(mmdd){
+  var s=deadlineStatus(mmdd);
+  if(!s)return "";
+  if(s.passed){
+    return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#F1EFE8;color:#8a8a86;\"><i class=\"ti ti-clock-x\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Deadline passed — next date not yet announced</span>";
+  }
+  return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B;\"><i class=\"ti ti-clock\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Deadline ~"+s.label+"</span>";
+}
+
 var COUNTRIES=["","Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia","Botswana","Brazil","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (DRC)","Congo (Republic)","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Estonia","Ethiopia","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala","Guinea","Guinea-Bissau","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lesotho","Liberia","Libya","Lithuania","Luxembourg","Macau","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritania","Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
 
 var COMPS=[
-  {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,cross:true,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer from any school"},
-  {n:"iGEM Synthetic Biology",cat:"science",team:"Teams of 3-6",eli:"Global",tier:1,cross:true,desc:"International synthetic biology competition - Giant Jamboree",why:"Teams routinely cross schools and countries - biology, coding, and design needed"},
-  {n:"Science Olympiad",cat:"science",team:"Teams of 15",eli:"US + intl",tier:2,cross:false,desc:"Team-based science and engineering events - same school required",why:"Find teammates at your own school across 23 science events"},
-  {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,cross:true,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-school teams welcome - science, business, and design skills all needed"},
-  {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,cross:"prep",desc:"Most prestigious US science competition - individual entry, prep with a peer first",why:"Find a thinking partner from any school to sharpen your research"},
-  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds"},
-  {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,cross:true,desc:"Annual Princeton team math competition",why:"Cross-school teams allowed - team round requires coordinated problem solving"},
-  {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,cross:true,desc:"International math modeling contest",why:"Cross-school teams allowed - needs math and research writing"},
-  {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level"},
-  {n:"DECA ICDC",cat:"business",team:"Same-school chapter",eli:"Global",tier:2,cross:false,desc:"International business and marketing - 230k+ students - chapter based",why:"Same-school chapter required - find teammates at your school"},
-  {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design"},
-  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,cross:true,desc:"University of Delaware - business and social innovation tracks",why:"Cross-school teams allowed - ideal pairing is Vision/CEO with Tech/CTO"},
-  {n:"FBLA Competitive Events",cat:"business",team:"Same-school chapter",eli:"US + intl chapters",tier:2,cross:false,desc:"Future Business Leaders - chapter based, same school required",why:"Same school required - find teammates at your school"},
-  {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,cross:true,desc:"Free global investment strategy competition - 6,000+ students",why:"Cross-school teams welcome - needs finance, research, and presentation"},
-  {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Cross-school teams allowed - social enterprise needs business and research"},
-  {n:"WSI Impact League",cat:"impact",team:"Teams of 2-4",eli:"Global",tier:2,cross:true,desc:"Social impact case competition - mental health, climate, economics",why:"Cross-school teams welcome - needs research, design, and business strategy"},
-  {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged"},
-  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills"},
-  {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product"},
-  {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills"},
-  {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills"},
-  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:2,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed"},
-  {n:"John Locke Essay",cat:"writing",team:"Prep partner",eli:"Global - 150 countries",tier:1,cross:"prep",desc:"Most prestigious global essay contest - 63k students - Oxford and Princeton judges",why:"Individual entry - find an intellectual sparring partner from any school"},
-  {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's longest-running teen writing recognition - 28 categories",why:"Individual entry - find a writing partner from any school"},
-  {n:"Kennedy Profile in Courage Essay",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"One of the most prestigious US essay competitions - $10k prize",why:"Individual entry - find a research and editing partner from any school"},
-  {n:"Adroit Journal Prize",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Prestigious literary journal - winners published in The Adroit Journal",why:"Individual entry - find a peer from any school for feedback"},
-  {n:"YoungArts",cat:"arts",team:"Prep partner",eli:"US ages 15-18",tier:1,cross:"prep",desc:"Most prestigious US arts competition - up to $10k - Presidential Scholar eligible",why:"Individual entry - find a creative partner from any school"},
-  {n:"Scholastic Art Award",cat:"arts",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's most prestigious teen art recognition - Gold Keys win $12,500",why:"Individual entry - find a creative peer from any school"},
-  {n:"Local / Regional Science Fair",cat:"science",team:"1-3 students",eli:"Local",tier:3,cross:false,desc:"Your local or regional fair - feeds into the ISEF pathway",why:"Usually same school or district - find a local lab partner"}
+  {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,cross:true,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer from any school",url:"https://www.societyforscience.org/isef/"},
+  {n:"iGEM Synthetic Biology",cat:"science",team:"Teams of 3-6",eli:"Global",tier:1,cross:true,desc:"International synthetic biology competition - Giant Jamboree",why:"Teams routinely cross schools and countries - biology, coding, and design needed",url:"https://igem.org/"},
+  {n:"Science Olympiad",cat:"science",team:"Teams of 15",eli:"US + intl",tier:2,cross:false,desc:"Team-based science and engineering events - same school required",why:"Find teammates at your own school across 23 science events",url:"https://www.soinc.org/"},
+  {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,cross:true,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-school teams welcome - science, business, and design skills all needed",url:"https://www.conradchallenge.org/",deadline:"10-30"},
+  {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,cross:"prep",desc:"Most prestigious US science competition - individual entry, prep with a peer first",why:"Find a thinking partner from any school to sharpen your research",url:"https://www.societyforscience.org/sts/",deadline:"11-07"},
+  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/",deadline:"09-21"},
+  {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,cross:true,desc:"Annual Princeton team math competition",why:"Cross-school teams allowed - team round requires coordinated problem solving",url:"https://pumac.princeton.edu/"},
+  {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,cross:true,desc:"International math modeling contest",why:"Cross-school teams allowed - needs math and research writing",url:"https://www.comap.com/highschool/contests/himcm/"},
+  {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
+  {n:"DECA ICDC",cat:"business",team:"Same-school chapter",eli:"Global",tier:2,cross:false,desc:"International business and marketing - 230k+ students - chapter based",why:"Same-school chapter required - find teammates at your school",url:"https://www.deca.org/"},
+  {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design",url:"https://blueoceancompetition.org/",deadline:"02-22"},
+  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,cross:true,desc:"University of Delaware - business and social innovation tracks",why:"Cross-school teams allowed - ideal pairing is Vision/CEO with Tech/CTO",url:"https://diamondchallenge.org/",deadline:"01-15"},
+  {n:"FBLA Competitive Events",cat:"business",team:"Same-school chapter",eli:"US + intl chapters",tier:2,cross:false,desc:"Future Business Leaders - chapter based, same school required",why:"Same school required - find teammates at your school",url:"https://www.fbla.org/"},
+  {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,cross:true,desc:"Free global investment strategy competition - 6,000+ students",why:"Cross-school teams welcome - needs finance, research, and presentation",url:"https://globalyouth.wharton.upenn.edu/investment-competition/"},
+  {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Cross-school teams allowed - social enterprise needs business and research",url:"https://sageglobal.org/"},
+  {n:"World Series of Innovation (WSI)",cat:"impact",team:"Teams of 2-4",eli:"Global",tier:2,cross:true,desc:"NFTE's social impact case competition - mental health, climate, economics",why:"Cross-school teams welcome - needs research, design, and business strategy",url:"https://www.nfte.com/"},
+  {n:"USA Biolympiad (USABO)",cat:"science",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"Nation's largest biology testing program - four-tier exam series",why:"Individual entry - find a study partner from any school to review with",url:"https://www.usabo-trc.org/"},
+  {n:"US Physics Olympiad (USAPhO)",cat:"science",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"AAPT's selection series for the US team at the International Physics Olympiad",why:"Individual entry - find a peer to work through problem sets with",url:"https://www.aapt.org/physicsteam/"},
+  {n:"Genius Olympiad",cat:"science",team:"Individual or team",eli:"Global",tier:2,cross:true,desc:"International environmental science competition - award ceremony at RIT",why:"Cross-school and international teams welcome - environmental research and design",url:"https://geniusolympiad.org/"},
+  {n:"USAMO / USAJMO",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"Top invitational round of the AMC/AIME pathway, run by MAA",why:"Individual entry - find a study partner at your exact level",url:"https://maa.org/math-competitions/"},
+  {n:"American Computer Science League (ACSL)",cat:"math",team:"Individual or team",eli:"US + international",tier:2,cross:true,desc:"Programming and computer science problem-solving contest, several divisions",why:"Cross-school teams allowed - needs coding and algorithmic thinking",url:"https://www.acsl.org/"},
+  {n:"Purple Comet Math Meet",cat:"math",team:"Teams up to 6",eli:"International",tier:2,cross:true,desc:"Free online team math competition, run over a set window each spring",why:"Cross-school teams allowed - needs coordinated problem solving under time pressure",url:"https://purplecomet.org/"},
+  {n:"USACO",cat:"tech",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"US Computing Olympiad - free online programming contests, since 1992",why:"Individual entry - find a coding partner to practice algorithms with",url:"https://usaco.org/"},
+  {n:"CyberPatriot",cat:"tech",team:"Teams of 2-6",eli:"US",tier:2,cross:false,desc:"National Youth Cyber Defense Competition - secure virtual networks",why:"Same school/organization team required - needs cybersecurity and IT skills",url:"https://www.uscyberpatriot.org/"},
+  {n:"Technovation Girls",cat:"tech",team:"Teams",eli:"Global, girls ages 13-18",tier:2,cross:true,desc:"Global program - teams build a mobile app addressing a real community problem",why:"Cross-school and international teams welcome - coding, business, and pitching all needed",url:"https://technovationchallenge.org/"},
+  {n:"NASA Space Apps Challenge",cat:"tech",team:"Teams",eli:"Global",tier:2,cross:true,desc:"NASA's global hackathon using real NASA open data, one weekend each fall",why:"Cross-school and cross-country is standard - coder, designer, and storyteller all needed",url:"https://www.spaceappschallenge.org/"},
+  {n:"National History Day",cat:"writing",team:"Individual or team",eli:"US grades 6-12",tier:2,cross:true,desc:"Year-long research program - documentaries, exhibits, papers, performances",why:"Cross-school partners allowed in the team categories - needs research and storytelling",url:"https://www.nhd.org/"},
+  {n:"Envirothon",cat:"science",team:"Teams of 5",eli:"US + Canada",tier:2,cross:false,desc:"North America's largest environmental education competition - soils, forestry, wildlife, aquatics",why:"Same school/district team required - find teammates for the five field categories",url:"https://envirothon.org/"},
+  {n:"Math Kangaroo",cat:"math",team:"Individual",eli:"Global",tier:2,cross:"prep",desc:"International math competition - 839+ centers across the US",why:"Individual entry - find a study partner from any school to prep with",url:"https://mathkangaroo.org/"},
+  {n:"National Ocean Sciences Bowl",cat:"science",team:"Teams",eli:"US, 25 regions",tier:2,cross:false,desc:"Quiz-bowl format testing knowledge of oceanography and marine science",why:"Same-region team required - find teammates across biology, chemistry, physics, and geology",url:"https://nosb.org/"},
+  {n:"Odyssey of the Mind",cat:"tech",team:"Teams up to 7",eli:"Global, 25+ countries",tier:2,cross:false,desc:"International creative problem-solving competition - build, perform, and improvise solutions",why:"Same school/club team required - needs a mix of builders, writers, and performers",url:"https://www.odysseyofthemind.com/"},
+  {n:"Davidson Fellows Scholarship",cat:"science",team:"Individual or 2-person team",eli:"US, age 18 and under",tier:1,cross:"prep",desc:"Scholarships of $25k-$100k for a completed, graduate-level piece of original work in STEM, literature, music, or philosophy",why:"Individual entry - find a peer working on an equally ambitious independent project",url:"https://www.davidsongifted.org/gifted-programs/fellows-scholarship/",deadline:"02-15"},
+  {n:"International Olympiad in Informatics (IOI)",cat:"tech",team:"Prep partner",eli:"Global - qualify via national olympiad",tier:1,cross:"prep",desc:"The top algorithmic programming olympiad in the world - national teams of up to 4",why:"Individual entry - find a partner from any school to train on algorithms with",url:"https://ioinformatics.org/"},
+  {n:"Stockholm Junior Water Prize",cat:"science",team:"Individual or pair",eli:"Global, ages 15-20",tier:1,cross:true,desc:"International research competition addressing water quality, management, and treatment challenges",why:"Cross-school pairs allowed - needs environmental research and a strong presentation",url:"https://siwi.org/stockholm-junior-water-prize/",deadline:"04-15"},
+  {n:"Microsoft Imagine Cup",cat:"tech",team:"Teams up to 4",eli:"Global",tier:1,cross:true,desc:"Global competition to build an MVP using AI and cloud tools that addresses a major world challenge",why:"Cross-school and international teams welcome - needs coding, product thinking, and pitching",url:"https://imaginecup.microsoft.com/"},
+  {n:"Eugene O'Neill Theater Center Young Playwrights Festival",cat:"arts",team:"Prep partner",eli:"US, ages 12-18",tier:1,cross:"prep",desc:"National playwriting festival - selected scripts get a professional staged reading",why:"Individual entry - find a fellow writer from any school for feedback on your script",url:"https://www.theoneill.org/"},
+  {n:"Harvard International Review Academic Writing Contest",cat:"writing",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"Biannual analytical writing contest on international affairs, judged by HIR's editorial board",why:"Individual entry - find a research and editing partner from any school",url:"https://hir.harvard.edu/"},
+  {n:"National Cyber League",cat:"tech",team:"Individual or team",eli:"US high school + college",tier:2,cross:true,desc:"Learning-centered cybersecurity competition across nine categories, with a shareable skills report",why:"Cross-school teams allowed - needs cryptography, forensics, and security skills",url:"https://nationalcyberleague.org/"},
+  {n:"International Mathematical Olympiad (IMO)",cat:"math",team:"Prep partner",eli:"Global, under 20, pre-university",tier:1,cross:"prep",desc:"The oldest and most prestigious world championship math competition - national teams of up to 6",why:"Individual entry - find a study partner from any school to train for national selection",url:"https://www.imo-official.org/"},
+  {n:"International Physics Olympiad (IPhO)",cat:"science",team:"Prep partner",eli:"Global - top national performers",tier:1,cross:"prep",desc:"The most prestigious physics competition for high schoolers - theoretical and experimental exams",why:"Individual entry - find a partner from any school to work through problem sets with",url:"https://www.ipho-new.org/"},
+  {n:"World Scholar's Cup",cat:"impact",team:"Teams of 3",eli:"Global, ages up to 18",tier:2,cross:true,desc:"Interdisciplinary team competition across science, history, literature, and the arts",why:"Mixed-school teams allowed - needs debate, writing, and broad academic range",url:"https://scholarscup.org/"},
+  {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged",url:""},
+  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/",deadline:"01-15"},
+  {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product",url:"https://mlh.io/"},
+  {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills",url:"https://www.firstinspires.org/"},
+  {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills",url:"https://www.roboticseducation.org/"},
+  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:2,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed",url:"https://www.congressionalappchallenge.us/",deadline:"10-26"},
+  {n:"John Locke Essay",cat:"writing",team:"Prep partner",eli:"Global - 150 countries",tier:1,cross:"prep",desc:"Most prestigious global essay contest - 63k students - Oxford and Princeton judges",why:"Individual entry - find an intellectual sparring partner from any school",url:"https://www.johnlockeinstitute.com/"},
+  {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's longest-running teen writing recognition - 28 categories",why:"Individual entry - find a writing partner from any school",url:"https://www.artandwriting.org/"},
+  {n:"Kennedy Profile in Courage Essay",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"One of the most prestigious US essay competitions - $10k prize",why:"Individual entry - find a research and editing partner from any school",url:"https://www.jfklibrary.org/learn/education/profile-in-courage-essay-contest"},
+  {n:"Adroit Journal Prize",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Prestigious literary journal - winners published in The Adroit Journal",why:"Individual entry - find a peer from any school for feedback",url:"https://theadroitjournal.org/adroit-prizes/",deadline:"05-01"},
+  {n:"One Teen Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 13-19",tier:2,cross:"prep",desc:"Short fiction contest run by a literary magazine dedicated to teen writers",why:"Individual entry - find a peer from any school to trade drafts with",url:"https://one-story.com/write/one-teen-story-contest/",deadline:"12-01"},
+  {n:"Narrative Magazine High School Contest",cat:"writing",team:"Prep partner",eli:"US + international",tier:2,cross:"prep",desc:"Annual short fiction, essay, or poetry contest judged by Narrative Magazine's editors",why:"Individual entry - find a partner from any school for feedback before submitting",url:"https://www.narrativemagazine.com/narrative-for-schools/eleventh-annual-high-school-contest"},
+  {n:"Bennington Young Writers Awards",cat:"writing",team:"Prep partner",eli:"Global, grades 9-12",tier:1,cross:"prep",desc:"National writing competition with full-tuition Bennington College scholarships for winners who enroll",why:"Individual entry - find a writing partner from any school for feedback",url:"https://www.bennington.edu/news-and-features/announcing-winners-of-2025-2026-young-writers-awards",deadline:"11-01"},
+  {n:"Ocean Awareness Contest",cat:"impact",team:"Individual",eli:"Global, ages 11-18",tier:2,cross:true,desc:"International creative writing and arts contest responding to an annual ocean/climate theme",why:"Individual entry, cross-school peers welcome - needs writing or art plus environmental research",url:"https://bowseat.org/programs/ocean-awareness-contest/contest-overview/",deadline:"06-08"},
+  {n:"NSHSS Creative Writing Scholarship",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:2,cross:"prep",desc:"Fiction and poetry scholarship contest run by the National Society of High School Scholars",why:"Individual entry - find a peer from any school for feedback",url:"https://www.nshss.org/scholarships/s/nshss-creative-writing-scholarship/",deadline:"10-02"},
+  {n:"Parsec Short Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 19 and under",tier:2,cross:"prep",desc:"Speculative fiction contest with a dedicated Youth Story Prize for teen writers",why:"Individual entry - find a peer from any school for feedback",url:"https://parsec-sff.org/short-story-contest/",deadline:"03-31"},
+  {n:"Ann Arbor District Library Flash Fiction Contest",cat:"writing",team:"Individual",eli:"Ann Arbor area, grades 6-12",tier:3,cross:false,desc:"Local flash fiction competition run by the Ann Arbor District Library",why:"Local competition - find a fellow writer at your library or school",url:"https://aadl.org/teenswrite",deadline:"03-01"},
+  {n:"Polyphony Lit",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Recurring seasonal short fiction and poetry contest with blind judging by guest editors",why:"Individual entry - find a peer from any school for feedback",url:"https://www.polyphonylit.org/copy-of-fall-contest-2025-2",deadline:"03-31"},
+  {n:"The New York Times Student Contests",cat:"writing",team:"Individual",eli:"Global, ages 13-19",tier:1,cross:true,desc:"NYT Learning Network's yearly calendar of writing, photo essay, and multimedia contests",why:"Individual entry - find a peer from any school to workshop your submission with",url:"https://www.nytimes.com/2025/07/23/learning/our-2025-26-student-contest-calendar.html"},
+  {n:"The HG Wells Short Story Competition",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"International short fiction contest with a dedicated junior prize for writers 21 and under",why:"Individual entry - find a peer from any school for feedback",url:"https://hgwellscompetition.com",deadline:"07-07"},
+  {n:"Francine Ringold Awards for New Writers",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Fiction and poetry competition for emerging writers, run by Nimrod International Journal",why:"Individual entry - find a peer from any school for feedback",url:"https://nimrod.utulsa.edu/the-francine-ringold-awards-for-new-writers/"},
+  {n:"Bucks County Community College Short Fiction Contest",cat:"writing",team:"Individual",eli:"Regional",tier:3,cross:false,desc:"Local short fiction contest hosted by Bucks County Community College's School of Language and Literature",why:"Local competition - find a fellow writer nearby",url:"https://www.bucks.edu/academics/schools/lang-lit/highschoolshortfictioncontest/"},
+  {n:"YoungArts",cat:"arts",team:"Prep partner",eli:"US ages 15-18",tier:1,cross:"prep",desc:"Most prestigious US arts competition - up to $10k - Presidential Scholar eligible",why:"Individual entry - find a creative partner from any school",url:"https://www.youngarts.org/"},
+  {n:"Scholastic Art Award",cat:"arts",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's most prestigious teen art recognition - Gold Keys win $12,500",why:"Individual entry - find a creative peer from any school",url:"https://www.artandwriting.org/"},
+  {n:"Local / Regional Science Fair",cat:"science",team:"1-3 students",eli:"Local",tier:3,cross:false,desc:"Your local or regional fair - feeds into the ISEF pathway",why:"Usually same school or district - find a local lab partner",url:""}
 ];
 
 // Skill category colors — unique per category, consistent with competition colors
@@ -1732,6 +1838,7 @@ function rGoals(){
     "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search — ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
     "<div id=\"pills\" style=\"display:flex;flex-wrap:wrap;gap:5px;min-height:10px;margin-bottom:1rem;\"></div>"+
     "<button class=\"exbtn\" id=\"exbtn\"><i class=\"ti ti-compass\" style=\"font-size:18px;color:#7F77DD;\"></i><span>Not sure what's out there? Browse by category</span><i class=\"ti ti-chevron-down\" id=\"exch\" style=\"font-size:15px;margin-left:auto;\"></i></button>"+
+    "<button class=\"exbtn\" id=\"suggestbtn\"><i class=\"ti ti-sparkles\" style=\"font-size:18px;color:#7F77DD;\"></i><span>Tell us your interests, we'll suggest competitions</span></button>"+
     "<div class=\"expp\" id=\"expp\">"+
       "<div class=\"ctabs\" id=\"ctabs\">"+
         "<button class=\"ctab on\" data-cat=\"all\" style=\"color:#7F77DD;\">All</button>"+
@@ -1780,6 +1887,7 @@ function rGoals(){
     document.getElementById("exch").style.transform=exploreOpen?"rotate(180deg)":"";
     if(exploreOpen)renderCat();
   });
+  document.getElementById("suggestbtn").addEventListener("click",openInterestSuggestModal);
   document.querySelectorAll(".ctab").forEach(function(t){
     t.addEventListener("click",function(){
       var cat=this.dataset.cat;
@@ -1832,6 +1940,55 @@ function doSearch(v){
   dd.style.display=(res.length||v.trim().length>2)?"block":"none";
 }
 
+// Click-through detail view — before this, the only way to learn about a
+// competition was the one-line 'why' text on the card itself. This gives
+// a real answer to 'what is this, exactly' before committing to add it.
+function openCompDetail(c){
+  var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+  var tm=TRC[c.tier]||TRC[2];
+  var xs=getCrossStyle(c.cross);
+  var added=selComps.some(function(s){return s.n===c.n;});
+  var backFn=exploreOpen?function(){renderCat();closeCompDetailOverlay();}:function(){closeCompDetailOverlay();};
+  var overlay=document.createElement("div");
+  overlay.id="comp-detail-overlay";
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  overlay.innerHTML="<div style=\"background:white;border-radius:16px;padding:1.5rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);\">"+
+    "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:6px;\">"+c.n+"</div>"+
+    "<div style=\"display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;\">"+
+      "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+      "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
+      "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
+      deadlineChipHtml(c.deadline)+
+    "</div>"+
+    "<div style=\"font-size:13px;color:#444;line-height:1.6;margin-bottom:12px;\">"+c.desc+"</div>"+
+    "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;\">"+
+      "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;\"><div style=\"font-size:11px;color:#6b6b6b;margin-bottom:2px;\">Team</div><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.team+"</div></div>"+
+      "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;\"><div style=\"font-size:11px;color:#6b6b6b;margin-bottom:2px;\">Eligibility</div><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.eli+"</div></div>"+
+    "</div>"+
+    "<div class=\"why\" style=\"margin-bottom:14px;\"><strong>Why find a partner:</strong> "+c.why+"</div>"+
+    (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet — search the name directly to confirm details.</div>")+
+    "<div style=\"display:flex;gap:8px;\">"+
+      (added?"<button style=\"flex:1;padding:10px;background:#3B6D11;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Added</button>":
+            "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add to my targets</button>")+
+      "<button id=\"comp-detail-close\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Close</button>"+
+    "</div>"+
+  "</div>";
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click",function(e){if(e.target===overlay)closeCompDetailOverlay();});
+  document.getElementById("comp-detail-close").addEventListener("click",closeCompDetailOverlay);
+  var addBtn=document.getElementById("comp-detail-add");
+  if(addBtn)addBtn.addEventListener("click",function(){
+    addComp(c);
+    closeCompDetailOverlay();
+    if(exploreOpen)renderCat();
+    var pillsEl=document.getElementById("pills");if(pillsEl)renderPills();
+  });
+}
+function closeCompDetailOverlay(){
+  var el=document.getElementById("comp-detail-overlay");
+  if(el)el.remove();
+}
+
 function renderCat(){
   var list=activeCats.length?COMPS.filter(function(c){return activeCats.indexOf(c.cat)>=0;}):COMPS;
   var el=document.getElementById("clist");if(!el)return;
@@ -1843,19 +2000,22 @@ function renderCat(){
     var added=selComps.some(function(s){return s.n===c.n;});
     var d=document.createElement("div");d.className="citem";
     d.innerHTML="<div style=\"flex:1;min-width:0;\">"+
-      "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.n+"</div>"+
+      "<div class=\"comp-detail-open\" data-name=\""+esc(c.n)+"\" style=\"font-size:13px;font-weight:600;color:#1a1a1a;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;\">"+c.n+"</div>"+
       "<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+c.desc+"</div>"+
       "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
+        deadlineChipHtml(c.deadline)+
       "</div>"+
       "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
+      (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
     "</div>"+
     "<button style=\"flex-shrink:0;padding:6px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:white;margin-top:2px;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\">"+
       (added?"Added ✓":"+ Add")+
     "</button>";
+    d.querySelector(".comp-detail-open").addEventListener("click",function(){openCompDetail(c);});
     if(!added){
       d.querySelector("button").addEventListener("click",function(e){
         e.stopPropagation();addComp(c);
@@ -1885,6 +2045,146 @@ function renderPills(){
     btn.addEventListener("click",function(){removeComp(name);});
     sp.appendChild(txt);sp.appendChild(btn);el.appendChild(sp);
   });
+}
+
+// ── AI competition suggestions from free-text interest ──────
+// Asks the AI to pick from Partnr's own real competition list based on
+// a student's stated interest — never to invent a new competition or
+// state a fact (deadline, prize) not already in the list. Even so,
+// every returned name is checked against the real COMPS array before
+// rendering, so a model slip can never surface a fabricated result.
+function openInterestSuggestModal(){
+  R(logo()+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">What are you interested in?</div>"+
+      "<div class=\"sub\">Tell us in your own words — even something vague like \"I like science but don't know what's out there\" works.</div>"+
+      "<div class=\"fi\"><textarea id=\"interest-text\" placeholder=\"e.g. I'm into AI and want to build something useful, or: I like biology and want to do research...\">"+esc(S.idea)+"</textarea></div>"+
+      "<button class=\"bp\" id=\"interest-go\">Suggest competitions →</button>"+
+      "<button class=\"bkbtn\" id=\"interest-cancel\">Cancel</button>"+
+    "</div>"
+  );
+  document.getElementById("interest-cancel").addEventListener("click",function(){goTo("goals");});
+  document.getElementById("interest-go").addEventListener("click",async function(){
+    var text=document.getElementById("interest-text").value.trim();
+    if(!text){showErr("interest-text","Tell us a bit about what you're interested in");scrollToFirstErr();return;}
+    var btn=this;btn.disabled=true;btn.textContent="Thinking…";
+    try{
+      var suggestions=await fetchCompetitionSuggestions(text);
+      renderInterestSuggestions(text,suggestions);
+    }catch(ex){
+      console.error("[Partnr] competition suggestion failed:",ex);
+      R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">Couldn't get suggestions</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">Something went wrong — you can still browse by category instead.</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
+      document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
+    }
+  });
+}
+
+// Calls the edge function in 'suggest_competitions' mode with the full
+// real competition list (name, category, team requirement, eligibility,
+// cross type, description) so the model can only choose among real,
+// accurate entries — never invent a new one or a fact not given here.
+async function fetchCompetitionSuggestions(interestText){
+  var session=await getSession();
+  if(!session)throw new Error("no session");
+  var compList=COMPS.map(function(c){
+    var catName=(CM2[c.cat]&&CM2[c.cat].n)||c.cat;
+    var typeLabel=c.cross===true?"cross-school ok":c.cross==="prep"?"prep partner":"same school";
+    return c.n+" | "+catName+" | "+c.team+" | "+c.eli+" | "+typeLabel+" | "+c.desc;
+  }).join("\n");
+  var prompt="A high school student described their interest as: \""+interestText+"\"\n\n"+
+    "Here is the COMPLETE real list of competitions available on Partnr (name | category | team size | eligibility | type | description):\n"+compList+"\n\n"+
+    "Pick the 3 to 5 BEST-FITTING competitions from this exact list for this student's stated interest. "+
+    "You MUST only use competition names EXACTLY as they appear above — never invent a new competition, and never state a deadline or prize amount, since none are given here. "+
+    "For each pick, write one specific sentence on why it fits what they said.\n\n"+
+    "Return ONLY valid JSON: {\"suggestions\":[{\"name\":\"exact name from the list\",\"why\":\"one sentence\"}]}";
+  var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "apikey":SUPABASE_KEY,
+      "Authorization":"Bearer "+session.access_token
+    },
+    body:JSON.stringify({prompt:prompt,mode:"suggest_competitions",max_tokens:800})
+  });
+  if(!res.ok)throw new Error("status "+res.status);
+  var d=await res.json();
+  if(d.error)throw new Error("api error");
+  var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
+  var parsed=JSON.parse(txt);
+  var raw=parsed.suggestions||[];
+  // Defensive: only keep suggestions whose name exactly matches a real
+  // competition. Anything else is dropped silently — a model slip
+  // should never surface a fabricated competition to a student.
+  var kept=[];
+  raw.forEach(function(s){
+    var real=COMPS.find(function(c){return c.n===s.name;});
+    if(real)kept.push({comp:real,why:s.why||real.why});
+  });
+  return kept;
+}
+
+function renderInterestSuggestions(interestText,suggestions){
+  if(!suggestions.length){
+    R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-search\" style=\"font-size:32px;color:#AFA9EC;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">No clear fit found</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">Try browsing by category instead, or describe your interest differently.</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
+    document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
+    return;
+  }
+  var shortText=interestText.length>60?interestText.slice(0,60)+"…":interestText;
+  var h=logo()+
+    "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Based on \""+esc(shortText)+"\"</div>"+
+    "<div class=\"sub\">Here's what looks like a fit. Add any to your targets, or see who's already working on it.</div>";
+  suggestions.forEach(function(s,i){
+    var c=s.comp;
+    var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    var xs=getCrossStyle(c.cross);
+    var added=selComps.some(function(sc){return sc.n===c.n;});
+    h+="<div class=\"card\">"+
+      "<div class=\"comp-detail-open\" data-name=\""+esc(c.n)+"\" style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;\">"+c.n+"</div>"+
+      "<div style=\"display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap;\">"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\">"+xs.lbl+"</span>"+
+        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
+        deadlineChipHtml(c.deadline)+
+      "</div>"+
+      "<div style=\"font-size:12px;font-style:italic;color:"+cm.c+";margin-bottom:10px;\"><i class=\"ti ti-sparkles\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+esc(s.why)+"</div>"+
+      (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-bottom:10px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
+      "<div style=\"display:flex;gap:8px;\">"+
+        "<button class=\"bc suggest-add\" data-i=\""+i+"\" style=\"flex:1;background:"+(added?"#3B6D11":cm.c)+";\" "+(added?"disabled":"")+">"+(added?"Added ✓":"+ Add to my targets")+"</button>"+
+        "<button class=\"bo suggest-find\" data-i=\""+i+"\">Find students →</button>"+
+      "</div>"+
+    "</div>";
+  });
+  h+="<button class=\"bkbtn\" id=\"interest-back2\">← Back to goals</button>";
+  R(h);
+  document.querySelectorAll(".comp-detail-open").forEach(function(el){
+    el.addEventListener("click",function(){
+      var s=suggestions.find(function(x){return x.comp.n===el.dataset.name;});
+      if(s)openCompDetail(s.comp);
+    });
+  });
+  document.querySelectorAll(".suggest-add").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var s=suggestions[parseInt(this.dataset.i)];
+      addComp(s.comp);
+      this.textContent="Added ✓";this.style.background="#3B6D11";this.disabled=true;
+    });
+  });
+  document.querySelectorAll(".suggest-find").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var s=suggestions[parseInt(this.dataset.i)];
+      // Jump straight into Skill Search, pre-filtered to this exact real
+      // competition — the recommendation hands off to real people, not
+      // more AI guessing.
+      goTo("matches");
+      document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});
+      var searchTabBtn=document.getElementById("nb-search");
+      if(searchTabBtn)searchTabBtn.classList.add("on");
+      showTab("search");
+      var sel=document.getElementById("filter-comp");
+      if(sel){sel.value=s.comp.n;sel.dispatchEvent(new Event("change"));}
+    });
+  });
+  document.getElementById("interest-back2").addEventListener("click",function(){goTo("goals");});
 }
 
 // ── Step validation ──────────────────────────
@@ -2038,6 +2338,37 @@ function rLoading(){
   var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skill levels...","Building your results..."];
   var i=0;var iv=setInterval(function(){i++;var el=document.getElementById("lmsg");if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
 }
+// Instead of a random re-roll, this asks two quick things before spending
+// another real match call: what wasn't the right fit, and what they're
+// actually looking for now. Both feed directly into the next prompt so
+// the second round is a genuine attempt to correct course, not a
+// re-shuffled version of the same guess.
+function openRematchModal(){
+  R(logo()+
+    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Find new partners</div>"+
+      "<div class=\"sub\">Help us do better this round — what wasn't the right fit, and what are you looking for?</div>"+
+      "<div class=\"slabel\" style=\"margin-top:0;\">What wasn't working? <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
+      "<div class=\"cgrow\" id=\"rematch-reasons\" style=\"margin-bottom:1rem;\"></div>"+
+      "<div class=\"fi\"><label for=\"rematch-needed\">What kind of partner are you looking for?</label><input id=\"rematch-needed\" placeholder=\"e.g. a biology partner, someone who can build an app...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
+      "<button class=\"bp\" id=\"rematch-go\">Find new partners →</button>"+
+      "<button class=\"bkbtn\" id=\"rematch-cancel\">Cancel</button>"+
+    "</div>"
+  );
+  mkChips("rematch-reasons",["Wrong skills","Wrong location","Wrong role fit","Wrong competition focus","Just want more options"],[],false);
+  document.getElementById("rematch-cancel").addEventListener("click",function(){goTo("matches");});
+  document.getElementById("rematch-go").addEventListener("click",function(){
+    var reasons=getChips("rematch-reasons");
+    S.skillsNeeded=document.getElementById("rematch-needed").value.trim();
+    REMATCH_FEEDBACK=reasons.length?("The student passed on the previous round of matches because: "+reasons.join(", ")+". Adjust this round to directly address that.") : "";
+    // Quietly persist the updated 'looking for' text so it sticks even
+    // if this match call fails or hits the daily limit.
+    saveProfile().catch(function(){});
+    goTo("loading");
+    doFetch();
+  });
+}
+
 async function doFetch(){
   var t=TR[S.track]||{n:S.track};var r=RO[S.role]||{n:S.role};
   var compInfo=selComps.map(function(c){
@@ -2047,10 +2378,46 @@ async function doFetch(){
   var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none";
   var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
   var neededStr=S.skillsNeeded||"open — infer from idea and role";
+  var feedbackLine=REMATCH_FEEDBACK?("\nPrevious round feedback: "+REMATCH_FEEDBACK):"";
+  REMATCH_FEEDBACK=""; // one-time use — consumed here so it never leaks into a later, unrelated call
   var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
-    var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
+    // Real matching now goes through a Supabase edge function that holds
+    // the actual Anthropic key server-side — the previous direct
+    // fetch("https://api.anthropic.com/...") call with no key attached
+    // only ever works inside Claude's own Artifacts preview, never on a
+    // real deployed site, so this call was almost certainly always
+    // failing and silently landing on fallback() below.
+    var session=await getSession();
+    if(!session)throw new Error("no session");
+    var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "apikey":SUPABASE_KEY,
+        "Authorization":"Bearer "+session.access_token
+      },
+      body:JSON.stringify({prompt:prompt})
+    });
+    if(res.status===429){
+      // Daily limit reached — this is not a failure, so it gets its own
+      // clear message rather than silently showing demo profiles, which
+      // would look identical to "the AI call broke" from the student's
+      // side and just be confusing.
+      var limitInfo={};
+      try{limitInfo=await res.json();}catch(ex){}
+      var limitN=limitInfo.limit||3;
+      if(MATCHES.length){
+        showToast("You've used today's "+limitN+" match rounds — new ones available tomorrow.");
+        goTo("matches");
+      } else {
+        // No existing matches to fall back to (first-ever call somehow
+        // hit the limit) — show demo profiles rather than a dead end.
+        fallback();
+      }
+      return;
+    }
     if(!res.ok)throw new Error("status "+res.status);
     var d=await res.json();
     if(d.error)throw new Error("api error");
@@ -2058,7 +2425,7 @@ async function doFetch(){
     var parsed=JSON.parse(txt);
     MATCHES=parsed.matches||[];PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
     goTo("matches");
-  } catch(e){fallback();}
+  } catch(e){console.error("[Partnr] AI matching failed, showing demo data:",e);fallback();}
 }
 
 // ── Matches page ─────────────────────────────
@@ -2078,7 +2445,7 @@ function rMatches(){
       "<button class=\"nb\" id=\"nb-recruit\">Recruiting me</button>"+
       "<button class=\"nb\" id=\"nb-search\">Skill search</button>"+
       "<button class=\"nb\" id=\"nb-deadlines\">Deadlines</button>"+
-      "<button class=\"nb\" id=\"nb-conns\">Connections<span id=\"conn-badge\"></span></button>"+
+      "<button class=\"nb\" id=\"nb-conns\"><i class=\"ti ti-inbox\" style=\"font-size:13px;vertical-align:-2px;margin-right:3px;\"></i>Inbox<span id=\"conn-badge\"></span></button>"+
       "<button class=\"nb\" id=\"nb-me\">My profile</button>"+
     "</div>"+
     "<div id=\"tc\"></div>"
@@ -2110,7 +2477,7 @@ async function updateConnBadge(){
     var n=res.count||0;
     var el=document.getElementById("conn-badge");
     if(!el)return;
-    el.innerHTML=n?" <span style=\"background:#7F77DD;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;\">"+n+"</span>":"";
+    el.innerHTML=n?" <span style=\"background:#C53030;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;font-weight:700;\">"+n+"</span>":"";
   }catch(ex){/* badge is cosmetic — never block the UI on it */}
 }
 
@@ -2176,6 +2543,18 @@ function showTab(tab){
   else if(tab==="me"){el.innerHTML=meTab();bindMeTab();}
 }
 
+// Rebuilds selComps from the saved profile so the AI prompt has the
+// student's real target competitions, not an empty list. Shared by both
+// the empty-state 'Find my partners' button and the refine-and-rematch flow.
+function rebuildSelCompsFromProfile(){
+  if(!selComps.length&&(S.comps||[]).length){
+    selComps=S.comps.map(function(name){
+      var known=COMPS.find(function(c){return c.n===name;});
+      return known||{n:name,cat:"custom",team:"Varies",eli:"Local / Regional",tier:3,cross:true,desc:"Custom competition",why:"Find a partner for your specific competition"};
+    });
+  }
+}
+
 function mCards(){
   if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem 1rem;\">"+
     "<i class=\"ti ti-users-group\" style=\"font-size:38px;color:#AFA9EC;\"></i>"+
@@ -2183,7 +2562,10 @@ function mCards(){
     "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">Matches aren't saved between visits yet. Run matching again to see partner suggestions, or head to Skill search to find real students directly.</div>"+
     "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find my partners \u2192</button>"+
   "</div>";
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Your AI matches</div>";
+  var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;\">"+
+    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Your AI matches</div>"+
+    "<button id=\"refine-rematch-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">Not the right fit? Refine & try again →</button>"+
+  "</div>";
   MATCHES.forEach(function(m,i){
     var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
     var sw=m.skillsWithLevels||{};
@@ -2216,16 +2598,13 @@ function mCards(){
 function bindME(){
   var rematch=document.getElementById("rematch-btn");
   if(rematch)rematch.addEventListener("click",function(){
-    // Rebuild selComps from the saved profile so the AI prompt has the
-    // student's real target competitions, not an empty list.
-    if(!selComps.length&&(S.comps||[]).length){
-      selComps=S.comps.map(function(name){
-        var known=COMPS.find(function(c){return c.n===name;});
-        return known||{n:name,cat:"custom",team:"Varies",eli:"Local / Regional",tier:3,cross:true,desc:"Custom competition",why:"Find a partner for your specific competition"};
-      });
-    }
-    goTo("loading");
-    doFetch();
+    rebuildSelCompsFromProfile();
+    openRematchModal();
+  });
+  var refineBtn=document.getElementById("refine-rematch-btn");
+  if(refineBtn)refineBtn.addEventListener("click",function(){
+    rebuildSelCompsFromProfile();
+    openRematchModal();
   });
   document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){openModal(parseInt(this.dataset.idx));});});
   document.querySelectorAll(".pfb").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(this.dataset.idx));});});
@@ -2298,7 +2677,7 @@ function openModal(idx){
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
         "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro — tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>No private messages until both students accept and parent / teacher is notified.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you — you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
         "<textarea id=\"mmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"sbtn\" style=\"flex:1;padding:10px;background:"+t.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
@@ -2342,14 +2721,28 @@ function pCards(){
   });
   return h;
 }
-function bindPE(){document.querySelectorAll(".apb").forEach(function(b){b.addEventListener("click",function(){alert("Application sent for \""+this.dataset.title+"\"!\n\nYour role, skill levels, and portfolio will be shared. They will respond within 48 hours.");});});}
+// The 'Recruiting me' projects are still 100% AI-generated demo data,
+// not real postings from real students — same as the original Matches
+// tab before real students existed. So this can't honestly promise a
+// response from anyone, or even that an application went anywhere real.
+// It also shouldn't use alert(), which is jarring and against the app's
+// own toast pattern used everywhere else.
+function bindPE(){document.querySelectorAll(".apb").forEach(function(b){b.addEventListener("click",function(){showToast("Project postings aren't connected to real students yet — check back soon!");});});}
 
 function sTab(){
+  var compOptions=["<option value=\"\">Any competition</option>"]
+    .concat(COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}))
+    .join("");
   return "<div class=\"slabel\" style=\"margin-top:0;\">Find students by skill</div>"+
-    "<div class=\"sub\">Browse by category or search any skill, competition, or role.</div>"+
-    "<div style=\"display:flex;gap:8px;margin-bottom:1.25rem;\">"+
-      "<input id=\"ss\" placeholder=\"Search — Python, ISEF, Figma, debate, nonprofit...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+    "<div class=\"sub\">Browse by category, or filter by exactly who you need — a competition, your city, your school.</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:0.75rem;\">"+
+      "<input id=\"ss\" placeholder=\"Search — Python, ISEF, Figma, debate, nonprofit... (optional)\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
+    "</div>"+
+    "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
+      "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;max-width:220px;\">"+compOptions+"</select>"+
+      "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
+      "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
     "</div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Browse by category</div>"+
     "<div id=\"skill-browse\" style=\"margin-bottom:1rem;\"></div>"+
@@ -2408,7 +2801,7 @@ function bindSE(){
         b.addEventListener("click",function(){
           var skill=this.dataset.skill;
           document.getElementById("ss").value=skill;
-          srchSkill(skill);
+          runSkillSearch();
           // Highlight selected
           document.querySelectorAll(".skill-drill-item").forEach(function(x){x.style.fontWeight="500";x.style.borderWidth="1px";});
           this.style.fontWeight="700";this.style.borderWidth="2px";
@@ -2417,30 +2810,41 @@ function bindSE(){
     });
   });
 
-  // Search button
-  document.getElementById("ssb").addEventListener("click",function(){
+  // Filter chips: toggle on/off, same visual pattern as chips elsewhere.
+  var cityChip=document.getElementById("filter-city");
+  var schoolChip=document.getElementById("filter-school");
+  [cityChip,schoolChip].forEach(function(chip){
+    if(!chip)return;
+    chip.addEventListener("click",function(){chip.classList.toggle("on");runSkillSearch();});
+    addKbdActivation(chip);
+  });
+
+  // Gathers the current query + all active filters and runs a search.
+  // Filters alone (no typed text) are enough to trigger a real search —
+  // that's the whole point of being able to just browse by competition,
+  // city, or school without needing to guess a keyword.
+  function runSkillSearch(){
     var q=document.getElementById("ss").value.trim();
-    if(q){
-      document.getElementById("skill-browse").style.display="none";
-      document.getElementById("skill-drill").style.display="none";
-      srchSkill(q);
-    }
-  });
+    var comp=document.getElementById("filter-comp").value;
+    var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
+    var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
+    if(!q&&!comp&&!city&&!school)return;
+    document.getElementById("skill-browse").style.display="none";
+    document.getElementById("skill-drill").style.display="none";
+    srchSkill({query:q,competition:comp,city:city,school:school});
+  }
+
+  document.getElementById("ssb").addEventListener("click",runSkillSearch);
   document.getElementById("ss").addEventListener("keydown",function(e){
-    if(e.key==="Enter"){
-      var q=this.value.trim();
-      if(q){
-        document.getElementById("skill-browse").style.display="none";
-        document.getElementById("skill-drill").style.display="none";
-        srchSkill(q);
-      }
-    }
+    if(e.key==="Enter")runSkillSearch();
   });
+  document.getElementById("filter-comp").addEventListener("change",runSkillSearch);
 }
 
 function dCards(){
   if(!COMPS_DATA.length)return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No competitions loaded yet.</div>";
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>"+
+    "<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:1rem;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Dates and prizes here are AI estimates, not official — tap a competition's official site link to confirm the real deadline before you submit anything.</div>";
   [].concat(COMPS_DATA).sort(function(a,b){return a.daysUntil-b.daysUntil;}).forEach(function(c){
     var t=TR[c.track]||TR.research;
     var urg=c.daysUntil<=45,soon=c.daysUntil<=90;
@@ -2465,6 +2869,7 @@ function dCards(){
           "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.eligibility+"</span>"+
           "<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+c.daysUntil+"d left</span>"+
         "</div>"+
+        (function(){var real=COMPS.find(function(rc){return rc.n===c.name;});return real&&real.url?"<a href=\""+esc(real.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Confirm real deadline on official site</a>":"";})()+
       "</div>"+
     "</div>";
   });
@@ -2526,6 +2931,16 @@ function connPersonRow(item,extraHtml){
   "</div>";
 }
 
+// Honest alternative to promising a response time nobody can control:
+// shows how long a request has actually been sitting, computed from the
+// real timestamp. This creates real pressure to respond without Partnr
+// claiming a commitment it has no way to enforce.
+function daysWaitingInfo(createdAt){
+  var days=Math.floor((Date.now()-new Date(createdAt).getTime())/(1000*60*60*24));
+  var label=days<=0?"Sent today":days===1?"Waiting 1 day":"Waiting "+days+" days";
+  return {label:label,urgent:days>=3};
+}
+
 async function renderConnections(){
   var el=document.getElementById("tc");
   if(!el)return;
@@ -2545,7 +2960,9 @@ async function renderConnections(){
     h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">No one has asked to connect with you yet. When a student sends you a request, it shows up here with their message.</p>";
   } else {
     data.incoming.forEach(function(item){
+      var wait=daysWaitingInfo(item.row.created_at);
       h+=connPersonRow(item,
+        "<div style=\"font-size:11px;font-weight:600;color:"+(wait.urgent?"#A32D2D":"#854F0B")+";margin-bottom:8px;\"><i class=\"ti ti-clock\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+wait.label+"</div>"+
         "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<button class=\"bc conn-accept\" data-id=\""+esc(item.row.id)+"\" data-name=\""+esc(item.other.name)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button>"+
           "<button class=\"bo conn-decline\" data-id=\""+esc(item.row.id)+"\">Decline</button>"+
@@ -2576,8 +2993,9 @@ async function renderConnections(){
     h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't sent any requests yet. Find someone in Skill search and tap Connect.</p>";
   } else {
     data.outgoing.forEach(function(item){
+      var wait=daysWaitingInfo(item.row.created_at);
       h+=connPersonRow(item,
-        "<div style=\"font-size:11px;padding:3px 10px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;font-weight:500;\">Waiting for them to accept</div>"
+        "<div style=\"font-size:11px;padding:3px 10px;border-radius:20px;background:#FAEEDA;color:#854F0B;display:inline-block;font-weight:500;\">Waiting for them to accept · "+wait.label+"</div>"
       );
     });
   }
@@ -2782,14 +3200,29 @@ function bindMeTab(){
 }
 
 // ── Skill search ────────────────────────────
-async function srchSkill(skill){
+async function srchSkill(opts){
+  if(typeof opts==="string")opts={query:opts};
+  opts=opts||{};
+  var query=(opts.query||"").trim();
+  var competition=(opts.competition||"").trim();
+  var city=(opts.city||"").trim();
+  var school=(opts.school||"").trim();
+  var isFilterOnly=!query&&(competition||city||school); // no typed text, pure structured filter
+
+  var descParts=[];
+  if(query)descParts.push("\""+query+"\"");
+  if(competition)descParts.push(competition);
+  if(city)descParts.push("in "+city);
+  if(school)descParts.push("at "+school);
+  var desc=descParts.join(" · ")||"partners";
+
   var el=document.getElementById("sr");if(!el)return;
-  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Searching for "+esc(skill)+"...</div></div>";
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Searching for "+esc(desc)+"...</div></div>";
   try{
     var session=await getSession();
     var myId=session&&session.user?session.user.id:null;
-    var real=await searchRealStudents(skill,myId);
-    if(real.length){renderSR(real,skill,false);return;}
+    var real=await searchRealStudents({query:query,competition:competition,city:city,school:school},myId);
+    if(real.length){renderSR(real,desc,false);return;}
   }catch(ex){
     console.error("[Partnr search] failed:",ex);
     el.innerHTML="<div style=\"text-align:center;padding:2rem 1rem;\">"+
@@ -2799,10 +3232,21 @@ async function srchSkill(skill){
     "</div>";
     return;
   }
-  // No real students matched (or the query failed) — show demo
-  // profiles instead, clearly labeled so nobody mistakes them for
-  // real matches.
-  renderSR(demoSR(skill),skill,true);
+  if(isFilterOnly){
+    // Structured filters (competition/city/school) found no real matches.
+    // Demo profiles here would actively mislead — they wouldn't actually
+    // be at that school or targeting that competition — so this gets an
+    // honest empty state instead of a fabricated result.
+    el.innerHTML="<div style=\"text-align:center;padding:2rem 1rem;\">"+
+      "<i class=\"ti ti-users-group\" style=\"font-size:32px;color:#AFA9EC;\"></i>"+
+      "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">No real students match yet</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Nobody onboarded so far matches "+esc(desc)+". Check back as more students join, or try widening your filters.</div>"+
+    "</div>";
+    return;
+  }
+  // Free-text search with no real matches — show demo profiles instead,
+  // clearly labeled so nobody mistakes them for real matches.
+  renderSR(demoSR(query||desc),desc,true);
 }
 
 function demoSR(skill){
@@ -2894,7 +3338,7 @@ function openSearchConnectModal(realId,name){
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
         "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro — tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>No private messages until both students accept and parent / teacher is notified.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you — you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
         "<textarea id=\"srmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"srsbtn\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
