@@ -2568,9 +2568,25 @@ async function updateConnBadge(){
   try{
     var session=await getSession();
     if(!session)return;
-    var res=await sba.from("connections").select("id",{count:"exact",head:true})
-      .eq("student_b_id",session.user.id).eq("status","pending");
-    var n=res.count||0;
+    var myId=session.user.id;
+    var pendingRes=await sba.from("connections").select("id",{count:"exact",head:true})
+      .eq("student_b_id",myId).eq("status","pending");
+    var pendingCount=pendingRes.count||0;
+
+    // Unified badge: pending requests + unread messages across every
+    // accepted connection, added together into one number — matches
+    // how a real inbox works, rather than tracking these separately.
+    var connsRes=await sba.from("connections").select("id")
+      .eq("status","accepted").or("student_a_id.eq."+myId+",student_b_id.eq."+myId);
+    var connIds=(connsRes.data||[]).map(function(c){return c.id;});
+    var unreadCount=0;
+    if(connIds.length){
+      var unreadRes=await sba.from("messages").select("id",{count:"exact",head:true})
+        .in("connection_id",connIds).is("read_at",null).neq("sender_id",myId);
+      unreadCount=unreadRes.count||0;
+    }
+
+    var n=pendingCount+unreadCount;
     var el=document.getElementById("conn-badge");
     if(!el)return;
     el.innerHTML=n?" <span style=\"background:#C53030;color:white;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:2px;font-weight:700;\">"+n+"</span>":"";
@@ -2632,7 +2648,7 @@ function submitWaitlist(){
 function showTab(tab){
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
-  else if(tab==="recruit"){el.innerHTML=pCards();bindPE();}
+  else if(tab==="recruit"){rRecruit();}
   else if(tab==="search"){el.innerHTML=sTab();bindSE();}
   else if(tab==="deadlines"){el.innerHTML=dCards();}
   else if(tab==="conns"){renderConnections();}
@@ -2796,34 +2812,273 @@ function sendConn(){
   document.getElementById("dbn").addEventListener("click",function(){goTo("matches");});
 }
 
-function pCards(){
-  var r=RO[S.role]||{n:S.role||"Partner"};
-  if(!PROJECTS.length)return "<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No projects matched your role yet.</div>";
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Projects recruiting your role</div>";
-  PROJECTS.forEach(function(p){
-    var t=TR[p.track]||TR[S.track]||TR.research;
-    var stags=(p.skills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
-    h+="<div class=\"card\">"+
-      "<div style=\"display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;\">"+
-        "<div style=\"flex:1;\"><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+p.title+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;margin-top:1px;\">"+p.authorName+" · "+p.authorSchool+", "+p.authorCountry+" · "+p.posted+"</div></div>"+
-        "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";flex-shrink:0;\">"+p.spots+" spot"+(p.spots>1?"s":"")+" open</span>"+
-      "</div>"+
-      "<div style=\"font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;\">"+p.description+"</div>"+
-      "<div style=\"font-size:12px;font-weight:600;color:"+t.c+";background:"+t.bg+";padding:6px 10px;border-radius:8px;margin-bottom:8px;\"><i class=\"ti ti-star\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>"+p.matchReason+"</div>"+
-      "<div class=\"tags\" style=\"margin-bottom:8px;\">"+stags+"<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+p.competition+"</span><span class=\"tag\">Needs "+r.n+"</span></div>"+
-      "<button class=\"apb\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>"+
-    "</div>";
+// ── Recruiting Me: real project postings ─────────────
+// Replaces the old 100% AI-fictional PROJECTS array. Anyone can browse
+// open postings (mirrors how Skill Search already works — discoverable,
+// not scoped to a pair); applying sends a real application a project
+// owner can accept or decline, same shape as the connections flow.
+async function loadRealProjects(){
+  var session=await getSession();
+  var myId=session&&session.user?session.user.id:null;
+  var res=await sba.from("projects").select("*").eq("status","open").order("created_at",{ascending:false}).limit(30);
+  if(res.error)throw res.error;
+  var projects=(res.data||[]).filter(function(p){return p.student_id!==myId;});
+  if(!projects.length)return [];
+  var authorIds=projects.map(function(p){return p.student_id;});
+  var authorsRes=await sba.from("students").select("id,name,school,country,role,track").in("id",authorIds);
+  var authorsById={};
+  (authorsRes.data||[]).forEach(function(a){authorsById[a.id]=a;});
+  // Prioritize postings that need the viewer's own role — same
+  // complementary-matching idea used everywhere else in Partnr.
+  projects.sort(function(a,b){
+    var aMatch=a.needed_role===S.role?0:1;
+    var bMatch=b.needed_role===S.role?0:1;
+    return aMatch-bMatch;
   });
-  return h;
+  return projects.map(function(p){return {project:p,author:authorsById[p.student_id]};});
 }
-// The 'Recruiting me' projects are still 100% AI-generated demo data,
-// not real postings from real students — same as the original Matches
-// tab before real students existed. So this can't honestly promise a
-// response from anyone, or even that an application went anywhere real.
-// It also shouldn't use alert(), which is jarring and against the app's
-// own toast pattern used everywhere else.
-function bindPE(){document.querySelectorAll(".apb").forEach(function(b){b.addEventListener("click",function(){showToast("Project postings aren't connected to real students yet — check back soon!");});});}
+
+async function rRecruit(){
+  var el=document.getElementById("tc");if(!el)return;
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div>";
+  var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;\">"+
+    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Projects recruiting</div>"+
+    "<button id=\"post-project-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">+ Post a project</button>"+
+  "</div>";
+  var myPostingsRes,items;
+  try{
+    var session=await getSession();
+    var myId=session&&session.user?session.user.id:null;
+    if(myId){
+      myPostingsRes=await sba.from("projects").select("*,project_applications(id,status)").eq("student_id",myId).order("created_at",{ascending:false});
+      var myPostings=myPostingsRes.data||[];
+      if(myPostings.length){
+        h+="<div class=\"slabel\">Your postings</div>";
+        myPostings.forEach(function(p){
+          var pendingCount=(p.project_applications||[]).filter(function(a){return a.status==="pending";}).length;
+          h+="<div class=\"pit\">"+
+            "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
+            "<div style=\"font-size:11px;color:#6b6b6b;\">"+(p.status==="open"?"Open":"Closed")+(pendingCount?" · "+pendingCount+" pending":"")+"</div></div>"+
+            "<button class=\"bo my-posting-manage\" data-id=\""+esc(p.id)+"\">Manage</button>"+
+          "</div>";
+        });
+        h+="<div style=\"height:0.5rem;\"></div>";
+      }
+    }
+    items=await loadRealProjects();
+    h+="<div class=\"slabel\">Open postings</div>";
+    if(!items.length){
+      h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">No open postings right now. Be the first — post a project above.</p>";
+    } else {
+      items.forEach(function(item){
+        var p=item.project,author=item.author;
+        var t=TR[author&&author.track]||TR.research;
+        var r=RO[p.needed_role]||{n:p.needed_role||"Any role",i:"ti-user"};
+        var stags=(p.skills||[]).map(function(s){return "<span class=\"tag\">"+esc(s)+"</span>";}).join("");
+        h+="<div class=\"card\">"+
+          "<div style=\"display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;\">"+
+            "<div style=\"flex:1;\"><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
+            "<div style=\"font-size:12px;color:#6b6b6b;margin-top:1px;\">"+esc(displayName(author?author.name:"A student"))+(author?" · "+esc(author.school||"")+", "+esc(author.country||""):"")+"</div></div>"+
+            "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";flex-shrink:0;\">"+p.spots+" spot"+(p.spots>1?"s":"")+"</span>"+
+          "</div>"+
+          "<div style=\"font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;\">"+esc(p.description)+"</div>"+
+          "<div class=\"tags\" style=\"margin-bottom:8px;\">"+stags+
+            (p.competition_name?"<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(p.competition_name)+"</span>":"")+
+            "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\">Needs "+esc(r.n)+"</span>"+
+            getStageChip(p.stage)+
+          "</div>"+
+          "<button class=\"bc real-apply-btn\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>"+
+        "</div>";
+      });
+    }
+    el.innerHTML=h;
+    document.getElementById("post-project-btn").addEventListener("click",rPostProject);
+    document.querySelectorAll(".my-posting-manage").forEach(function(b){
+      b.addEventListener("click",function(){rManagePosting(this.dataset.id);});
+    });
+    document.querySelectorAll(".real-apply-btn").forEach(function(b){
+      b.addEventListener("click",function(){openProjectApplyModal(this.dataset.id,this.dataset.title);});
+    });
+  }catch(ex){
+    console.error("[Partnr] loading projects failed:",ex);
+    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load projects — please try again.</p>";
+  }
+}
+
+function rPostProject(){
+  var el=document.getElementById("tc");if(!el)return;
+  var roleOpts="<option value=\"\">Any role</option>"+Object.keys(RO).map(function(k){return "<option value=\""+k+"\">"+RO[k].n+"</option>";}).join("");
+  var compOpts="<option value=\"\">Not tied to a specific competition</option>"+COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}).join("");
+  el.innerHTML="<div class=\"slabel\" style=\"margin-top:0;\">Post a project</div>"+
+    "<div class=\"fi\"><label for=\"pp-title\">Title</label><input id=\"pp-title\" placeholder=\"e.g. Need a designer for our Diamond Challenge pitch\"/></div>"+
+    "<div class=\"fi\"><label for=\"pp-desc\">Description</label><textarea id=\"pp-desc\" placeholder=\"What are you building, and what do you need help with?\"></textarea></div>"+
+    "<div class=\"fi\"><label for=\"pp-role\">Role needed</label><select id=\"pp-role\">"+roleOpts+"</select></div>"+
+    "<div class=\"fi\"><label for=\"pp-skills\">Skills needed <span style=\"font-weight:400;color:#6b6b6b;\">(comma-separated)</span></label><input id=\"pp-skills\" placeholder=\"e.g. Figma, UI Design, Prototyping\"/></div>"+
+    "<div class=\"fi\"><label for=\"pp-comp\">Competition</label><select id=\"pp-comp\">"+compOpts+"</select></div>"+
+    "<div class=\"fi\"><label for=\"pp-spots\">Spots open</label><input id=\"pp-spots\" type=\"number\" min=\"1\" max=\"10\" value=\"1\"/></div>"+
+    "<div class=\"slabel\">Stage</div>"+
+    "<div id=\"pp-stage\" class=\"stbar\">"+
+      ["Spark|spark","Planning|planning","Building|building","Submitting|submitting"].map(function(x){
+        var p=x.split("|");
+        return "<div class=\"stb\" data-val=\""+p[1]+"\">"+p[0]+"</div>";
+      }).join("")+
+    "</div>"+
+    "<button class=\"bp\" id=\"pp-submit\">Post project →</button>"+
+    "<button class=\"bkbtn\" id=\"pp-cancel\">Cancel</button>";
+  var chosenStage="planning";
+  document.querySelectorAll("#pp-stage .stb").forEach(function(b){
+    if(b.dataset.val===chosenStage)b.classList.add("on");
+    b.addEventListener("click",function(){
+      document.querySelectorAll("#pp-stage .stb").forEach(function(x){x.classList.remove("on");});
+      this.classList.add("on");chosenStage=this.dataset.val;
+    });
+  });
+  document.getElementById("pp-cancel").addEventListener("click",function(){showTab("recruit");});
+  document.getElementById("pp-submit").addEventListener("click",async function(){
+    var title=document.getElementById("pp-title").value.trim();
+    var desc=document.getElementById("pp-desc").value.trim();
+    if(!title||!desc){showToast("Please add a title and description");return;}
+    var role=document.getElementById("pp-role").value||null;
+    var skills=document.getElementById("pp-skills").value.split(",").map(function(s){return s.trim();}).filter(Boolean);
+    var comp=document.getElementById("pp-comp").value||null;
+    var spots=parseInt(document.getElementById("pp-spots").value,10)||1;
+    var session=await getSession();
+    if(!session)return;
+    var btn=this;btn.disabled=true;btn.textContent="Posting…";
+    var res=await sba.from("projects").insert({
+      student_id:session.user.id,title:title,description:desc,partner_need:role,
+      needed_role:role,skills:skills,competition_name:comp,spots:spots,stage:chosenStage,status:"open"
+    });
+    if(res.error){
+      console.error("[Partnr] post project failed:",res.error);
+      showToast("Couldn't post — please try again");
+      btn.disabled=false;btn.textContent="Post project →";
+      return;
+    }
+    showToast("Project posted!");
+    showTab("recruit");
+  });
+}
+
+function openProjectApplyModal(projectId,title){
+  R(logo()+
+    "<div style=\"min-height:280px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
+      "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
+        "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Apply to \""+esc(title)+"\"</div>"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Tell them why you're a fit.</div>"+
+        "<textarea id=\"pa-msg\" placeholder=\"I've got experience with...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:1rem;\"></textarea>"+
+        "<div style=\"display:flex;gap:8px;\">"+
+          "<button id=\"pa-send\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send application →</button>"+
+          "<button id=\"pa-cancel\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Cancel</button>"+
+        "</div>"+
+      "</div>"+
+    "</div>"
+  );
+  document.getElementById("pa-cancel").addEventListener("click",function(){showTab("recruit");});
+  document.getElementById("pa-send").addEventListener("click",async function(){
+    var msg=document.getElementById("pa-msg").value.trim();
+    if(!msg){showErr("pa-msg","Please write a short message before sending");scrollToFirstErr();return;}
+    var session=await getSession();
+    if(!session)return;
+    var btn=this;btn.disabled=true;btn.textContent="Sending…";
+    var res=await sba.from("project_applications").insert({project_id:projectId,applicant_id:session.user.id,message:msg});
+    if(res.error){
+      btn.disabled=false;btn.textContent="Send application →";
+      if(res.error.code==="23505")showToast("You've already applied to this project");
+      else showToast("Couldn't send — please try again");
+      return;
+    }
+    R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Application sent!</div><button id=\"pa-done\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to projects</button></div></div>");
+    document.getElementById("pa-done").addEventListener("click",function(){showTab("recruit");});
+  });
+}
+
+// Ensures a real, accepted connection exists between the project owner
+// (the one accepting, currently authenticated) and the applicant, so
+// chat and workspace unlock exactly the way they do from the normal
+// matching flow. Reuses any existing connection between the two rather
+// than creating a duplicate. The insert must put the current user as
+// student_a_id — confirmed against the real RLS policy rather than
+// assumed, since connections_insert_own requires auth.uid() = student_a_id.
+async function ensureAcceptedConnection(otherId,projectTitle){
+  var session=await getSession();
+  if(!session)return;
+  var myId=session.user.id;
+  try{
+    var existing=await sba.from("connections").select("id,status")
+      .or("and(student_a_id.eq."+myId+",student_b_id.eq."+otherId+"),and(student_a_id.eq."+otherId+",student_b_id.eq."+myId+")")
+      .maybeSingle();
+    if(existing.data){
+      if(existing.data.status!=="accepted"){
+        await sba.from("connections").update({status:"accepted"}).eq("id",existing.data.id);
+      }
+    } else {
+      var insertRes=await sba.from("connections").insert({
+        student_a_id:myId,student_b_id:otherId,
+        message:"Accepted for \""+projectTitle+"\"",
+        status:"accepted"
+      });
+      if(insertRes.error)console.error("[Partnr] connection insert failed:",insertRes.error);
+    }
+  }catch(ex){
+    console.error("[Partnr] ensureAcceptedConnection failed:",ex);
+  }
+}
+
+async function rManagePosting(projectId){
+  var el=document.getElementById("tc");if(!el)return;
+  el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div>";
+  try{
+    var projRes=await sba.from("projects").select("title").eq("id",projectId).single();
+    var projectTitle=(projRes.data&&projRes.data.title)||"your project";
+    var appsRes=await sba.from("project_applications").select("*").eq("project_id",projectId).order("created_at",{ascending:false});
+    var apps=appsRes.data||[];
+    var applicantIds=apps.map(function(a){return a.applicant_id;});
+    var applicantsById={};
+    if(applicantIds.length){
+      var studentsRes=await sba.from("students").select("id,name,school,country").in("id",applicantIds);
+      (studentsRes.data||[]).forEach(function(s){applicantsById[s.id]=s;});
+    }
+    var h="<button id=\"mp-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
+      "<div class=\"slabel\" style=\"margin-top:0;\">Applications</div>";
+    if(!apps.length){
+      h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">No applications yet.</p>";
+    } else {
+      apps.forEach(function(a){
+        var applicant=applicantsById[a.applicant_id];
+        h+="<div class=\"card\">"+
+          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:2px;\">"+esc(displayName(applicant?applicant.name:"A student"))+"</div>"+
+          "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">"+esc(applicant?applicant.school:"")+(applicant&&applicant.country?", "+esc(applicant.country):"")+"</div>"+
+          (a.message?"<div class=\"why\" style=\"margin-bottom:10px;\">"+esc(a.message)+"</div>":"")+
+          (a.status==="pending"?
+            "<div style=\"display:flex;gap:8px;\"><button class=\"bc app-accept\" data-id=\""+esc(a.id)+"\" data-applicant=\""+esc(a.applicant_id)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button><button class=\"bo app-decline\" data-id=\""+esc(a.id)+"\">Decline</button></div>":
+            "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(a.status==="accepted"?"#EAF3DE":"#F1EFE8")+";color:"+(a.status==="accepted"?"#3B6D11":"#5F5E5A")+";\">"+(a.status==="accepted"?"Accepted — check your Inbox for chat & workspace":"Declined")+"</span>")+
+        "</div>";
+      });
+    }
+    el.innerHTML=h;
+    document.getElementById("mp-back").addEventListener("click",function(){showTab("recruit");});
+    document.querySelectorAll(".app-accept").forEach(function(b){
+      b.addEventListener("click",async function(){
+        var btn=this;btn.disabled=true;btn.textContent="Accepting…";
+        await sba.from("project_applications").update({status:"accepted"}).eq("id",this.dataset.id);
+        await ensureAcceptedConnection(this.dataset.applicant,projectTitle);
+        showToast("Accepted — chat and workspace are now open in your Inbox");
+        rManagePosting(projectId);
+      });
+    });
+    document.querySelectorAll(".app-decline").forEach(function(b){
+      b.addEventListener("click",async function(){
+        await sba.from("project_applications").update({status:"declined"}).eq("id",this.dataset.id);
+        rManagePosting(projectId);
+      });
+    });
+  }catch(ex){
+    console.error("[Partnr] loading applications failed:",ex);
+    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load applications — please try again.</p>";
+  }
+}
+
 
 function sTab(){
   var compOptions=["<option value=\"\">Any competition</option>"]
@@ -2938,34 +3193,61 @@ function bindSE(){
 }
 
 function dCards(){
-  if(!COMPS_DATA.length)return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No competitions loaded yet.</div>";
+  var withDeadline=COMPS.filter(function(c){return c.deadline;});
+  if(!withDeadline.length)return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No verified deadlines yet — check back as we confirm more.</div>";
+
+  var trackToCats={research:["science","math"],business:["business"],impact:["impact"],arts:["arts","writing"],tech:["tech"]};
+  var myCats=trackToCats[S.track]||[];
+
+  function daysUntilFor(mmdd){
+    var parts=mmdd.split("-");
+    var m=parseInt(parts[0],10),d=parseInt(parts[1],10);
+    var now=new Date();now.setHours(0,0,0,0);
+    var target=new Date(now.getFullYear(),m-1,d);
+    if(target<now)target=new Date(now.getFullYear()+1,m-1,d);
+    return Math.round((target-now)/(1000*60*60*24));
+  }
+
+  var items=withDeadline.map(function(c){
+    var status=deadlineStatus(c.deadline);
+    return {comp:c,status:status,sortDays:status.passed?9999+daysUntilFor(c.deadline):daysUntilFor(c.deadline)};
+  });
+  items.sort(function(a,b){return a.sortDays-b.sortDays;});
+
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>"+
-    "<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:1rem;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Dates and prizes here are AI estimates, not official — tap a competition's official site link to confirm the real deadline before you submit anything.</div>";
-  [].concat(COMPS_DATA).sort(function(a,b){return a.daysUntil-b.daysUntil;}).forEach(function(c){
-    var t=TR[c.track]||TR.research;
-    var urg=c.daysUntil<=45,soon=c.daysUntil<=90;
-    var ubg=urg?"#FCEBEB":soon?"#FAEEDA":"#EAF3DE";
-    var uc=urg?"#A32D2D":soon?"#854F0B":"#3B6D11";
-    var ut=urg?"Act now":soon?"Coming up":"Upcoming";
-    h+="<div class=\"dl\" style=\""+(c.isRecommended?"border-color:"+t.c+";border-width:2px;":"")+"\">" +
+    "<div style=\"font-size:12px;color:#3B6D11;background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:1rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Real, independently-verified deadlines only — nothing here is AI-guessed.</div>";
+
+  items.forEach(function(item){
+    var c=item.comp;
+    var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+    var isRecommended=myCats.indexOf(c.cat)>=0;
+    var passed=item.status.passed;
+    var days=item.sortDays;
+    var urg=!passed&&days<=45,soon=!passed&&days>45&&days<=90;
+    var ubg=passed?"#F1EFE8":urg?"#FCEBEB":soon?"#FAEEDA":"#EAF3DE";
+    var uc=passed?"#8a8a86":urg?"#A32D2D":soon?"#854F0B":"#3B6D11";
+    var ut=passed?"Passed":urg?"Act now":soon?"Coming up":"Upcoming";
+    var parts=c.deadline.split("-");
+    var monthLabel=MONTH_NAMES[parseInt(parts[0],10)-1];
+    var dayLabel=parseInt(parts[1],10);
+    h+="<div class=\"dl\" style=\""+(isRecommended?"border-color:"+cm.c+";border-width:2px;":"")+(passed?"opacity:0.6;":"")+"\">"+
       "<div style=\"text-align:center;min-width:46px;flex-shrink:0;\">"+
-        "<div style=\"font-size:10px;font-weight:600;color:#6b6b6b;text-transform:uppercase;\">"+(c.deadline.split(" ")[0]||"").substring(0,3)+"</div>"+
-        "<div style=\"font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1;\">"+(c.deadline.match(/\d+/)||["?"])[0]+"</div>"+
+        "<div style=\"font-size:10px;font-weight:600;color:#6b6b6b;text-transform:uppercase;\">"+monthLabel+"</div>"+
+        "<div style=\"font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1;\">"+dayLabel+"</div>"+
         "<div style=\"font-size:10px;padding:2px 5px;border-radius:20px;font-weight:600;background:"+ubg+";color:"+uc+";display:inline-block;margin-top:3px;\">"+ut+"</div>"+
       "</div>"+
       "<div style=\"flex:1;\">"+
         "<div style=\"display:flex;align-items:center;gap:5px;margin-bottom:3px;\">"+
-          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+c.name+"</div>"+
-          (c.isRecommended?"<span style=\"font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">For you</span>":"")+
+          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+c.n+"</div>"+
+          (isRecommended?"<span style=\"font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:"+cm.bg+";color:"+cm.tc+";\">For you</span>":"")+
         "</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;line-height:1.4;\">"+c.description+"</div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;line-height:1.4;\">"+c.desc+"</div>"+
         "<div style=\"display:flex;flex-wrap:wrap;gap:5px;align-items:center;\">"+
-          "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
-          "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.prize+"</span>"+
-          "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.eligibility+"</span>"+
-          "<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+c.daysUntil+"d left</span>"+
+          "<span class=\"tag\" style=\"background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+          "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.eli+"</span>"+
+          (!passed?"<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+days+"d left</span>":"<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">Next date TBA</span>")+
         "</div>"+
-        (function(){var real=COMPS.find(function(rc){return rc.n===c.name;});return real&&real.url?"<a href=\""+esc(real.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Confirm real deadline on official site</a>":"";})()+
+        (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site</a>":"")+
       "</div>"+
     "</div>";
   });
@@ -3442,9 +3724,16 @@ function renderChatMessages(msgs,myId){
     el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;text-align:center;margin:auto;\">Say hi — this is the start of your conversation.</p>";
     return;
   }
-  el.innerHTML=msgs.map(function(m){
+  el.innerHTML=msgs.map(function(m,i){
     var mine=m.sender_id===myId;
-    return "<div style=\"align-self:"+(mine?"flex-end":"flex-start")+";max-width:75%;background:"+(mine?"#7F77DD":"white")+";color:"+(mine?"white":"#1a1a1a")+";padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;word-break:break-word;\">"+esc(m.body)+"</div>";
+    // Only the LAST of my own messages shows a read receipt — matches
+    // how most chat apps do it, rather than a checkmark on every line.
+    var isLastMine=mine&&(i===msgs.length-1||msgs.slice(i+1).every(function(x){return x.sender_id===myId;}));
+    var readLabel=(mine&&isLastMine&&m.read_at)?"<div style=\"font-size:10px;color:#9a97c9;text-align:right;margin-top:2px;\">Read</div>":"";
+    return "<div style=\"align-self:"+(mine?"flex-end":"flex-start")+";max-width:75%;\">"+
+      "<div style=\"background:"+(mine?"#7F77DD":"white")+";color:"+(mine?"white":"#1a1a1a")+";padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;word-break:break-word;\">"+esc(m.body)+"</div>"+
+      readLabel+
+    "</div>";
   }).join("");
   el.scrollTop=el.scrollHeight;
 }
@@ -3453,6 +3742,7 @@ async function markMessagesRead(connectionId,myId){
   try{
     await sba.from("messages").update({read_at:new Date().toISOString()})
       .eq("connection_id",connectionId).is("read_at",null).neq("sender_id",myId);
+    updateConnBadge();
   }catch(ex){/* cosmetic — never block chat on this */}
 }
 
