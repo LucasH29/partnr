@@ -689,12 +689,13 @@ async function searchRealStudents(opts,excludeId){
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
   var competition=(opts.competition||"").trim();
-  if(!query&&!city&&!school&&!competition)return [];
+  var category=(opts.category||"").trim();
+  if(!query&&!city&&!school&&!competition&&!category)return [];
 
   var idList=null; // null = no id-narrowing needed (pure city/school filter)
   var skillMatch={};
 
-  if(query||competition){
+  if(query||competition||category){
     var ids={};
     if(query){
       var wc=query;
@@ -724,6 +725,26 @@ async function searchRealStudents(opts,excludeId){
         ids=narrowed;
       } else {
         ids=compIds;
+      }
+    }
+    if(category){
+      // Broader than an exact competition name — matches any student
+      // targeting ANY real competition that falls under this category,
+      // e.g. "All Tech competitions" captures Congressional App
+      // Challenge, USACO, CyberPatriot, etc. all at once.
+      var namesInCategory=COMPS.filter(function(c){return c.cat===category;}).map(function(c){return c.n;});
+      var catIds={};
+      if(namesInCategory.length){
+        var catCompRes=await sba.from("competitions").select("student_id").in("competition_name",namesInCategory);
+        if(catCompRes.error)throw catCompRes.error;
+        (catCompRes.data||[]).forEach(function(r){catIds[r.student_id]=true;});
+      }
+      if(query||competition){
+        var narrowedCat={};
+        Object.keys(ids).forEach(function(id){if(catIds[id])narrowedCat[id]=true;});
+        ids=narrowedCat;
+      } else {
+        ids=catIds;
       }
     }
     idList=Object.keys(ids);
@@ -1118,7 +1139,7 @@ var COMPS=[
   {n:"Science Olympiad",cat:"science",team:"Teams of 15",eli:"US + intl",tier:2,cross:false,desc:"Team-based science and engineering events - same school required",why:"Find teammates at your own school across 23 science events",url:"https://www.soinc.org/"},
   {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,cross:true,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-school teams welcome - science, business, and design skills all needed",url:"https://www.conradchallenge.org/",deadline:"10-30"},
   {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,cross:"prep",desc:"Most prestigious US science competition - individual entry, prep with a peer first",why:"Find a thinking partner from any school to sharpen your research",url:"https://www.societyforscience.org/sts/",deadline:"11-07"},
-  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/",deadline:"09-21"},
+  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/",deadline:"09-20"},
   {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,cross:true,desc:"Annual Princeton team math competition",why:"Cross-school teams allowed - team round requires coordinated problem solving",url:"https://pumac.princeton.edu/"},
   {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,cross:true,desc:"International math modeling contest",why:"Cross-school teams allowed - needs math and research writing",url:"https://www.comap.com/highschool/contests/himcm/"},
   {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
@@ -1135,31 +1156,31 @@ var COMPS=[
   {n:"USAMO / USAJMO",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"Top invitational round of the AMC/AIME pathway, run by MAA",why:"Individual entry - find a study partner at your exact level",url:"https://maa.org/math-competitions/"},
   {n:"American Computer Science League (ACSL)",cat:"math",team:"Individual or team",eli:"US + international",tier:2,cross:true,desc:"Programming and computer science problem-solving contest, several divisions",why:"Cross-school teams allowed - needs coding and algorithmic thinking",url:"https://www.acsl.org/"},
   {n:"Purple Comet Math Meet",cat:"math",team:"Teams up to 6",eli:"International",tier:2,cross:true,desc:"Free online team math competition, run over a set window each spring",why:"Cross-school teams allowed - needs coordinated problem solving under time pressure",url:"https://purplecomet.org/"},
-  {n:"USACO",cat:"tech",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"US Computing Olympiad - free online programming contests, since 1992",why:"Individual entry - find a coding partner to practice algorithms with",url:"https://usaco.org/"},
-  {n:"CyberPatriot",cat:"tech",team:"Teams of 2-6",eli:"US",tier:2,cross:false,desc:"National Youth Cyber Defense Competition - secure virtual networks",why:"Same school/organization team required - needs cybersecurity and IT skills",url:"https://www.uscyberpatriot.org/"},
-  {n:"Technovation Girls",cat:"tech",team:"Teams",eli:"Global, girls ages 13-18",tier:2,cross:true,desc:"Global program - teams build a mobile app addressing a real community problem",why:"Cross-school and international teams welcome - coding, business, and pitching all needed",url:"https://technovationchallenge.org/"},
-  {n:"NASA Space Apps Challenge",cat:"tech",team:"Teams",eli:"Global",tier:2,cross:true,desc:"NASA's global hackathon using real NASA open data, one weekend each fall",why:"Cross-school and cross-country is standard - coder, designer, and storyteller all needed",url:"https://www.spaceappschallenge.org/"},
+  {n:"USACO",cat:"tech",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"US Computing Olympiad - free online programming contests, since 1992",why:"Individual entry - find a coding partner to practice algorithms with",url:"https://usaco.org/",subcat:"coding"},
+  {n:"CyberPatriot",cat:"tech",team:"Teams of 2-6",eli:"US",tier:2,cross:false,desc:"National Youth Cyber Defense Competition - secure virtual networks",why:"Same school/organization team required - needs cybersecurity and IT skills",url:"https://www.uscyberpatriot.org/",subcat:"coding"},
+  {n:"Technovation Girls",cat:"tech",team:"Teams",eli:"Global, girls ages 13-18",tier:2,cross:true,desc:"Global program - teams build a mobile app addressing a real community problem",why:"Cross-school and international teams welcome - coding, business, and pitching all needed",url:"https://technovationchallenge.org/",subcat:"coding"},
+  {n:"NASA Space Apps Challenge",cat:"tech",team:"Teams",eli:"Global",tier:2,cross:true,desc:"NASA's global hackathon using real NASA open data, one weekend each fall",why:"Cross-school and cross-country is standard - coder, designer, and storyteller all needed",url:"https://www.spaceappschallenge.org/",subcat:"coding"},
   {n:"National History Day",cat:"writing",team:"Individual or team",eli:"US grades 6-12",tier:2,cross:true,desc:"Year-long research program - documentaries, exhibits, papers, performances",why:"Cross-school partners allowed in the team categories - needs research and storytelling",url:"https://www.nhd.org/"},
   {n:"Envirothon",cat:"science",team:"Teams of 5",eli:"US + Canada",tier:2,cross:false,desc:"North America's largest environmental education competition - soils, forestry, wildlife, aquatics",why:"Same school/district team required - find teammates for the five field categories",url:"https://envirothon.org/"},
   {n:"Math Kangaroo",cat:"math",team:"Individual",eli:"Global",tier:2,cross:"prep",desc:"International math competition - 839+ centers across the US",why:"Individual entry - find a study partner from any school to prep with",url:"https://mathkangaroo.org/"},
   {n:"National Ocean Sciences Bowl",cat:"science",team:"Teams",eli:"US, 25 regions",tier:2,cross:false,desc:"Quiz-bowl format testing knowledge of oceanography and marine science",why:"Same-region team required - find teammates across biology, chemistry, physics, and geology",url:"https://nosb.org/"},
   {n:"Odyssey of the Mind",cat:"tech",team:"Teams up to 7",eli:"Global, 25+ countries",tier:2,cross:false,desc:"International creative problem-solving competition - build, perform, and improvise solutions",why:"Same school/club team required - needs a mix of builders, writers, and performers",url:"https://www.odysseyofthemind.com/"},
   {n:"Davidson Fellows Scholarship",cat:"science",team:"Individual or 2-person team",eli:"US, age 18 and under",tier:1,cross:"prep",desc:"Scholarships of $25k-$100k for a completed, graduate-level piece of original work in STEM, literature, music, or philosophy",why:"Individual entry - find a peer working on an equally ambitious independent project",url:"https://www.davidsongifted.org/gifted-programs/fellows-scholarship/",deadline:"02-15"},
-  {n:"International Olympiad in Informatics (IOI)",cat:"tech",team:"Prep partner",eli:"Global - qualify via national olympiad",tier:1,cross:"prep",desc:"The top algorithmic programming olympiad in the world - national teams of up to 4",why:"Individual entry - find a partner from any school to train on algorithms with",url:"https://ioinformatics.org/"},
+  {n:"International Olympiad in Informatics (IOI)",cat:"tech",team:"Prep partner",eli:"Global - qualify via national olympiad",tier:1,cross:"prep",desc:"The top algorithmic programming olympiad in the world - national teams of up to 4",why:"Individual entry - find a partner from any school to train on algorithms with",url:"https://ioinformatics.org/",subcat:"coding"},
   {n:"Stockholm Junior Water Prize",cat:"science",team:"Individual or pair",eli:"Global, ages 15-20",tier:1,cross:true,desc:"International research competition addressing water quality, management, and treatment challenges",why:"Cross-school pairs allowed - needs environmental research and a strong presentation",url:"https://siwi.org/stockholm-junior-water-prize/",deadline:"04-15"},
-  {n:"Microsoft Imagine Cup",cat:"tech",team:"Teams up to 4",eli:"Global",tier:1,cross:true,desc:"Global competition to build an MVP using AI and cloud tools that addresses a major world challenge",why:"Cross-school and international teams welcome - needs coding, product thinking, and pitching",url:"https://imaginecup.microsoft.com/"},
+  {n:"Microsoft Imagine Cup",cat:"tech",team:"Teams up to 4",eli:"Global",tier:1,cross:true,desc:"Global competition to build an MVP using AI and cloud tools that addresses a major world challenge",why:"Cross-school and international teams welcome - needs coding, product thinking, and pitching",url:"https://imaginecup.microsoft.com/",subcat:"coding"},
   {n:"Eugene O'Neill Theater Center Young Playwrights Festival",cat:"arts",team:"Prep partner",eli:"US, ages 12-18",tier:1,cross:"prep",desc:"National playwriting festival - selected scripts get a professional staged reading",why:"Individual entry - find a fellow writer from any school for feedback on your script",url:"https://www.theoneill.org/"},
   {n:"Harvard International Review Academic Writing Contest",cat:"writing",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"Biannual analytical writing contest on international affairs, judged by HIR's editorial board",why:"Individual entry - find a research and editing partner from any school",url:"https://hir.harvard.edu/"},
-  {n:"National Cyber League",cat:"tech",team:"Individual or team",eli:"US high school + college",tier:2,cross:true,desc:"Learning-centered cybersecurity competition across nine categories, with a shareable skills report",why:"Cross-school teams allowed - needs cryptography, forensics, and security skills",url:"https://nationalcyberleague.org/"},
+  {n:"National Cyber League",cat:"tech",team:"Individual or team",eli:"US high school + college",tier:2,cross:true,desc:"Learning-centered cybersecurity competition across nine categories, with a shareable skills report",why:"Cross-school teams allowed - needs cryptography, forensics, and security skills",url:"https://nationalcyberleague.org/",subcat:"coding"},
   {n:"International Mathematical Olympiad (IMO)",cat:"math",team:"Prep partner",eli:"Global, under 20, pre-university",tier:1,cross:"prep",desc:"The oldest and most prestigious world championship math competition - national teams of up to 6",why:"Individual entry - find a study partner from any school to train for national selection",url:"https://www.imo-official.org/"},
   {n:"International Physics Olympiad (IPhO)",cat:"science",team:"Prep partner",eli:"Global - top national performers",tier:1,cross:"prep",desc:"The most prestigious physics competition for high schoolers - theoretical and experimental exams",why:"Individual entry - find a partner from any school to work through problem sets with",url:"https://www.ipho-new.org/"},
   {n:"World Scholar's Cup",cat:"impact",team:"Teams of 3",eli:"Global, ages up to 18",tier:2,cross:true,desc:"Interdisciplinary team competition across science, history, literature, and the arts",why:"Mixed-school teams allowed - needs debate, writing, and broad academic range",url:"https://scholarscup.org/"},
   {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged",url:""},
   {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/",deadline:"01-15"},
-  {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product",url:"https://mlh.io/"},
-  {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills",url:"https://www.firstinspires.org/"},
-  {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills",url:"https://www.roboticseducation.org/"},
-  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:2,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed",url:"https://www.congressionalappchallenge.us/",deadline:"10-26"},
+  {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product",url:"https://mlh.io/",subcat:"coding"},
+  {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills",url:"https://www.firstinspires.org/",subcat:"robotics"},
+  {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills",url:"https://www.roboticseducation.org/",subcat:"robotics"},
+  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:2,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed",url:"https://www.congressionalappchallenge.us/",deadline:"10-26",subcat:"coding"},
   {n:"John Locke Essay",cat:"writing",team:"Prep partner",eli:"Global - 150 countries",tier:1,cross:"prep",desc:"Most prestigious global essay contest - 63k students - Oxford and Princeton judges",why:"Individual entry - find an intellectual sparring partner from any school",url:"https://www.johnlockeinstitute.com/"},
   {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's longest-running teen writing recognition - 28 categories",why:"Individual entry - find a writing partner from any school",url:"https://www.artandwriting.org/"},
   {n:"Kennedy Profile in Courage Essay",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"One of the most prestigious US essay competitions - $10k prize",why:"Individual entry - find a research and editing partner from any school",url:"https://www.jfklibrary.org/learn/education/profile-in-courage-essay-contest"},
@@ -1320,9 +1341,9 @@ function rWelcome(){
       "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Startups\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-chart-line\" style=\"font-size:21px;color:#3B6D11;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Startups</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Investment & Finance\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-coin\" style=\"font-size:21px;color:#854F0B;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Investment & Finance</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"impact\" data-label=\"Nonprofit & Impact\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-world\" style=\"font-size:21px;color:#1D9E75;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Nonprofit & Impact</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Robotics\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-robot\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Robotics</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Coding\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-code\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Coding</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Engineering\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"robotics\" data-label=\"Robotics\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-robot\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Robotics</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"coding\" data-label=\"Coding\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-code\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Coding</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"none\" data-label=\"Engineering\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:21px;color:#993C1D;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Arts & Writing</div></div>"+
     "</div>"+
     "<div style=\"text-align:center;font-size:11px;color:#6b6b6b;margin-bottom:1rem;\">Tap any category to browse real competitions — no account needed</div>"+
@@ -1337,7 +1358,7 @@ function rWelcome(){
     tile.setAttribute("role","button");tile.setAttribute("tabindex","0");
     addKbdActivation(tile);
     tile.addEventListener("click",function(){
-      rCompPreview(tile.dataset.cats.split(","),tile.dataset.label);
+      rCompPreview(tile.dataset.cats.split(","),tile.dataset.label,tile.dataset.subcat||"");
     });
   });
 }
@@ -1346,8 +1367,13 @@ function rWelcome(){
 // this is public, non-personal data (just the static competition list),
 // so there's no reason to gate it behind signup. Ends with a CTA that
 // carries the competition they were looking at straight into signup.
-function rCompPreview(catIds,label){
-  var list=COMPS.filter(function(c){return catIds.indexOf(c.cat)>=0;});
+function rCompPreview(catIds,label,subcat){
+  var list=COMPS.filter(function(c){
+    if(catIds.indexOf(c.cat)<0)return false;
+    if(subcat==="none")return !c.subcat;
+    if(subcat)return c.subcat===subcat;
+    return true;
+  });
   var h=logo()+
     "<button id=\"preview-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
     "<h2 style=\"margin-bottom:0.25rem;\">"+esc(label)+" competitions</h2>"+
@@ -3081,13 +3107,23 @@ async function rManagePosting(projectId){
 
 
 function sTab(){
-  var compOptions=["<option value=\"\">Any competition</option>"]
-    .concat(COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}))
-    .join("");
+  var compOptions=["<option value=\"\">Any competition</option>"];
+  var catKeysForFilter=["science","math","business","impact","tech","writing","arts"];
+  compOptions.push("<optgroup label=\"By category (broader)\">"+
+    catKeysForFilter.map(function(k){
+      var cm=CM2[k]||{n:k};
+      return "<option value=\"cat:"+k+"\">All "+esc(cm.n)+" competitions</option>";
+    }).join("")+"</optgroup>");
+  compOptions.push("<optgroup label=\"By exact competition\">"+
+    COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}).join("")+
+  "</optgroup>");
+  compOptions=compOptions.join("");
   return "<div class=\"slabel\" style=\"margin-top:0;\">Find students by skill</div>"+
-    "<div class=\"sub\">Browse by category, or filter by exactly who you need — a competition, your city, your school.</div>"+
-    "<div style=\"display:flex;gap:8px;margin-bottom:0.75rem;\">"+
-      "<input id=\"ss\" placeholder=\"Search — Python, ISEF, Figma, debate, nonprofit... (optional)\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+    "<div class=\"sub\">Browse by category, or filter by exactly who you need — a competition (or a whole category of them), your city, your school.</div>"+
+    "<div class=\"swrap\" style=\"margin-bottom:0.75rem;display:flex;gap:8px;\">"+
+      "<div style=\"position:relative;flex:1;\"><input id=\"ss\" autocomplete=\"off\" placeholder=\"Search — Python, ISEF, Figma, debate, nonprofit... (optional)\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+        "<div id=\"skill-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
+      "</div>"+
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
     "</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
@@ -3176,20 +3212,70 @@ function bindSE(){
   // city, or school without needing to guess a keyword.
   function runSkillSearch(){
     var q=document.getElementById("ss").value.trim();
-    var comp=document.getElementById("filter-comp").value;
+    var compRaw=document.getElementById("filter-comp").value;
+    var comp=compRaw.indexOf("cat:")===0?"":compRaw;
+    var category=compRaw.indexOf("cat:")===0?compRaw.slice(4):"";
     var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
     var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
-    if(!q&&!comp&&!city&&!school)return;
+    if(!q&&!comp&&!category&&!city&&!school){
+      // Everything's cleared — restore the browse-by-category view
+      // instead of leaving a blank pane. This is the fix for the bug
+      // where browse-by-category vanished after any search and never
+      // came back, even once every filter was cleared again.
+      document.getElementById("skill-browse").style.display="block";
+      document.getElementById("skill-drill").style.display="none";
+      document.getElementById("sr").innerHTML="";
+      return;
+    }
     document.getElementById("skill-browse").style.display="none";
     document.getElementById("skill-drill").style.display="none";
-    srchSkill({query:q,competition:comp,city:city,school:school});
+    srchSkill({query:q,competition:comp,category:category,city:city,school:school});
   }
 
   document.getElementById("ssb").addEventListener("click",runSkillSearch);
   document.getElementById("ss").addEventListener("keydown",function(e){
     if(e.key==="Enter")runSkillSearch();
   });
+  // Also react live as text is typed/cleared — not just on Enter or the
+  // Search button — so deleting the text alone restores the browse view.
+  document.getElementById("ss").addEventListener("input",function(){
+    if(!this.value.trim())runSkillSearch();
+  });
   document.getElementById("filter-comp").addEventListener("change",runSkillSearch);
+
+  // Skill-name autocomplete — same pattern as the school/city
+  // autocomplete elsewhere: suggests as you type, never forces a
+  // selection, free text still works if what you want isn't listed.
+  var allSkillNames=[];
+  SKILL_CATS.forEach(function(cat){cat.items.forEach(function(item){allSkillNames.push(item);});});
+  var ssInput=document.getElementById("ss");
+  var skillSuggestBox=document.getElementById("skill-suggest");
+  if(ssInput&&skillSuggestBox){
+    ssInput.addEventListener("input",function(){
+      var q=ssInput.value.trim().toLowerCase();
+      if(q.length<2){skillSuggestBox.style.display="none";return;}
+      var matches=allSkillNames.filter(function(name){return name.toLowerCase().indexOf(q)===0;}).slice(0,8);
+      if(!matches.length){skillSuggestBox.style.display="none";return;}
+      skillSuggestBox.innerHTML=matches.map(function(name){
+        return "<div class=\"skill-suggest-item\" role=\"option\" tabindex=\"0\" data-name=\""+esc(name)+"\" style=\"padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;\">"+esc(name)+"</div>";
+      }).join("");
+      skillSuggestBox.style.display="block";
+      skillSuggestBox.querySelectorAll(".skill-suggest-item").forEach(function(item){
+        item.addEventListener("mouseenter",function(){item.style.background="#f8f8f6";});
+        item.addEventListener("mouseleave",function(){item.style.background="";});
+        addKbdActivation(item);
+        item.addEventListener("click",function(){
+          ssInput.value=item.dataset.name;
+          skillSuggestBox.style.display="none";
+        });
+      });
+    });
+    document.addEventListener("click",function(e){
+      if(e.target!==ssInput&&!skillSuggestBox.contains(e.target)){
+        skillSuggestBox.style.display="none";
+      }
+    });
+  }
 }
 
 function dCards(){
@@ -3215,7 +3301,7 @@ function dCards(){
   items.sort(function(a,b){return a.sortDays-b.sortDays;});
 
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>"+
-    "<div style=\"font-size:12px;color:#3B6D11;background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:1rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Real, independently-verified deadlines only — nothing here is AI-guessed.</div>";
+    "";
 
   items.forEach(function(item){
     var c=item.comp;
@@ -3886,13 +3972,15 @@ async function srchSkill(opts){
   opts=opts||{};
   var query=(opts.query||"").trim();
   var competition=(opts.competition||"").trim();
+  var category=(opts.category||"").trim();
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
-  var isFilterOnly=!query&&(competition||city||school); // no typed text, pure structured filter
+  var isFilterOnly=!query&&(competition||category||city||school); // no typed text, pure structured filter
 
   var descParts=[];
   if(query)descParts.push("\""+query+"\"");
   if(competition)descParts.push(competition);
+  if(category)descParts.push("all "+((CM2[category]&&CM2[category].n)||category)+" competitions");
   if(city)descParts.push("in "+city);
   if(school)descParts.push("at "+school);
   var desc=descParts.join(" · ")||"partners";
@@ -3902,7 +3990,7 @@ async function srchSkill(opts){
   try{
     var session=await getSession();
     var myId=session&&session.user?session.user.id:null;
-    var real=await searchRealStudents({query:query,competition:competition,city:city,school:school},myId);
+    var real=await searchRealStudents({query:query,competition:competition,category:category,city:city,school:school},myId);
     if(real.length){renderSR(real,desc,false);return;}
   }catch(ex){
     console.error("[Partnr search] failed:",ex);
