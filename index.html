@@ -4188,10 +4188,14 @@ function bindMeTab(){
     var wrap=vEmailBtn.parentNode;
     var domain=getEmailDomain(S.email);
     if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
-      var errBox=document.createElement("div");
-      errBox.style.cssText="margin-top:6px;font-size:12px;color:#A32D2D;";
+      var errBox=document.getElementById("verifyEmailErr");
+      if(!errBox){
+        errBox=document.createElement("div");
+        errBox.id="verifyEmailErr";
+        errBox.style.cssText="margin-top:6px;font-size:12px;color:#A32D2D;";
+        wrap.appendChild(errBox);
+      }
       errBox.textContent="This only works with a school email address, not a personal one like Gmail.";
-      wrap.appendChild(errBox);
       return;
     }
     vEmailBtn.disabled=true;vEmailBtn.textContent="Generating code…";
