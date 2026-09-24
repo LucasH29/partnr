@@ -3818,7 +3818,7 @@ function meTab(){
           "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;\"></i> School email verified (auto-detected)</span>":
           S.schoolVerification==="self_reported_multiple"?
           "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-users\" style=\"font-size:12px;\"></i> Self-Reported (confirmed by multiple students)</span>":
-          "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"verifyEmailBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Verify with school email</button> <button id=\"reqVerifyBtn\" style=\"background:none;border:none;color:#6b6b6b;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Request verification</button>")+"</div>"+
+          "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"verifyEmailBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Verify with school email</button> <button id=\"helpVerifyBtn\" style=\"background:none;border:none;color:#6b6b6b;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Can't verify this way? Ask us for help</button>")+"</div>"+
       "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
@@ -4183,95 +4183,129 @@ function bindMeTab(){
   if(rst)rst.addEventListener("click",resetAll);
   var blkBtn=document.getElementById("blocked-btn");
   if(blkBtn)blkBtn.addEventListener("click",renderBlockedList);
+  // Asks for the SCHOOL email directly rather than assuming it's the
+  // same as the account's login email - a student who followed our own
+  // onboarding advice ("use a personal email so you never lose access")
+  // needs a way to prove a DIFFERENT address actually belongs to their
+  // school. Without this, that button could never work for anyone who
+  // took that advice, which is most students.
   var vEmailBtn=document.getElementById("verifyEmailBtn");
-  if(vEmailBtn)vEmailBtn.addEventListener("click",async function(){
+  if(vEmailBtn)vEmailBtn.addEventListener("click",function(){
     var wrap=vEmailBtn.parentNode;
-    var domain=getEmailDomain(S.email);
-    if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
+    vEmailBtn.style.display="none";
+    var inputBox=document.createElement("div");
+    inputBox.id="verifyEmailInputBox";
+    inputBox.style.cssText="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;";
+    inputBox.innerHTML="<input id=\"schoolEmailInput\" type=\"email\" placeholder=\"you@yourschool.edu\" style=\"font-size:12px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;flex:1;min-width:180px;\"/>"+
+      "<button id=\"sendVerifyCodeBtn\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;\">Send code</button>";
+    wrap.appendChild(inputBox);
+    var schoolEmailInputEl=document.getElementById("schoolEmailInput");
+    // Pre-fill only if the login email is itself already a non-personal
+    // domain - a small convenience, never assumed otherwise.
+    schoolEmailInputEl.value=(S.email&&PERSONAL_EMAIL_DOMAINS.indexOf(getEmailDomain(S.email))<0)?S.email:"";
+    schoolEmailInputEl.focus();
+    function showVerifyEmailErr(msg){
       var errBox=document.getElementById("verifyEmailErr");
       if(!errBox){
         errBox=document.createElement("div");
         errBox.id="verifyEmailErr";
-        errBox.style.cssText="margin-top:6px;font-size:12px;color:#A32D2D;";
+        errBox.style.cssText="margin-top:6px;font-size:12px;color:#A32D2D;width:100%;";
         wrap.appendChild(errBox);
       }
-      errBox.textContent="This only works with a school email address, not a personal one like Gmail.";
-      return;
+      errBox.textContent=msg;
     }
-    vEmailBtn.disabled=true;vEmailBtn.textContent="Generating code…";
-    function makeCode(){
-      var chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";var c="";
-      for(var i=0;i<6;i++)c+=chars[Math.floor(Math.random()*chars.length)];
-      return c;
-    }
-    try{
-      var session=await getSession();
-      var code=null,attempts=0;
-      while(attempts<3&&!code){
-        var candidate=makeCode();
-        var ins=await sba.from("school_email_verification_codes").insert({
-          student_id:session.user.id,code:candidate,expected_domain:domain
-        });
-        if(!ins.error)code=candidate;
-        attempts++;
+    document.getElementById("sendVerifyCodeBtn").addEventListener("click",async function(){
+      var typedEmail=document.getElementById("schoolEmailInput").value.trim();
+      var domain=getEmailDomain(typedEmail);
+      var sendBtn=this;
+      var existingErr=document.getElementById("verifyEmailErr");if(existingErr)existingErr.remove();
+      if(!typedEmail||!typedEmail.includes("@")){
+        showVerifyEmailErr("Please enter a valid email address.");
+        return;
       }
-      if(!code){throw new Error("Could not generate a unique code");}
-      var box=document.createElement("div");
-      box.style.cssText="margin-top:8px;padding:10px;background:#F1EFE8;border-radius:8px;font-size:12px;color:#1a1a1a;line-height:1.5;";
-      box.innerHTML="Send an email from <strong>"+esc(S.email)+"</strong> to <strong>verify@projectpartnr.com</strong> with this code anywhere in the subject line:"+
-        "<div style=\"font-size:18px;font-weight:700;letter-spacing:2px;margin:8px 0;color:#534AB7;\">"+code+"</div>"+
-        "<button id=\"checkVerifyStatus\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">I've sent it - check now</button>"+
-        "<div id=\"verifyStatusMsg\" style=\"margin-top:6px;\"></div>";
-      wrap.appendChild(box);
-      vEmailBtn.style.display="none";
-      document.getElementById("checkVerifyStatus").addEventListener("click",async function(){
-        var btn=this;btn.disabled=true;btn.textContent="Checking…";
-        try{
-          var check=await sba.from("school_email_verification_codes").select("status").eq("code",code).maybeSingle();
-          var msgEl=document.getElementById("verifyStatusMsg");
-          if(check.data&&check.data.status==="verified"){
-            S.schoolVerification="verified";
-            var el=document.getElementById("tc");
-            if(el){el.innerHTML=meTab();bindMeTab();}
-          }else if(check.data&&check.data.status==="failed"){
-            msgEl.innerHTML="<span style=\"font-size:12px;color:#A32D2D;\">The email arrived, but not from the expected domain. Make sure you're sending from your real school account.</span>";
-            btn.disabled=false;btn.textContent="Check again";
-          }else{
-            msgEl.innerHTML="<span style=\"font-size:12px;color:#6b6b6b;\">Not received yet - school email can take a few minutes to arrive.</span>";
+      if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
+        showVerifyEmailErr("This only works with a school email address, not a personal one like Gmail.");
+        return;
+      }
+      sendBtn.disabled=true;sendBtn.textContent="Generating code…";
+      function makeCode(){
+        var chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";var c="";
+        for(var i=0;i<6;i++)c+=chars[Math.floor(Math.random()*chars.length)];
+        return c;
+      }
+      try{
+        var session=await getSession();
+        var code=null,attemptsN=0;
+        while(attemptsN<3&&!code){
+          var candidate=makeCode();
+          var ins=await sba.from("school_email_verification_codes").insert({
+            student_id:session.user.id,code:candidate,expected_domain:domain,claimed_email:typedEmail
+          });
+          if(!ins.error)code=candidate;
+          attemptsN++;
+        }
+        if(!code){throw new Error("Could not generate a unique code");}
+        inputBox.innerHTML="Send an email from <strong>"+esc(typedEmail)+"</strong> to <strong>verify@projectpartnr.com</strong> with this code anywhere in the subject line:"+
+          "<div style=\"font-size:18px;font-weight:700;letter-spacing:2px;margin:8px 0;color:#534AB7;\">"+code+"</div>"+
+          "<button id=\"checkVerifyStatus\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">I've sent it - check now</button>"+
+          "<div id=\"verifyStatusMsg\" style=\"margin-top:6px;\"></div>";
+        document.getElementById("checkVerifyStatus").addEventListener("click",async function(){
+          var btn=this;btn.disabled=true;btn.textContent="Checking…";
+          try{
+            var check=await sba.from("school_email_verification_codes").select("status").eq("code",code).maybeSingle();
+            var msgEl=document.getElementById("verifyStatusMsg");
+            if(check.data&&check.data.status==="verified"){
+              S.schoolVerification="verified";
+              var el=document.getElementById("tc");
+              if(el){el.innerHTML=meTab();bindMeTab();}
+            }else if(check.data&&check.data.status==="failed"){
+              msgEl.innerHTML="<span style=\"font-size:12px;color:#A32D2D;\">The email arrived, but not from the expected domain. Make sure you're sending from your real school account.</span>";
+              btn.disabled=false;btn.textContent="Check again";
+            }else{
+              msgEl.innerHTML="<span style=\"font-size:12px;color:#6b6b6b;\">Not received yet - school email can take a few minutes to arrive.</span>";
+              btn.disabled=false;btn.textContent="Check again";
+            }
+          }catch(ex){
             btn.disabled=false;btn.textContent="Check again";
           }
-        }catch(ex){
-          btn.disabled=false;btn.textContent="Check again";
-        }
-      });
-    }catch(ex){
-      console.error("Verification code generation failed",ex);
-      vEmailBtn.disabled=false;vEmailBtn.textContent="Verify with school email";
-    }
+        });
+      }catch(ex){
+        console.error("Verification code generation failed",ex);
+        showVerifyEmailErr("Something went wrong generating your code — please try again.");
+        sendBtn.disabled=false;sendBtn.textContent="Send code";
+      }
+    });
+    schoolEmailInputEl.addEventListener("keydown",function(e){
+      if(e.key==="Enter"){e.preventDefault();document.getElementById("sendVerifyCodeBtn").click();}
+    });
   });
-  var reqBtn=document.getElementById("reqVerifyBtn");
-  if(reqBtn)reqBtn.addEventListener("click",function(){
-    var wrap=reqBtn.parentNode;
-    var inputId="verifyUrlInput";
+  // Real fallback for students who genuinely can't complete school-email
+  // verification (e.g. their school blocks all outside mail). Replaces
+  // the old "Request verification" field, which only wrote to a column
+  // nobody ever reviewed - this inserts into a real table with a DB
+  // trigger that emails hello@projectpartnr.com automatically.
+  var helpVerifyBtn=document.getElementById("helpVerifyBtn");
+  if(helpVerifyBtn)helpVerifyBtn.addEventListener("click",function(){
+    var wrap=helpVerifyBtn.parentNode;
+    helpVerifyBtn.style.display="none";
     var box=document.createElement("div");
-    box.style.cssText="margin-top:6px;display:flex;gap:6px;align-items:center;";
-    box.innerHTML="<input id=\""+inputId+"\" type=\"text\" placeholder=\"Your school's website (optional)\" style=\"font-size:12px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;flex:1;\"/>"+
-      "<button id=\"submitVerifyReq\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">Send</button>";
-    reqBtn.style.display="none";
+    box.style.cssText="margin-top:8px;width:100%;";
+    box.innerHTML="<textarea id=\"helpVerifyNote\" placeholder=\"What's your school, and why can't you verify with your school email?\" style=\"width:100%;height:60px;resize:none;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:6px;\"></textarea>"+
+      "<button id=\"submitHelpVerify\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">Send</button>";
     wrap.appendChild(box);
-    document.getElementById(inputId).focus();
-    document.getElementById("submitVerifyReq").addEventListener("click",async function(){
-      var url=document.getElementById(inputId).value.trim();
+    document.getElementById("helpVerifyNote").focus();
+    document.getElementById("submitHelpVerify").addEventListener("click",async function(){
+      var note=document.getElementById("helpVerifyNote").value.trim();
       var btn=this;btn.disabled=true;btn.textContent="Sending…";
       try{
         var session=await getSession();
-        await sba.from("students").update({
-          verification_requested:true,
-          verification_request_note:url
-        }).eq("id",session.user.id);
-        box.innerHTML="<span style=\"font-size:12px;color:#1D9E75;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Request sent</span>";
+        var res=await sba.from("verification_help_requests").insert({
+          student_id:session.user.id,school_name:S.school||null,claimed_email:S.email||null,note:note||null
+        });
+        if(res.error)throw res.error;
+        box.innerHTML="<span style=\"font-size:12px;color:#1D9E75;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Sent — someone will follow up.</span>";
       }catch(ex){
-        console.error("Verification request failed",ex);
+        console.error("Verification help request failed",ex);
         btn.disabled=false;btn.textContent="Send";
       }
     });
