@@ -2598,7 +2598,7 @@ function renderInterestSuggestions(interestText,suggestions){
 }
 
 // ── Step validation ──────────────────────────
-function step2(){
+async function step2(){
   var n=document.getElementById("iname").value.trim();
   var e=document.getElementById("iemail").value.trim();
   var sc=document.getElementById("ischool").value.trim();
@@ -2637,6 +2637,18 @@ function step2(){
   if(PENDING_GOOGLE_SESSION){
     // Already authenticated via Google — no magic link needed, just
     // save what they typed and continue straight to Track & Role.
+    try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
+    goTo("track");
+    return;
+  }
+
+  // Already logged in via a real session (e.g. this is Edit Profile on
+  // an existing account, not a brand-new signup). Re-sending a magic
+  // link here was pure redundancy — the student has to leave the app,
+  // dig up a new email, and click through again just to change a field
+  // on an account they're already authenticated to change.
+  var existingSession=await getSession();
+  if(existingSession){
     try{localStorage.setItem("partnr_pending_signup",JSON.stringify(S));}catch(ex){}
     goTo("track");
     return;
