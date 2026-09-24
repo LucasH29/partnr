@@ -152,7 +152,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],portfolioItems:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
 var REMATCH_FEEDBACK="";
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
@@ -466,7 +466,7 @@ async function saveProfile(){
     id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
-    location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],
+    location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],portfolio_items:S.portfolioItems||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null
   });
   if(upsertRes.error)return upsertRes;
@@ -504,7 +504,7 @@ async function loadProfileIntoState(uid){
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
   S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
-  S.experience=p.experience||[];S.awards=p.awards||[];S.stage=p.stage||"";
+  S.experience=p.experience||[];S.awards=p.awards||[];S.portfolioItems=p.portfolio_items||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
   S.dob=p.dob||"";
   S.skillsNeeded=p.skills_needed||"";
@@ -817,6 +817,7 @@ async function searchRealStudents(opts,excludeId){
       otherSkills:otherSkills,
       competitions:compsByStudent[s.id]||[],
       portfolio:s.github||null,
+      portfolioItems:s.portfolio_items||[],
       _realId:s.id
     };
   });
@@ -2021,6 +2022,21 @@ function rSkills(){
     "</div>";
   }).join("");
 
+  // Real project entries — not GitHub-only, since Partnr matches across
+  // research, business, impact, and arts/writing tracks too, not just
+  // tech. A link is optional (GitHub repo, Google Doc, video, anything)
+  // since not every project has one worth sharing.
+  var portfolioHTML=S.portfolioItems.map(function(p,i){
+    return "<div class=\"exp-pill\">"+
+      "<div style=\"flex:1;\">"+
+      "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
+      (p.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+esc(p.desc)+"</div>":"")+
+      (p.link?"<a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(p.link)+"</a>":"")+
+      "</div>"+
+      "<button class=\"portfolio-pill-del\" data-pi=\""+i+"\" aria-label=\"Remove this project\"><i class=\"ti ti-x\"></i></button>"+
+    "</div>";
+  }).join("");
+
   R(logo()+sb(3)+
     "<h2>Your skills</h2>"+
     "<div class=\"sub\">Select specific skills, courses, and tools you know. The more specific, the better your matches.</div>"+
@@ -2054,6 +2070,17 @@ function rSkills(){
         "<input id=\"award-inp\" placeholder=\"e.g. 1st place regional science fair 2024\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
         "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
       "</div>"+
+      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 4px;\">Portfolio</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Add a few real projects — a paper, a pitch deck, a repo, a video. Visible to other students, since this is what actually gets you matched.</div>"+
+      "<div id=\"portfolio-list\">"+portfolioHTML+"</div>"+
+      (S.portfolioItems.length<6?
+        "<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
+          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-title\">Project title</label><input id=\"port-title\" placeholder=\"e.g. ISEF Project: Microplastics in Groundwater\"/></div>"+
+          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-desc\">Description <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><textarea id=\"port-desc\" style=\"height:60px;\" placeholder=\"What is it, and what did you do?\"></textarea></div>"+
+          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-link\">Link <span style=\"font-weight:400;color:#6b6b6b;\">(optional — GitHub, a doc, a video, anything)</span></label><input id=\"port-link\" placeholder=\"https://...\"/></div>"+
+          "<button id=\"port-add\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add project</button>"+
+        "</div>"
+        : "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\">Maximum 6 projects reached.</div>")+
     "</div>"+
     "<button class=\"bp\" id=\"s4\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
@@ -2155,6 +2182,27 @@ function rSkills(){
   document.getElementById("award-inp").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("award-add").click();}});
   document.querySelectorAll("[data-ai]").forEach(function(b){
     b.addEventListener("click",function(){S.awards.splice(parseInt(this.dataset.ai),1);rSkills();});
+  });
+
+  var portAddBtn=document.getElementById("port-add");
+  if(portAddBtn){
+    portAddBtn.addEventListener("click",function(){
+      var t=document.getElementById("port-title").value.trim();
+      if(!t)return;
+      var link=document.getElementById("port-link").value.trim();
+      if(link&&!/^https?:\/\//i.test(link)){
+        showErr("port-link","Links must start with http:// or https://");
+        scrollToFirstErr();
+        return;
+      }
+      S.portfolioItems.push({title:t,desc:document.getElementById("port-desc").value.trim(),link:link});
+      rSkills();
+    });
+    var portTitleEl=document.getElementById("port-title");
+    if(portTitleEl)portTitleEl.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();portAddBtn.click();}});
+  }
+  document.querySelectorAll(".portfolio-pill-del").forEach(function(b){
+    b.addEventListener("click",function(){S.portfolioItems.splice(parseInt(this.dataset.pi),1);rSkills();});
   });
 
   document.getElementById("s4").addEventListener("click",step4);
@@ -3806,6 +3854,10 @@ function meTab(){
   var awdHTML=S.awards.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+
     S.awards.map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;\"></i>"+esc(a)+"</div>";}).join(""):"";
   var neededHTML=S.skillsNeeded?"<div class=\"slabel\" style=\"margin-top:1rem;\">Looking for</div><div style=\"font-size:13px;color:#666;line-height:1.5;\">"+esc(S.skillsNeeded)+"</div>":"";
+  var portfolioViewHTML=S.portfolioItems.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Portfolio</div>"+
+    S.portfolioItems.map(function(p){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+(p.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(p.desc)+"</div>":"")+
+    (p.link?"<a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(p.link)+"</a>":"")+
+    "</div>";}).join(""):"";
   return "<div class=\"card\">"+
     "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
@@ -3827,7 +3879,7 @@ function meTab(){
     "</div>"+
     "<div class=\"tags\">"+tags+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
-    expHTML+awdHTML+neededHTML+
+    expHTML+awdHTML+portfolioViewHTML+neededHTML+
   "</div>"+
   // Edit Profile button
   "<button class=\"bp\" id=\"edit-profile-btn\" style=\"margin-bottom:8px;\">Edit profile</button>"+
@@ -4440,6 +4492,14 @@ function renderSR(results,skill,isDemo){
     var cm=CM[r.avatarColor]||CM.purple;var t=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
     var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().indexOf(k)>=0;})||"exploring";
     var others=(r.otherSkills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
+    var portfolioLine=(r.portfolioItems&&r.portfolioItems.length)?
+      "<div style=\"margin-bottom:8px;\">"+
+        r.portfolioItems.slice(0,2).map(function(p){
+          return "<div style=\"font-size:12px;color:#444;margin-bottom:2px;\"><i class=\"ti ti-briefcase\" style=\"font-size:11px;color:#7F77DD;vertical-align:-1px;margin-right:3px;\"></i>"+esc(p.title)+
+            (p.link?" <a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;text-decoration:none;\">↗</a>":"")+
+          "</div>";
+        }).join("")+
+      "</div>":"";
     h+="<div class=\"card\" style=\"display:flex;gap:12px;align-items:flex-start;\">"+
       "<div class=\"av\" style=\"width:42px;height:42px;font-size:13px;background:"+cm.bg+";color:"+cm.c+";flex-shrink:0;\">"+r.avatar+"</div>"+
       "<div style=\"flex:1;min-width:0;\">"+
@@ -4455,6 +4515,7 @@ function renderSR(results,skill,isDemo){
           "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+ro.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+ro.n+"</span>"+
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "</div>"+
+        portfolioLine+
         "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId||"")+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
           (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
@@ -4549,7 +4610,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],skillsNeeded:""};
+  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],portfolioItems:[],skillsNeeded:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
   signOutUser().catch(function(){});
