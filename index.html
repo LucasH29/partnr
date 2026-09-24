@@ -121,6 +121,30 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
   var SUPABASE_URL="https://dlbspwpxiavxpwvohamx.supabase.co";
   var SUPABASE_KEY="sb_publishable_CElTyYebKKkTIk4nrZBveQ_q0X9_D0b";
   var sba=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+  // Real, independently-verified deadline data lives in Supabase now, not
+  // in this file. Keyed by competition name (must match COMPS' "n" field
+  // exactly). Kicked off immediately so it's very likely already loaded
+  // by the time anyone actually browses competitions.
+  var DEADLINE_DATA={};
+  var DEADLINE_DATA_LOADED=false;
+  async function loadDeadlineData(){
+    try{
+      var res=await sba.from("competition_deadlines")
+        .select("competition_name,deadline_date,cycle_end_date,typical_reopen_period,status");
+      if(res.error){DEADLINE_DATA_LOADED=true;return;}
+      (res.data||[]).forEach(function(row){
+        DEADLINE_DATA[row.competition_name]=row;
+      });
+      DEADLINE_DATA_LOADED=true;
+      // If the person is already looking at a screen that shows deadline
+      // info, refresh it now that real data has arrived.
+      if(typeof CURRENT_TAB!=="undefined"&&typeof showTab==="function"){
+        try{showTab(CURRENT_TAB);}catch(ex){}
+      }
+    }catch(ex){DEADLINE_DATA_LOADED=true;}
+  }
+  loadDeadlineData();
 </script>
 </head>
 <body>
@@ -1067,6 +1091,7 @@ var CM2={
   tech:{n:"Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
   writing:{n:"Writing",c:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
   arts:{n:"Arts",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
+  law:{n:"Law",c:"#7A2942",bg:"#F5E7EC",tc:"#5C1F32"},
   custom:{n:"Custom",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"}
 };
 
@@ -1112,23 +1137,64 @@ function getStageChip(stage){
 // so plainly rather than showing a stale date as if it were still current —
 // matches the honest-by-default approach used everywhere else in Partnr.
 var MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-function deadlineStatus(mmdd){
-  if(!mmdd)return null;
-  var parts=mmdd.split("-");
-  var m=parseInt(parts[0],10),d=parseInt(parts[1],10);
-  var now=new Date();
-  var thisYear=new Date(now.getFullYear(),m-1,d);
-  var passed=now>thisYear;
-  var label=MONTH_NAMES[m-1]+" "+d;
-  return {label:label,passed:passed};
+// Parse a "YYYY-MM-DD" string into a Date at local midnight.
+function parseISODate(iso){
+  var p=iso.split("-");
+  return new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10));
 }
-function deadlineChipHtml(mmdd){
-  var s=deadlineStatus(mmdd);
-  if(!s)return "";
-  if(s.passed){
-    return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#F1EFE8;color:#8a8a86;\"><i class=\"ti ti-clock-x\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Deadline passed — next date not yet announced</span>";
+function formatISODate(iso,includeYear){
+  var p=iso.split("-");
+  var m=MONTH_NAMES[parseInt(p[1],10)-1];
+  var d=parseInt(p[2],10);
+  return includeYear?m+" "+d+" "+p[0]:m+" "+d;
+}
+function daysUntilISODate(iso){
+  var now=new Date();now.setHours(0,0,0,0);
+  var target=parseISODate(iso);
+  return Math.round((target-now)/(1000*60*60*24));
+}
+
+// Every deadline chip and the Deadlines calendar both read from real,
+// independently-verified data in Supabase (competition_deadlines),
+// looked up by competition name - never a local estimate or rollover.
+// Four possible states, matching exactly what the backend verified:
+//  - confirmed: entry is open, deadline_date is a real upcoming date
+//  - cycle_active: entry closed, but the competition is still running -
+//    show cycle_end_date instead of a deadline
+//  - not_yet_announced: nothing confirmed yet; show the honest observed
+//    pattern (typical_reopen_period) only if one was actually found
+//  - uncertain: show nothing at all
+function deadlineChipHtml(compName){
+  var d=DEADLINE_DATA[compName];
+  if(!d)return "";
+  if(d.status==="confirmed"&&d.deadline_date){
+    return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B;\"><i class=\"ti ti-clock\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Deadline ~"+formatISODate(d.deadline_date)+"</span>";
   }
-  return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B;\"><i class=\"ti ti-clock\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Deadline ~"+s.label+"</span>";
+  if(d.status==="cycle_active"&&d.cycle_end_date){
+    return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11;\"><i class=\"ti ti-refresh\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>Running through "+formatISODate(d.cycle_end_date,true)+"</span>";
+  }
+  if(d.status==="not_yet_announced"&&d.typical_reopen_period){
+    return "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#F1EFE8;color:#6b6b6b;\"><i class=\"ti ti-calendar\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+esc(d.typical_reopen_period)+"</span>";
+  }
+  return "";
+}
+
+// Shared list order everywhere competitions are browsed: most
+// nationally/internationally recognized first (tier), then within a tier
+// the ones with a real confirmed deadline surface before the ones we
+// haven't verified an upcoming date for (soonest first), then alphabetical
+// as the final, honest tiebreak.
+function compareComps(a,b){
+  if(a.tier!==b.tier)return a.tier-b.tier;
+  var da=DEADLINE_DATA[a.n],db=DEADLINE_DATA[b.n];
+  var aHas=(da&&da.status==="confirmed"&&da.deadline_date)?1:0;
+  var bHas=(db&&db.status==="confirmed"&&db.deadline_date)?1:0;
+  if(aHas!==bHas)return bHas-aHas;
+  if(aHas&&bHas){
+    var diff=daysUntilISODate(da.deadline_date)-daysUntilISODate(db.deadline_date);
+    if(diff!==0)return diff;
+  }
+  return a.n.localeCompare(b.n);
 }
 
 var COUNTRIES=["","Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia","Botswana","Brazil","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (DRC)","Congo (Republic)","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Eswatini","Estonia","Ethiopia","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala","Guinea","Guinea-Bissau","Haiti","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kosovo","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lesotho","Liberia","Libya","Lithuania","Luxembourg","Macau","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritania","Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palestine","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
@@ -1137,15 +1203,15 @@ var COMPS=[
   {n:"Regeneron ISEF",cat:"science",team:"Up to 3 students",eli:"Global",tier:1,cross:true,desc:"World's largest pre-college science competition - $75k top prize",why:"Need a lab partner, data analyst, or research writer from any school",url:"https://www.societyforscience.org/isef/"},
   {n:"iGEM Synthetic Biology",cat:"science",team:"Teams of 3-6",eli:"Global",tier:1,cross:true,desc:"International synthetic biology competition - Giant Jamboree",why:"Teams routinely cross schools and countries - biology, coding, and design needed",url:"https://igem.org/"},
   {n:"Science Olympiad",cat:"science",team:"Teams of 15",eli:"US + intl",tier:2,cross:false,desc:"Team-based science and engineering events - same school required",why:"Find teammates at your own school across 23 science events",url:"https://www.soinc.org/"},
-  {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,cross:true,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-school teams welcome - science, business, and design skills all needed",url:"https://www.conradchallenge.org/",deadline:"10-30"},
-  {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,cross:"prep",desc:"Most prestigious US science competition - individual entry, prep with a peer first",why:"Find a thinking partner from any school to sharpen your research",url:"https://www.societyforscience.org/sts/",deadline:"11-07"},
-  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/",deadline:"09-20"},
+  {n:"Conrad Challenge",cat:"science",team:"2-5 students",eli:"Global",tier:2,cross:true,desc:"Innovation challenge - aerospace, health, energy, cyber",why:"Cross-school teams welcome - science, business, and design skills all needed",url:"https://www.conradchallenge.org/"},
+  {n:"Regeneron STS Prep",cat:"science",team:"Prep partner",eli:"US 12th grade",tier:1,cross:"prep",desc:"Most prestigious US science competition - individual entry, prep with a peer first",why:"Find a thinking partner from any school to sharpen your research",url:"https://www.societyforscience.org/sts/"},
+  {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/"},
   {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,cross:true,desc:"Annual Princeton team math competition",why:"Cross-school teams allowed - team round requires coordinated problem solving",url:"https://pumac.princeton.edu/"},
   {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,cross:true,desc:"International math modeling contest",why:"Cross-school teams allowed - needs math and research writing",url:"https://www.comap.com/highschool/contests/himcm/"},
   {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
   {n:"DECA ICDC",cat:"business",team:"Same-school chapter",eli:"Global",tier:2,cross:false,desc:"International business and marketing - 230k+ students - chapter based",why:"Same-school chapter required - find teammates at your school",url:"https://www.deca.org/"},
-  {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design",url:"https://blueoceancompetition.org/",deadline:"02-22"},
-  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,cross:true,desc:"University of Delaware - business and social innovation tracks",why:"Cross-school teams allowed - ideal pairing is Vision/CEO with Tech/CTO",url:"https://diamondchallenge.org/",deadline:"01-15"},
+  {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design",url:"https://blueoceancompetition.org/"},
+  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,cross:true,desc:"University of Delaware - business and social innovation tracks",why:"Cross-school teams allowed - ideal pairing is Vision/CEO with Tech/CTO",url:"https://diamondchallenge.org/"},
   {n:"FBLA Competitive Events",cat:"business",team:"Same-school chapter",eli:"US + intl chapters",tier:2,cross:false,desc:"Future Business Leaders - chapter based, same school required",why:"Same school required - find teammates at your school",url:"https://www.fbla.org/"},
   {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,cross:true,desc:"Free global investment strategy competition - 6,000+ students",why:"Cross-school teams welcome - needs finance, research, and presentation",url:"https://globalyouth.wharton.upenn.edu/investment-competition/"},
   {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Cross-school teams allowed - social enterprise needs business and research",url:"https://sageglobal.org/"},
@@ -1174,42 +1240,217 @@ var COMPS=[
   {n:"Modeling the Future Challenge",cat:"math",team:"Teams with a teacher/mentor",eli:"US high schoolers",tier:2,cross:false,desc:"Actuarial-style data modeling challenge - analyze risk and build predictive models",why:"Same school/club team required - needs math, data analysis, and clear reporting",url:"https://www.mtfchallenge.org/"},
   {n:"Build the Moon Challenge",cat:"science",team:"Teams with a coach",eli:"Global, middle + high school",tier:2,cross:true,desc:"Design and test lunar habitat structures using simulated lunar concrete",why:"Cross-school teams allowed - needs materials science and structural design",url:"https://btmc.competitionsciences.org/challenge-overview/"},
   {n:"UW Math Olympiad",cat:"math",team:"Individual",eli:"Grades 6-10, Seattle area",tier:3,cross:false,desc:"Local problem-solving competition testing both math ability and oral explanation skills",why:"Local competition - find a fellow student nearby to prep with",url:"https://sites.math.washington.edu/~mathcircle/olympiad/"},
+  {n:"National High School Mock Trial Championship",cat:"law",team:"State/regional champion teams",eli:"Culmination event - qualify via your state championship first",tier:1,cross:false,desc:"The national finals of mock trial - simulated courtroom litigation before real judges and attorneys",why:"This is the national finals - Partnr can't get you here directly. Start a mock trial team at your school (see California Mock Trial below) and aim for this.",url:"https://www.nationalmocktrial.org/"},
+  {n:"HSMCA National Championship",cat:"law",team:"Teams",eli:"Open to all high schoolers via online qualifiers",tier:1,cross:false,desc:"Appellate-level oral advocacy competition - argue constitutional law before simulated judges",why:"Same-school team required - needs strong public speaking and legal reasoning",url:"https://hsmca.org/"},
+  {n:"National Association of Moot Court (NAMC) Circuit",cat:"law",team:"Teams, Beginner division available",eli:"High schoolers, various regional sites",tier:2,cross:true,desc:"Appellate advocacy circuit with a dedicated Beginner division for new competitors",why:"Cross-school teams welcome in the Beginner division - needs legal writing and public speaking",url:"https://www.namcmootcourt.org/"},
+  {n:"California Mock Trial (Teach Democracy)",cat:"law",team:"Teams, 8+ students with a teacher sponsor",eli:"California high schoolers - no prior experience needed",tier:3,cross:false,desc:"The real starting point for mock trial in California - a teacher sponsor and 8 students is all it takes to start a team",why:"Same-school team required - this is how you actually start, no qualification needed",url:""},
+  {n:"We the People: The Citizen and the Constitution",cat:"law",team:"Teams, via state qualifiers",eli:"US high schoolers",tier:1,cross:false,desc:"Simulated congressional hearings testifying on constitutional principles",why:"This is a year-round school program, not a direct-entry competition - ask your school if a team exists or could be started",url:"https://www.civiced.org/we-the-people/national-competitions/documentaries"},
+  {n:"Ninth Circuit Civics Contest",cat:"law",team:"Individual",eli:"Grades 9-12, western US only",tier:3,cross:true,desc:"Essay or video analyzing a constitutional right's importance then and now",why:"Individual entry - find a peer from any school for feedback",url:"https://www.ca9.uscourts.gov/civicscontest/"},
+  {n:"Columbia Undergraduate Law Review High School Essay Contest",cat:"law",team:"Prep partner",eli:"Global high schoolers",tier:2,cross:"prep",desc:"Legal essay contest on law, society, and government power, judged by an Ivy League review",why:"Individual entry - find a peer from any school for feedback",url:"https://www.culawreview.org/high-school-essay-contest"},
+  {n:"Minds Underground Law Essay Competition",cat:"law",team:"Prep partner",eli:"Global, mainly ages 16-17",tier:2,cross:"prep",desc:"International legal essay competition on justice, equality, and the rule of law",why:"Individual entry - find a peer from any school for feedback",url:"https://www.mindsunderground.com/law-competition"},
+  {n:"Law Day Writing Contest (Essex County, NJ)",cat:"law",team:"Individual",eli:"Essex Vicinage, NJ schools only",tier:3,cross:false,desc:"Local essay and poetry contest on the rule of law, judged by the Essex County courts",why:"Local competition - find a fellow writer nearby",url:"https://www.njcourts.gov/courts/vicinages/essex/essex-law-day"},
+  {n:"Federal Bar Association Civics Essay Contest",cat:"law",team:"Prep partner",eli:"US, grades 9-12",tier:2,cross:"prep",desc:"National civics essay contest on constitutional questions and current court cases",why:"Individual entry - find a peer from any school for feedback",url:"https://www.fedbar.org/about-us/outreach/civics-essay-contest/"},
+  {n:"International Public Policy Forum",cat:"law",team:"Teams of 3+",eli:"Global, grades 9-12",tier:1,cross:true,desc:"Global policy debate combining a written qualifying essay with live oral rounds",why:"Cross-school teams welcome - needs persuasive writing and debate skills",url:"https://www.ippfdebate.com/"},
+  {n:"National High School Ethics Bowl",cat:"law",team:"Teams",eli:"Registered school teams",tier:2,cross:false,desc:"Collaborative ethics competition analyzing real moral dilemmas, judged on reasoning not debate wins",why:"Same-school team required - needs thoughtful discussion and ethical reasoning",url:"https://nhseb.org/"},
+  {n:"Empire Mock Trial Invitational (NY)",cat:"law",team:"Teams",eli:"US, grades 9-12",tier:2,cross:false,desc:"Elite international mock trial invitational, often called the 'World Championship' of mock trial",why:"Same-school team required - needs a full litigation team",url:"https://empiremocktrial.org/"},
+  {n:"Character.org Laws of Life Essay Contest",cat:"law",team:"Prep partner",eli:"Grades 4-12 worldwide",tier:2,cross:"prep",desc:"Personal essay on a core value and why it matters to you, judged globally",why:"Individual entry - find a peer from any school for feedback",url:"https://character.org/"},
+  {n:"National Speech and Debate Association (NSDA) Nationals",cat:"law",team:"Individual or team, by event",eli:"Qualify via NSDA district tournaments",tier:1,cross:true,desc:"The largest academic speech and debate tournament in the world, across many event formats",why:"This is a year-round school program, not a direct-entry competition - ask your school's speech & debate team, or find a partner to prep for open tournaments like Harvard's Novice division",url:"https://www.speechanddebate.org/competition-events/"},
+  {n:"Harvard Invitational",cat:"law",team:"Individual or team, by event",eli:"Varsity, JV, and Novice divisions",tier:1,cross:true,desc:"Prestigious national debate and speech tournament held at Harvard over Presidents' Day weekend",why:"Cross-school prep welcome - Novice division makes this accessible to newcomers",url:"https://www.tabroom.com/index/tourn/index.mhtml?tourn_id=31548"},
   {n:"Rube Goldberg Machine Contest",cat:"tech",team:"Teams of 1-15 with a coach",eli:"Global, middle + high school",tier:2,cross:true,desc:"Design a needlessly complex machine to perform a simple task, judged on creativity and function",why:"Cross-school teams allowed - needs mechanical design and a lot of patience",url:"https://www.rubegoldberg.org/rube-goldberg-contests/the-rube-goldberg-machine-contest/"},
   {n:"Destination Imagination",cat:"tech",team:"Teams of 2-7 with a manager",eli:"Global, elementary through high school",tier:2,cross:false,desc:"Open-ended creative problem-solving across engineering, technical design, and improv challenges",why:"Same team required - needs a genuine mix of builders, designers, and quick thinkers",url:"https://www.destinationimagination.org/challenge-experience/"},
-  {n:"Davidson Fellows Scholarship",cat:"science",team:"Individual or 2-person team",eli:"US, age 18 and under",tier:1,cross:"prep",desc:"Scholarships of $25k-$100k for a completed, graduate-level piece of original work in STEM, literature, music, or philosophy",why:"Individual entry - find a peer working on an equally ambitious independent project",url:"https://www.davidsongifted.org/gifted-programs/fellows-scholarship/",deadline:"02-15"},
+  {n:"JPL Invention Challenge",cat:"tech",team:"Teams of ~9 with chaperones",eli:"Southern California middle + high school",tier:3,cross:false,desc:"Build a themed device to solve JPL's annual engineering puzzle - a Southern California tradition since 1998",why:"Local competition - find a fellow builder nearby to design and test with",url:"https://www.jpl.nasa.gov/edu/events/"},
+  {n:"Wharton High School Data Science Competition",cat:"math",team:"Teams of 3-5, same school",eli:"Global, ages 14-18",tier:1,cross:false,desc:"Analyze simulated sports data and build predictive models, judged live via Zoom by Wharton",why:"Same-school team required - needs statistics, regression, and data visualization",url:"https://wsb.wharton.upenn.edu/wharton-data-competition/"},
+  {n:"World Robot Olympiad (WRO)",cat:"tech",team:"Teams of 2-3 with a coach",eli:"Global, ages 8-19 (up to 22 for Future Engineers)",tier:1,cross:false,subcat:"robotics",desc:"International robotics competition across four categories, from autonomous missions to self-driving vehicles",why:"Same-team required - needs a mix of hardware and programming skills",url:"https://wro-association.org/"},
+  {n:"National Robotics Challenge",cat:"tech",team:"Teams of 2-3 with a coach",eli:"Grades 6 through graduate school",tier:2,cross:false,subcat:"robotics",desc:"Open-platform robotics competition with 12 categories, from combat robots to autonomous vehicles",why:"Same team required - needs hands-on building and programming across a chosen category",url:"https://www.thenrc.org/"},
+  {n:"BEST Robotics Design Contest",cat:"tech",team:"Team",eli:"Middle + high school",tier:2,cross:false,subcat:"robotics",desc:"Free robotics competition building from a fixed kit, judged on notebook, marketing, and match performance",why:"Same team required - needs builders, a documentarian, and a presenter",url:"https://bestrobotics.org/"},
+  {n:"Botball Educational Robotics Program",cat:"tech",team:"Team",eli:"Middle + high school",tier:2,cross:false,subcat:"robotics",desc:"NASA-supported program building fully autonomous robots over a 7-week build period",why:"Same team required - needs autonomous programming and mechanical design",url:"https://robotics.nasa.gov/botball-robotics/"},
+  {n:"Zero Robotics High School Tournament",cat:"tech",team:"Team",eli:"High schoolers",tier:1,cross:false,subcat:"robotics",desc:"Write code that runs on NASA's real Astrobee robots aboard the International Space Station",why:"Same team required - needs strong programming, no hardware needed",url:"https://zerorobotics.mit.edu/tournaments/44/"},
+  {n:"RoboGames Junior League",cat:"tech",team:"Individual or team",eli:"High schoolers under 18",tier:2,cross:true,subcat:"robotics",desc:"Guinness-recognized largest robot competition, 50+ events from combat bots to humanoids",why:"Cross-school teams welcome - bring your own robot to whichever events you choose",url:"https://robogames.net/index.php"},
+  {n:"MATE ROV Competition",cat:"tech",team:"Team",eli:"High schoolers",tier:2,cross:false,subcat:"robotics",desc:"Build an underwater remotely-operated vehicle for real ocean science and engineering missions",why:"Same team required - needs mechanical, electrical, and mission-planning skills",url:"https://materovcompetition.org/"},
+  {n:"RoboRAVE International",cat:"tech",team:"Team",eli:"Middle + high school",tier:2,cross:false,subcat:"robotics",desc:"Open-platform robotics events like line-following, firefighting, and sumo - no qualifying rounds needed",why:"Same team required - choose whichever challenge events fit your robot",url:"https://roboraveinternational.org/"},
+  {n:"Robotics for Good Youth Challenge",cat:"tech",team:"Team",eli:"Under 18, Junior + Senior divisions",tier:2,cross:false,subcat:"robotics",desc:"Free international competition designing robots to address a global challenge, using open-source and recycled materials",why:"Same team required - needs hands-on building with a real social-impact angle",url:"https://aiforgood.itu.int/robotics-for-good-youth-challenge/"},
+  {n:"RoboCup Junior",cat:"tech",team:"Team",eli:"Ages 14-19",tier:1,cross:false,subcat:"robotics",desc:"International autonomous robotics competition spanning soccer, rescue, and service-robot challenges",why:"Same team required - needs sensors, algorithms, and real testing under match conditions",url:"https://www.robocup.org/"},
+  {n:"Harvard Student Agencies Case Competition",cat:"business",team:"Individual, no teams required",eli:"Global high schoolers",tier:2,cross:true,desc:"Solve a live real-world business case each year, judged by McKinsey, VC-backed founders, and Ivy League panels",why:"Individual entry - find a peer from any school to work through the case with",url:"https://highschoolcasecomp.org"},
+  {n:"Ithaca College High School Investment Competition",cat:"business",team:"Team",eli:"High schoolers",tier:2,cross:false,desc:"Manage a $1M virtual portfolio under real market conditions, capped trades reward deliberate strategy",why:"Same team required - needs coordinated trading decisions and risk management",url:"https://www.ithaca.edu/academics/school-business/high-school-investment-competition"},
+  {n:"Global Stock Pitch Competition",cat:"business",team:"Team",eli:"US + international high schoolers",tier:1,cross:false,desc:"Full equity research pitch on a real public company, judged up to a Global Youth Investment Summit in NYC",why:"Same team required - needs financial analysis, writing, and presenting",url:"https://yis.org/programs/stock-pitch-competition/"},
+  {n:"Stevens Trading Day",cat:"business",team:"Team",eli:"High school sophomores and juniors only",tier:2,cross:false,desc:"Virtual trading simulation, with finalists trading live on real Bloomberg Terminals at Stevens Institute",why:"Same team required - needs fast decision-making under live market pressure",url:"https://www.stevens.edu/school-business-high-school-programs-trading-day"},
+  {n:"Top Trader Stock Market Competition",cat:"business",team:"Team",eli:"US, rising grades 9-12 (requires SSN)",tier:2,cross:false,desc:"Short-term active trading competition managing a $1M virtual portfolio",why:"Same team required - needs momentum trading and timing decisions",url:"https://jindal.utdallas.edu/top-trader-2/"},
+  {n:"Capitol Hill Challenge",cat:"business",team:"Team",eli:"Public middle/high school teams",tier:2,cross:false,desc:"Manage a $100K simulated portfolio on the Stock Market Game platform, run by the SIFMA Foundation",why:"Same team required - needs asset allocation and ongoing strategy adjustment",url:"https://www.stockmarketgame.org/capitol-hill-challenge.html"},
+  {n:"National JA Stock Market Challenge",cat:"business",team:"Team",eli:"Must first complete your local JA Stock Market Challenge and curriculum",tier:1,cross:false,desc:"Real-time rapid trading finals in Boston, for teams that advance from local Junior Achievement chapters",why:"This is the national final - join your local JA chapter's Stock Market Challenge first to qualify",url:"https://jausa.ja.org/events/opportunity/national-ja-stock-market-challenge"},
+  {n:"KSU High School Investment Competition",cat:"business",team:"Team",eli:"High schoolers",tier:2,cross:false,desc:"Invest $1M in a virtual market via StockTrak, judged on both returns and written strategy",why:"Same team required - needs trading decisions plus a documented investment thesis",url:"https://cba.k-state.edu/academics/departments/finance/hs-investment-management.html"},
+  {n:"Ascend Berkeley Stock Pitch Competition",cat:"business",team:"Team",eli:"High schoolers",tier:2,cross:false,desc:"Equity research competition building and defending a full investment thesis on a real company",why:"Same team required - needs financial analysis and presentation skills",url:"https://www.algoed.co/competitions/ascend-berkeley-stock-pitch-competition"},
+  {n:"Wall Street South Stock Pitch Competition",cat:"business",team:"Team",eli:"Palm Beach County, FL high schoolers only",tier:3,cross:false,desc:"Live stock pitch competition presenting directly to real finance executives",why:"Local competition - find a fellow analyst nearby to build your pitch with",url:"https://pbcedu.org/wall-street-south-stock-pitch-competition-brings-regions-top-students-face-to-face-with-finance-leaders/"},
+  {n:"Bentley University Summer Stock Market Challenge",cat:"business",team:"Individual",eli:"High schoolers",tier:2,cross:true,desc:"Short summer trading simulation with a $50K virtual portfolio and a live leaderboard",why:"Individual entry - find a peer from any school to compare strategies with",url:"https://www.bentley.edu/undergraduate/summer-stock-market-challenge"},
+  {n:"TCU High School Investor Challenge",cat:"business",team:"Individual, selected cohort of 50",eli:"High schoolers entering senior year",tier:2,cross:true,desc:"5-day training on securities analysis followed by 8 months managing a real $100K virtual portfolio",why:"Individual entry - find a peer from any school to study alongside",url:"https://www.neeley.tcu.edu/Centers/LKCM-Center-for-Financial-Studies/High-School-Investor-Challenge"},
+  {n:"Wolves of Wall Street Competition",cat:"business",team:"Individual",eli:"Grades 8-12",tier:2,cross:true,desc:"12-week portfolio competition with live coaching sessions and a final pitch defense",why:"Individual entry - find a peer from any school to trade alongside",url:"https://www.learnwithleaders.com/competitions/the-wolves-of-wall-street-competition-page/"},
+  {n:"National Personal Finance Challenge",cat:"business",team:"Team",eli:"High schoolers",tier:1,cross:false,desc:"Multi-round personal finance competition building a full financial plan for a fictional family",why:"Same team required - needs strong personal finance and quiz bowl-style knowledge",url:"https://www.councilforeconed.org/programs/for-students/national-personal-finance-challenge/"},
+  {n:"Global Youth Entrepreneurship Challenge (GYEC)",cat:"business",team:"Teams of 3-8",eli:"Global, ages 14-18",tier:2,cross:true,desc:"12-hour sprint building a science-grounded business solution to a global issue, announced day-of",why:"Cross-school teams welcome - needs fast collaborative ideation under a strict time limit",url:"https://entreplanet.org/GYEC/"},
+  {n:"BPA Virtual Competitions & NLC",cat:"business",team:"Individual or team, BPA members",eli:"High schoolers, no qualifying rounds needed",tier:2,cross:false,desc:"Business Professionals of America's direct-entry virtual events, including a financial portfolio challenge",why:"Same-chapter team required - needs financial reporting and case analysis skills",url:"https://bpa.org/students/compete/virtual-competitions-and-nlc-national-showcase/"},
+  {n:"Bank of America Financial Skills Challenge",cat:"business",team:"Individual",eli:"Middle school, high school, and college students",tier:2,cross:true,desc:"6-hour gamified financial literacy simulation covering budgeting, credit, and real-life expenses",why:"Individual entry - find a peer from any school to compare strategies with",url:"https://www.financialskillschallenge.com/"},
+  {n:"SIU Annual Accounting Challenge",cat:"business",team:"Team of 4",eli:"Carbondale, IL area high schoolers",tier:3,cross:false,desc:"Written accounting exam plus a team-building competition, hosted by Southern Illinois University",why:"Local competition - find a fellow student nearby to prep for the exam with",url:"https://soa.siu.edu/challenge/index.php"},
+  {n:"Arizona Personal Finance Case Study",cat:"business",team:"Team of 3-4",eli:"Arizona high schoolers who've completed an economics course",tier:3,cross:false,desc:"State qualifying round for the National Personal Finance Challenge - analyze a fictional family's finances",why:"Local competition - find teammates nearby to build your case presentation with",url:"https://azecon.org/student-program/personal-finance-case-study/"},
+  {n:"International Finance Olympiad",cat:"business",team:"Individual or team",eli:"Global secondary school students",tier:1,cross:"prep",desc:"Global finance and economics olympiad - a proctored exam followed by a case-based international final",why:"Individual national-level entry - find a peer from any school to prep with",url:"https://www.finance-olympiad.com/"},
+  {n:"Minnesota Personal Finance Challenge",cat:"business",team:"Team of 3-4",eli:"Minnesota high schoolers",tier:3,cross:false,desc:"State qualifying round for the National Personal Finance Challenge, with a case study and quiz bowl",why:"Local competition - find teammates nearby to prep with",url:"https://www.mcee.umn.edu/programs/competitions/personal-finance-challenge"},
+  {n:"NASA TechRise Student Challenge",cat:"tech",team:"Teams of 6th-12th graders",eli:"US, grades 6-12",tier:1,cross:false,desc:"Propose a science or tech experiment to fly on a NASA-supported flight platform - 60 winning teams get $1,500 to build it",why:"Same team required - needs experimental design and technical writing",url:"https://www.futureengineers.org/nasatechrise"},
+  {n:"Live in a Healthy Space Design Contest",cat:"tech",team:"Individual or team of 2-5",eli:"Ages 12-18",tier:2,cross:true,desc:"Design a component of a space settlement focused on supporting human life, judged toward a conference presentation",why:"Cross-school teams allowed - needs systems thinking and conceptual design",url:"https://nss.org/healthy-space"},
+  {n:"NASA App Development Challenge",cat:"tech",team:"Team of 5+ with a lead teacher",eli:"US, grades 9-12",tier:2,cross:false,subcat:"coding",desc:"Design a software app addressing a real space exploration or navigation problem, presented to NASA",why:"Same team required - needs coding and UI design skills",url:"https://www.nasa.gov/learning-resources/app-development-challenge/"},
+  {n:"NASA Student Launch Challenge",cat:"tech",team:"Team",eli:"US - qualify via a top-25 finish at the American Rocketry Challenge or similar, plus a required workshop",tier:1,cross:false,desc:"Design, build, and launch a high-powered rocket carrying a real scientific payload",why:"This has a real prerequisite - a strong American Rocketry Challenge finish gets you here",url:"https://www.nasa.gov/learning-resources/nasa-student-launch/"},
+  {n:"UAS4STEM International Competition",cat:"tech",team:"Team with an adult mentor",eli:"Ages 11-19",tier:1,cross:false,subcat:"robotics",desc:"Design and fly drones through mission-based tasks, judged toward a championship at AirVenture Oshkosh",why:"Same team required - needs flight strategy and hands-on drone operation",url:"http://amablog.modelaircraft.org"},
+  {n:"NASA Human Exploration Rover Challenge",cat:"tech",team:"Team",eli:"US + international, grades 6-12",tier:1,cross:false,subcat:"robotics",desc:"Design and build a human-powered rover to navigate simulated extraterrestrial terrain",why:"Same team required - needs mechanical design and iterative testing",url:"https://www.nasa.gov/learning-resources/nasa-human-exploration-rover-challenge/"},
+  {n:"UK Youth Rocketry Challenge",cat:"tech",team:"Teams of 3-6, same school",eli:"UK, ages 11-18",tier:2,cross:false,desc:"Build and launch a rocket to defined mission criteria, from regional events to a national final",why:"Same-school team required - needs rocket design and recovery-system testing",url:"http://ukroc.com"},
+  {n:"Aerospace Jam",cat:"tech",team:"Team of 2-10 with a mentor",eli:"Wisconsin high schoolers",tier:3,cross:false,subcat:"robotics",desc:"Free drone-based aerospace robotics competition using mission tasks inspired by real scenarios",why:"Local competition - find a fellow builder nearby to fly with",url:"http://aerospacejam.org"},
+  {n:"CanSat Competition",cat:"tech",team:"Team of 3-6 with a mentor",eli:"ESA member/partner countries, ages 14-19",tier:1,cross:false,desc:"Design and build a satellite the size of a soda can, launched on a real rocket during the final",why:"Same team required - needs electronics, programming, and systems engineering",url:"https://www.esa.int/Education/CanSat/CanSat_2025-2026_Challenge_your_students_to_build_a_can-sized_satellite"},
+  {n:"NASA Lunabotics Junior Competition",cat:"tech",team:"Individual or team",eli:"US, K-12",tier:2,cross:true,subcat:"robotics",desc:"Design a robot to operate in a simulated lunar environment, judged on feasibility and clear explanation",why:"Cross-school teams welcome - needs robotics design and clear technical communication",url:"https://www.nasa.gov/learning-resources/lunabotics-challenge/"},
+  {n:"International Olympiad on Astronomy and Astrophysics (IOAA)",cat:"science",team:"National team",eli:"Under 20 - selected via national Olympiad pipelines",tier:1,cross:false,desc:"Elite astronomy olympiad testing theory, observation, and astrophysics data analysis",why:"This is the national-team level - find a peer from any school to prep for your country's selection process",url:"https://ioaastrophysics.org/current-ioaa/for-participants"},
+  {n:"International Astronomy and Astrophysics Competition (IAAC)",cat:"science",team:"Prep partner",eli:"Global high schoolers",tier:1,cross:"prep",desc:"Multi-round astronomy competition on celestial mechanics and cosmology, open entry with real cash prizes",why:"Individual entry - find a peer from any school to work through rounds with",url:"https://iaac.space/en/"},
+  {n:"International Space Olympiad",cat:"science",team:"Individual",eli:"Grades 5-12, Super Senior category for 11th-12th",tier:2,cross:true,desc:"Quiz-based global astronomy competition across three levels, winners earn a sponsored trip to NASA",why:"Individual entry - find a peer from any school to study alongside",url:"https://internationalspaceolympiad.com/"},
+  {n:"Gerard K. O'Neill Space Settlement Contest",cat:"science",team:"Individual or team of 2-12",eli:"Global, up to grade 12",tier:2,cross:true,desc:"Design a real human settlement in space, addressing gravity, agriculture, and energy systems",why:"Cross-school teams welcome - needs creative design and technical research",url:"https://nss.org/nss-space-settlement-contest/"},
+  {n:"US Invitational Young Physicists Tournament (USIYPT)",cat:"science",team:"Team of 4, same school",eli:"Invitation-based - schools must apply in advance",tier:2,cross:false,desc:"Two-day tournament solving open-ended physics problems through experiment and scientific debate",why:"Same-school team required - needs experimental design and public defense of your reasoning",url:"https://www.usaypt.org/"},
+  {n:"Cosmic Quest Astronomy Competition",cat:"science",team:"Team of 3",eli:"Global high schoolers",tier:2,cross:true,desc:"Two-round astronomy competition ending in a live buzz-format quiz, $111,000+ in prizes",why:"Cross-school teams welcome - needs fast recall and real-time problem-solving",url:"https://soac.club/cosmicquest.html"},
+  {n:"Breakthrough Junior Challenge",cat:"science",team:"Prep partner",eli:"Global, ages 13-18",tier:1,cross:"prep",desc:"Make a 2-minute video explaining a science concept - $250,000 scholarship for the winner",why:"Individual entry - find a peer from any school for feedback on your script and editing",url:"https://breakthroughjuniorchallenge.org/about"},
+  {n:"Genes in Space Competition",cat:"science",team:"Prep partner",eli:"US, ages 13+, grades 7-12",tier:1,cross:"prep",desc:"Propose a real genetics experiment - winners get it actually flown and run aboard the ISS",why:"Individual entry - find a peer from any school for feedback on your proposal",url:"https://www.genesinspace.org/us-contest/"},
+  {n:"Mars Society Mission to Mars Design Competition",cat:"science",team:"Team",eli:"Global, ages 13-19",tier:2,cross:true,desc:"5-week virtual program designing a real crewed Mars mission across science, engineering, and human factors",why:"Cross-school teams welcome - needs research, engineering, and a 25-page design report",url:"https://education.marssociety.org/competition/"},
+  {n:"University of Alabama High School Physics Contest",cat:"science",team:"Team of 4",eli:"Alabama + surrounding states",tier:3,cross:false,desc:"In-person physics contest with a written exam and a fast-paced team ciphering round",why:"Local competition - find teammates nearby to prep with",url:"https://physics.ua.edu/ua-high-school-physics-contest/"},
+  {n:"RoboCap League",cat:"tech",team:"Individual",eli:"Ages 8-16 - a real fit for 9th and 10th graders specifically",tier:2,cross:true,subcat:"robotics",desc:"Skill-based robotics assessment - demonstrate your skills to judges and earn a color-coded proficiency cap",why:"Individual entry - find a peer from any school to build skills alongside as you both work toward the next level",url:"https://www.robocapleague.com/"},
+  {n:"IOAA Junior",cat:"science",team:"National team of 5 + 2 leaders",eli:"Up to age 16 - selected via national Olympiad programs",tier:1,cross:false,desc:"Junior-level international astronomy olympiad - theory exams, observation, and data analysis",why:"National-team level - find a peer from any school to prep for your country's selection process",url:"https://ioaajr2026.ubu.ac.th/"},
+  {n:"NASA Space Place Art Challenge",cat:"arts",team:"Individual",eli:"Students worldwide, broad age range - parent/guardian consent required",tier:2,cross:true,desc:"Monthly space-themed art challenge - create original artwork around NASA's prompt",why:"Individual entry - find a peer from any school for feedback on your piece",url:"https://spaceplace.nasa.gov/art-challenge/en/"},
+  {n:"ASA Statistics Project Competition",cat:"math",team:"Individual or team",eli:"Grades 7-12",tier:2,cross:true,desc:"Design and complete an original statistical research project on a question of your choice",why:"Cross-school pairs allowed - needs data collection, analysis, and a formal written report",url:"https://www.amstat.org/education/asa-statistics-project-competition-for-grades-7-12"},
+  {n:"MathWorks Math Modeling Challenge (M3)",cat:"math",team:"Teams",eli:"US juniors/seniors + UK sixth form",tier:1,cross:false,desc:"14-hour team sprint building a real-world statistical model, run by SIAM and sponsored by MathWorks",why:"Same team required - needs strong math and the ability to work fast under pressure",url:"https://m3challenge.siam.org"},
+  {n:"RIT Data Science Challenge",cat:"math",team:"Teams of 3 with a mentor",eli:"Greater Rochester, NY area",tier:3,cross:false,desc:"Analyze real election data with Ph.D. mentors, using R, Python, or Julia",why:"Local competition - find teammates nearby to split Analyst, Captain, and Storyteller roles",url:"https://www.rit.edu/science/pre-college-competition"},
+  {n:"ISLP International Poster Competition",cat:"math",team:"Individual or team up to 5",eli:"Global high schoolers",tier:2,cross:true,desc:"Create a research poster analyzing real data, judged nationally then internationally",why:"Cross-school teams allowed - needs data analysis and visual communication",url:"https://iase-web.org/islp-competitions"},
+  {n:"TSA Data Science & Analytics",cat:"math",team:"Individual or team",eli:"High schoolers, TSA members",tier:2,cross:false,desc:"Investigate a real issue with data, presented as a poster plus an on-site analysis challenge",why:"Same-chapter team required - needs data visualization and fast statistical interpretation",url:"https://tsaweb.org/competitions/!hs/-in-category/categories/computer-science-and-information-technology"},
+  {n:"NFL Big Data Bowl (Analytics Track)",cat:"math",team:"Individual or team",eli:"Open to all ages with a Kaggle account, not HS-specific - minors need parental consent",tier:1,cross:true,desc:"Analyze real NFL player-tracking data - finalists present at the NFL Scouting Combine",why:"Cross-school teams welcome - be aware you're competing against professionals and grad students too",url:"https://www.kaggle.com/competitions/nfl-big-data-bowl-2026-analytics/overview"},
+  {n:"National Economics Challenge",cat:"business",team:"Individual or team",eli:"US high schoolers",tier:1,cross:false,desc:"Academic competition applying statistics and economic reasoning through regional, state, and national rounds",why:"Same-school team required - needs strong economics and quantitative reasoning",url:"https://www.councilforeconed.org/programs/for-students/national-economic-challenge/"},
+  {n:"Mu Alpha Theta Contests",cat:"math",team:"Individual",eli:"High schoolers",tier:2,cross:"prep",desc:"Timed exam-style math contests covering probability, statistics, and data interpretation",why:"Individual entry - find a peer from any school to practice problem sets with",url:"https://mualphatheta.org/contests"},
+  {n:"Skew The Script AP Data Science Challenge",cat:"math",team:"Individual or team",eli:"US, completed AP Statistics or AP CS",tier:2,cross:true,desc:"Apply statistics and coding to real public policy and social data questions",why:"Cross-school teams welcome - needs AP-level stats or coding background",url:"https://skewthescript.org/data-science-challenge"},
+  {n:"International Mathematical Modeling Challenge (IM\u00b2C)",cat:"math",team:"Teams with a faculty advisor",eli:"Global high schoolers",tier:1,cross:false,desc:"Multi-country team modeling competition tackling large real-world problems with data",why:"Same-school team required - needs strong statistical modeling and technical writing",url:"https://immchallenge.org"},
+  {n:"International Economics Olympiad (IEO)",cat:"business",team:"Prep partner",eli:"Global high schoolers",tier:1,cross:"prep",desc:"Global economics olympiad combining exams and case studies on markets, trade, and policy",why:"Individual national-level entry - find a peer from any school to prep with",url:"https://ieo-official.org"},
+  {n:"Davidson Fellows Scholarship",cat:"science",team:"Individual or 2-person team",eli:"US, age 18 and under",tier:1,cross:"prep",desc:"Scholarships of $25k-$100k for a completed, graduate-level piece of original work in STEM, literature, music, or philosophy",why:"Individual entry - find a peer working on an equally ambitious independent project",url:"https://www.davidsongifted.org/gifted-programs/fellows-scholarship/"},
   {n:"International Olympiad in Informatics (IOI)",cat:"tech",team:"Prep partner",eli:"Global - qualify via national olympiad",tier:1,cross:"prep",desc:"The top algorithmic programming olympiad in the world - national teams of up to 4",why:"Individual entry - find a partner from any school to train on algorithms with",url:"https://ioinformatics.org/",subcat:"coding"},
-  {n:"Stockholm Junior Water Prize",cat:"science",team:"Individual or pair",eli:"Global, ages 15-20",tier:1,cross:true,desc:"International research competition addressing water quality, management, and treatment challenges",why:"Cross-school pairs allowed - needs environmental research and a strong presentation",url:"https://siwi.org/stockholm-junior-water-prize/",deadline:"04-15"},
+  {n:"Stockholm Junior Water Prize",cat:"science",team:"Individual or pair",eli:"Global, ages 15-20",tier:1,cross:true,desc:"International research competition addressing water quality, management, and treatment challenges",why:"Cross-school pairs allowed - needs environmental research and a strong presentation",url:"https://siwi.org/stockholm-junior-water-prize/"},
   {n:"Microsoft Imagine Cup",cat:"tech",team:"Teams up to 4",eli:"Global",tier:1,cross:true,desc:"Global competition to build an MVP using AI and cloud tools that addresses a major world challenge",why:"Cross-school and international teams welcome - needs coding, product thinking, and pitching",url:"https://imaginecup.microsoft.com/",subcat:"coding"},
   {n:"Eugene O'Neill Theater Center Young Playwrights Festival",cat:"arts",team:"Prep partner",eli:"US, ages 12-18",tier:1,cross:"prep",desc:"National playwriting festival - selected scripts get a professional staged reading",why:"Individual entry - find a fellow writer from any school for feedback on your script",url:"https://www.theoneill.org/"},
+  {n:"The Blank Theatre Young Playwrights Festival",cat:"arts",team:"Prep partner",eli:"US, age 19 or younger",tier:1,cross:"prep",desc:"Winning scripts get a full professional production in a Hollywood theatre with working actors",why:"Individual entry - find a fellow writer from any school for feedback on your script",url:"https://www.theblank.com/ypf"},
+  {n:"Princeton University 10-Minute Play Contest",cat:"arts",team:"Prep partner",eli:"US, 11th grade only",tier:2,cross:"prep",desc:"Selective short-play contest judged by Princeton theater faculty",why:"Individual entry - find a fellow writer from any school for feedback on your script",url:"https://arts.princeton.edu/about/opportunities/high-school-contests/ten-minute-play-contest/"},
+  {n:"Mosaic Theater Company High School Playwriting Contest",cat:"arts",team:"Individual",eli:"Washington DC metro area, grades 9-12",tier:3,cross:false,desc:"Winning scripts are developed with real directors and performed by professional actors",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.mosaictheater.org/"},
+  {n:"The Theater Project Young Playwrights Competition",cat:"arts",team:"Individual",eli:"New Jersey residents, ages 13-18",tier:3,cross:false,desc:"Every entrant gets a real mentor meeting with an adult playwright for feedback",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.thetheaterproject.org/young-playwrights-competition"},
+  {n:"Lucille Lortel Theatre NYC Playwriting Fellowship",cat:"arts",team:"Individual",eli:"NYC public high school students",tier:3,cross:false,desc:"Intensive fellowship with mentorship, workshops, and a $500 honorarium",why:"Local competition - find a fellow NYC writer for feedback",url:"https://lortel.org/hspf/"},
+  {n:"Circle Theatre High School Playwriting Project",cat:"arts",team:"Individual",eli:"DFW Metroplex high schoolers",tier:3,cross:false,desc:"Two-round evaluation ending in a professional staged reading for finalists",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.circletheatre.com/hspp"},
+  {n:"Playmakers (Off Center)",cat:"arts",team:"Individual",eli:"Vermont-based writers and creators",tier:3,cross:false,desc:"Open monthly forum to test new short scripts in front of a live audience, no jury or selection process",why:"Local competition - find a fellow writer nearby to workshop with",url:"https://www.offcentervt.com/playmakers.html"},
+  {n:"Trinity Rep Student Playwriting Competition",cat:"arts",team:"Individual",eli:"New England students, grades 9-12",tier:3,cross:false,desc:"Blind-judged short play contest ending in a staged community reading",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.trinityrep.com/education/children-teens/write-here-write-now/"},
+  {n:"Writopia Lab's Worldwide Plays Festival",cat:"arts",team:"Individual",eli:"Requires prior or current enrollment in a Writopia Lab workshop",tier:2,cross:"prep",desc:"Themed short-play festival for Writopia students, staged in New York City",why:"This requires a Writopia workshop first - find a fellow Writopia writer for feedback",url:"https://www.writopialab.org/programs/specialty-programs/worldwide-plays-festival/the-competition"},
+  {n:"Phillips' Mill Play With Words",cat:"arts",team:"Individual",eli:"Within 75 miles of New Hope, PA, ages 12-18",tier:3,cross:false,desc:"Winning scripts performed on a historic stage, first 50 entries get a real critique",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.phillipsmill.org/drama/play-with-words"},
+  {n:"Playwrights for Change Competition",cat:"arts",team:"Individual",eli:"US + Canada, grades 6-12",tier:2,cross:"prep",desc:"National short-play contest on a social-compassion theme, professional feedback for every entrant",why:"Individual entry - find a fellow writer from any school for feedback",url:"https://www.aate.com/playwrights-for-change"},
+  {n:"Young Playwrights in Process (YPiP)",cat:"arts",team:"Individual",eli:"Indiana, grades 6-12",tier:3,cross:false,desc:"Scholarship playwriting competition ending in a live event with professional actors",why:"Local competition - find a fellow writer nearby for feedback",url:"https://www.irtlive.com/learn-and-engage/students-and-teachers/young-playwrights-in-process/"},
+  {n:"picoCTF",cat:"tech",team:"Individual or team",eli:"Open to everyone age 13+",tier:1,cross:true,subcat:"coding",desc:"Carnegie Mellon's gamified capture-the-flag cybersecurity competition - beginner-friendly, ~1M learners worldwide",why:"Cross-school teams welcome - needs cryptography, web exploitation, and forensics skills",url:"https://picoctf.org/"},
+  {n:"BDPA High School Coding Competition",cat:"tech",team:"Team via local chapter",eli:"High schoolers",tier:2,cross:false,subcat:"coding",desc:"Full-lifecycle web development competition run through BDPA's national tech-diversity network",why:"Same-chapter team required - needs database-driven web development skills",url:"https://bdpa.org/highschool-coding-competition/"},
+  {n:"CodeChef High School",cat:"tech",team:"Individual",eli:"Middle + high school, worldwide",tier:2,cross:true,subcat:"coding",desc:"Monthly global competitive programming contest series, aimed at building toward Olympiad-level coding",why:"Individual entry - find a peer from any school to practice with monthly",url:"https://www.codechef.com/school"},
+  {n:"International Computer Science Competition (ICSC)",cat:"tech",team:"Individual",eli:"Middle school, high school, and university students",tier:2,cross:true,subcat:"coding",desc:"Global CS competition emphasizing algorithmic theory and real research-paper analysis",why:"Individual entry - find a peer from any school to prep with",url:"https://icscompetition.org/en/"},
+  {n:"Bebras Computing Challenge",cat:"tech",team:"Individual",eli:"Ages 6-18, six age categories",tier:2,cross:true,subcat:"coding",desc:"School-administered computational thinking puzzles - no coding experience needed",why:"Individual entry - find a peer from any school to solve puzzles alongside",url:"https://www.bebraschallenge.org/index.php"},
+  {n:"Codeforces",cat:"tech",team:"Individual",eli:"Open to everyone, rating-based divisions",tier:1,cross:true,subcat:"coding",desc:"The most active competitive programming platform in the world - Elo-style rating recognized by top recruiters",why:"Individual entry - find a peer from any school to train and compete alongside",url:"https://codeforces.com/"},
+  {n:"TJ Invitational Open In Informatics (TJIOI)",cat:"tech",team:"Team",eli:"High schoolers globally",tier:2,cross:true,subcat:"coding",desc:"In-person + virtual programming contest hosted by TJHSST, spanning USACO Bronze through Platinum difficulty",why:"Cross-school teams welcome (non-TJ teams need an adult sponsor) - needs algorithmic skills",url:"https://activities.tjhsst.edu/tjioi/"},
+  {n:"High School Fed Challenge",cat:"business",team:"Team, one entry per school",eli:"US + DoDEA schools, grades 9-12",tier:1,cross:false,desc:"Federal Reserve-run economics competition - submit a podcast-style research script on an assigned theme",why:"Same-school team required - needs economic research and data analysis",url:"https://www.newyorkfed.org/outreach-and-education/high-school/high-school-fed-challenge"},
+  {n:"Georgetown GJIA High School Essay Contest",cat:"business",team:"Prep partner",eli:"Grades 9-12 + gap year students",tier:2,cross:"prep",desc:"Research essay on business, economics, or global affairs, published through a Georgetown academic journal",why:"Individual entry - find a peer from any school for feedback",url:"https://gjia.georgetown.edu/homepage/high-school-essay-contest/"},
+  {n:"AFSA National High School Essay Contest",cat:"business",team:"Prep partner",eli:"US, grades 9-12",tier:1,cross:"prep",desc:"Foreign policy essay contest with a real Semester at Sea placement and DC trip for first place",why:"Individual entry - find a peer from any school for feedback",url:"https://afsa.org/essay-contest"},
+  {n:"LSESU Economics Society Essay Competition",cat:"business",team:"Prep partner",eli:"Global, penultimate or final year of secondary school",tier:1,cross:"prep",desc:"International economics essay competition on prompts written by LSE faculty",why:"Individual entry - find a peer from any school for feedback",url:"https://lsesueconsoc.org/competitions/"},
+  {n:"Yale Foreign Policy Initiative (YFPI) Essay Contest",cat:"business",team:"Prep partner",eli:"Grades 9-12 or international equivalent",tier:2,cross:"prep",desc:"Foreign policy essay contest judged by Yale students and faculty, published on YFPI's platform",why:"Individual entry - find a peer from any school for feedback",url:"https://www.yaleforeignpolicy.org/high-school-essay-contest"},
+  {n:"Gilder Lehrman David McCullough Essay Prizes",cat:"writing",team:"Prep partner",eli:"Requires attending a Gilder Lehrman Affiliate School",tier:1,cross:"prep",desc:"American history essay prize with an economics-focused track on financial and policy history",why:"This requires your school to be a Gilder Lehrman affiliate - find a peer there for feedback",url:"https://www.gilderlehrman.org/student-opportunities/david-mccullough-essay-prizes"},
+  {n:"Buckley Institute Essay Contest",cat:"writing",team:"Prep partner",eli:"US citizens/permanent residents, grades 9-12",tier:2,cross:"prep",desc:"Political essay contest spanning economics, national policy, and ideology from a conservative lens",why:"Individual entry - find a peer from any school for feedback",url:"https://buckleyinstitute.com/programs/essay-contest/"},
+  {n:"The 1787 Prize",cat:"writing",team:"Team of 1-3",eli:"Grades 11-12 only",tier:2,cross:true,desc:"National constitutional studies essay contest, often touching taxation, commerce, and economic policy",why:"Cross-school teams allowed - needs constitutional analysis and writing",url:"https://www.socialstudies.org/awards/1787-prize"},
+  {n:"Biomimicry Youth Design Challenge",cat:"science",team:"Team",eli:"Grades 9-12, global",tier:2,cross:true,desc:"Design an invention inspired by how nature solves a similar problem, judged toward international recognition",why:"Cross-school teams welcome - needs research, design, and a video pitch",url:"https://www.youthchallenge.biomimicry.org/"},
+  {n:"National Innovator Challenge",cat:"tech",team:"Individual or team of up to 3",eli:"US, grades K-12 (ages 5-19)",tier:2,cross:true,desc:"Invent an app, product, or prototype and pitch it - top entries advance to the Global Innovator Challenge",why:"Cross-school teams welcome - needs a real invention plus a pitch video",url:"https://nationalinnovatorchallenge.org/"},
+  {n:"ASBE Foundation High School Engineering Design Challenge",cat:"tech",team:"Individual",eli:"Grades 9-12 with CAD background",tier:2,cross:"prep",desc:"Design a real industrial product from a professional-style brief, submitted as CAD files and renders",why:"Individual entry - find a peer from any school with CAD skills to work through the brief together",url:"https://www.asbefoundation.org/design-challenge"},
+  {n:"Cooper Hewitt National High School Design Competition",cat:"arts",team:"Individual or team of up to 3",eli:"Grades 9-12, US residents",tier:1,cross:true,desc:"Smithsonian-run design competition judged by real designers and Met Museum curators",why:"Cross-school teams welcome - needs design thinking and technical sketching",url:"https://www.cooperhewitt.org/design-competition/"},
+  {n:"Jacobson Institute BizInnovator Startup Innovator Competition",cat:"business",team:"Individual or small group",eli:"US citizens/residents, high schoolers",tier:2,cross:true,desc:"Pitch a real invention as a startup, judged by professional entrepreneurs for real seed-capital prizes",why:"Cross-school teams welcome - needs a business summary and a live pitch",url:"https://jacobsoninstitute.org/bizinnovator/innovatorcompetition"},
+  {n:"ASHRAE High School Design Competition",cat:"tech",team:"Individual or team of 1-5",eli:"Ages 13-18, global",tier:2,cross:true,desc:"Design a real HVAC system for a large building, judged by professional engineers",why:"Cross-school teams welcome - needs physics, energy calculations, and technical drawing",url:"https://www.ashrae.org/communities/student-zone/competitions/2025-2026-ashrae-high-school-design-competition"},
+  {n:"International Geography Olympiad (iGeo)",cat:"science",team:"National team of 4",eli:"Ages 16-19 - selected via your national geography olympiad",tier:1,cross:false,desc:"Elite geography olympiad combining a written test, multimedia test, and real fieldwork exercise",why:"This is the national-team level - find a peer from any school to prep for your country's selection process",url:"https://geoolympiad.org/"},
+  {n:"International Psychology Olympiad (IPsyO)",cat:"science",team:"Prep partner",eli:"Global high schoolers",tier:1,cross:"prep",desc:"College-level psychology exam testing theory, research methods, and real-world case analysis",why:"Individual entry - find a peer from any school to study alongside",url:"https://www.ipsyo.org/about.html"},
+  {n:"APA TOPSS High School Psychology Video Competition",cat:"science",team:"Individual",eli:"High schoolers worldwide",tier:2,cross:true,desc:"Make a short video applying psychological science to a real-world topic like AI and learning",why:"Individual entry - find a peer from any school for feedback on your script and editing",url:"https://www.apa.org/ed/precollege/topss/student-competition"},
+  {n:"Neuroscience Research Prize",cat:"science",team:"Prep partner",eli:"US, grades 9-12",tier:1,cross:"prep",desc:"Original neuroscience research project judged by the American Academy of Neurology",why:"Individual entry - find a peer from any school for feedback on your research",url:"https://www.competitionsciences.org/competitions/neuroscience-research-prize/"},
+  {n:"Minds Underground Psychology Essay Competition",cat:"science",team:"Prep partner",eli:"Global, mainly Year 12 (~16-17)",tier:2,cross:"prep",desc:"Research-based psychology essay contest on intelligence, personality, or experimental design",why:"Individual entry - find a peer from any school for feedback",url:"https://www.mindsunderground.com/psychology-competition"},
+  {n:"International Brain Bee (IBB)",cat:"science",team:"Prep partner",eli:"Global high schoolers",tier:1,cross:"prep",desc:"Neuroscience knowledge competition from local to international rounds - 25,000+ participants annually",why:"Individual entry - find a peer from any school to study neuroanatomy and cognition with",url:"https://www.thebrainbee.org/"},
+  {n:"Future Psych Scholars Competition",cat:"science",team:"Prep partner",eli:"Requires prior psychology coursework, research, or transcripts to qualify",tier:2,cross:"prep",desc:"University-style research proposal competition - design a study and defend it in a live presentation",why:"This has a real qualification requirement - find a peer from any school to prep your proposal with",url:"https://psych-scholars.com/w/competition?i=1"},
+  {n:"High School Academic Research Competition (SARC)",cat:"science",team:"Individual",eli:"Global high schoolers",tier:2,cross:true,desc:"Open-topic independent research competition with bootcamps and webinars along the way",why:"Individual entry - find a peer from any school for feedback on your research design",url:"https://www.researchcomp.org/"},
+  {n:"International Bipolar Foundation Teen Change-Maker Essay Contest",cat:"impact",team:"Individual",eli:"Grades 9-12 worldwide",tier:2,cross:true,desc:"Essay and short video on youth mental health leadership and building supportive school communities",why:"Individual entry - find a peer from any school for feedback",url:"https://ibpf.org/learn/programs/high-school-essay-contest/"},
+  {n:"Speaking Up About Mental Health Essay Contest (NIMH)",cat:"impact",team:"Individual",eli:"US, ages 16-18",tier:2,cross:true,desc:"NIH-sponsored essay on mental health stigma and access to care for young people",why:"Individual entry - find a peer from any school for feedback",url:"https://www.nimh.nih.gov/news/science-news/faqs-essay-contest"},
+  {n:"MindSpeak Youth Mental Health Essay Competition",cat:"impact",team:"Individual",eli:"New Jersey schools, grades 6-12",tier:3,cross:false,desc:"Essay contest on mental health at school, home, and in the community",why:"Local competition - find a fellow writer nearby for feedback",url:"https://shivsthirdeye.org/mindspeak-essay-competition-2025/"},
+  {n:"Carl C. Bell MD Memorial Award Essay Competition",cat:"impact",team:"Individual",eli:"Illinois high schoolers",tier:3,cross:false,desc:"Mental health essay contest blending psychological insight with social commentary",why:"Local competition - find a fellow writer nearby for feedback",url:"https://illinoispsychiatricsociety.org/carl-c-bell-award"},
+  {n:"Columbia State High School Psychology Competition",cat:"science",team:"Individual",eli:"Southern Middle Tennessee area schools",tier:3,cross:false,desc:"In-person subject exam testing core psychology concepts, part of a broader academic competition day",why:"Local competition - find a fellow student nearby to prep with",url:"https://www.columbiastate.edu/news/details/2026/03/high-school-competition-2026.html"},
+  {n:"NFTE World Youth Entrepreneurship Challenge",cat:"business",team:"Individual",eli:"Ages 15-22 - qualify via a national NFTE-affiliated competition",tier:1,cross:false,desc:"World finals for student founders who've already won their national NFTE competition",why:"This is the world-finals level - find a peer from any school to prep your national round with",url:"https://nfte.com/wyec/"},
+  {n:"NFTE National Youth Entrepreneurship Challenge",cat:"business",team:"Individual",eli:"Ages 15-22, US",tier:1,cross:false,desc:"8-month pitch competition for founders of an existing personal business, from local rounds to NYC finals",why:"Same-school entry to start - find a peer to prep your local round pitch with",url:"https://nfte.com/compete/"},
+  {n:"4As Foundation ReACT Competition",cat:"business",team:"Team",eli:"Manhattan Early College School for Advertising (MECA) and iAM students only",tier:3,cross:false,desc:"Real advertising-agency brief competition - past clients include Spotify and Reebok",why:"Same-school team required - needs advertising strategy across defined agency roles",url:"https://foundation.aaaa.org/programs--events.html"},
+  {n:"St. John's University High School Pitch Competition",cat:"business",team:"Individual or team of 1-3",eli:"High schoolers",tier:2,cross:true,desc:"Two-round pitch competition with mentorship from a St. John's business student along the way",why:"Cross-school teams welcome - needs a business pitch and financial projections",url:"https://www.stjohns.edu/academics/schools/peter-j-tobin-college-business/tobins-experiential-opportunities/high-school-pitch-competition-2026"},
+  {n:"TED Global Public Speaking Challenge",cat:"writing",team:"Individual",eli:"Ages 14-18, global",tier:1,cross:"prep",desc:"Create a one-minute speech on an original idea, winners earn a scholarship to TED Summer School",why:"Individual entry - find a peer from any school to practice your delivery with",url:"https://www.ted.immerse.education/public-speaking-challenge"},
+  {n:"Harvard Crimson Business Competition (HCBC)",cat:"business",team:"Team of 3-8",eli:"Grades 6-12, Junior + Senior divisions",tier:1,cross:true,desc:"Two-round global business competition ending in live presentations at Harvard",why:"Cross-school teams welcome - needs a full business plan and slide deck",url:"https://programs.thecrimson.com/harvard-crimson-business-comp"},
+  {n:"World AI Competition for Youth (WAICY)",cat:"tech",team:"Individual or team",eli:"Ages 6-18, global",tier:2,cross:true,subcat:"coding",desc:"One of the largest global AI competitions for students, spanning AI art, LLM apps, and coding tracks",why:"Cross-school teams welcome - needs creativity across whichever AI track you pick",url:"https://www.waicy.org/"},
+  {n:"International Olympiad in Artificial Intelligence (IOAI)",cat:"tech",team:"National team of 4",eli:"Under 20 - selected via national competitions or coordinator nomination",tier:1,cross:false,subcat:"coding",desc:"Elite AI olympiad combining a scientific round on ML/NLP theory with a hands-on practical round",why:"This is the national-team level - find a peer from any school to prep for your country's selection",url:"https://ioai-official.org/"},
+  {n:"AI Song Contest",cat:"tech",team:"Team",eli:"Open globally, no formal prerequisites",tier:2,cross:true,subcat:"coding",desc:"Co-create a song with AI tools, judged on originality, ethical AI use, and artistic intent",why:"Cross-school teams welcome - needs a mix of music and technical AI skills",url:"https://www.aisongcontest.com/"},
+  {n:"Horizon Academic Essay Prize",cat:"writing",team:"Prep partner",eli:"High schoolers worldwide",tier:2,cross:"prep",desc:"1,000-word essay on the ethical and social dimensions of AI, judged by professors from Yale and Cambridge",why:"Individual entry - find a peer from any school for feedback",url:"https://horizoninspires.com/essay-prize/"},
+  {n:"Kaggle BirdCLEF+",cat:"tech",team:"Individual or team",eli:"Open to anyone with a Kaggle account, not HS-specific - joining with a mentor is encouraged",tier:1,cross:true,subcat:"coding",desc:"Build an ML model identifying species from audio clips, in partnership with the Cornell Lab of Ornithology",why:"Cross-school teams welcome - be aware you're competing against a broad open field, not just students",url:"https://www.kaggle.com/competitions/birdclef-2025/overview"},
+  {n:"DataCrunch",cat:"tech",team:"Individual",eli:"Open to anyone with basic Python/ML knowledge, not HS-specific",tier:2,cross:true,subcat:"coding",desc:"Weekly forecasting sprints on real financial datasets, with ongoing stipends for top-performing models",why:"Individual entry - find a peer from any school to compare weekly models with",url:"https://tournament.datacrunch.com/"},
+  {n:"Bitgrit Competitions",cat:"tech",team:"Individual",eli:"Open to all, not HS-specific",tier:2,cross:true,subcat:"coding",desc:"Ongoing real-world ML challenges spanning finance, climate, and species classification",why:"Individual entry - find a peer from any school to tackle a challenge alongside",url:"https://bitgrit.net/competition/"},
+  {n:"VEX AI Robotics Competition (VAIRC)",cat:"tech",team:"Team",eli:"High school + college",tier:1,cross:false,subcat:"robotics",desc:"Advanced VEX format - build and program two autonomous robots using AI vision and sensor fusion",why:"Same team required - needs mechanical, electrical, and AI-driven programming skills",url:"https://recf.org/teams/competition/vex-ai-robotics-competition/"},
+  {n:"University of Florida SECME High School AI Contest",cat:"tech",team:"Team of 2",eli:"US, students at a registered SECME school",tier:2,cross:false,subcat:"coding",desc:"Complete structured AI/forecasting modules then analyze real energy datasets in a national contest",why:"Same-school team required - needs Python and data analysis skills",url:"http://i-contest-activities/"},
+  {n:"Singularity: AI Essay Contest",cat:"writing",team:"Prep partner",eli:"Grades 9-12, global",tier:2,cross:"prep",desc:"Essay on the future risks and possibilities of AI, judged by researchers from MIT, Yale, and Oxford",why:"Individual entry - find a peer from any school for feedback",url:"https://www.veritasai.com/singularity-ai-essay-contest"},
+  {n:"Kaggle Image Matching Challenge",cat:"tech",team:"Individual or team",eli:"Open worldwide, under-18 with consent",tier:1,cross:true,subcat:"coding",desc:"Build a model that groups similar images and estimates camera position, tied to a CVPR workshop",why:"Cross-school teams welcome - needs Python, deep learning, and 3D geometry",url:"https://www.kaggle.com/competitions/image-matching-challenge-2025"},
+  {n:"Saint Joseph's University Analytics & Data Visualization Competition",cat:"math",team:"Team",eli:"High schoolers, no prior experience needed",tier:2,cross:true,desc:"Build a data dashboard telling a clear story from a real dataset, using tools like Tableau",why:"Cross-school teams welcome - needs data cleaning and visual storytelling",url:"https://www.sju.edu/departments/dss/analyticscompetition"},
+  {n:"National HS Data Analysis & AI Challenge for Sustainable Development",cat:"math",team:"Team of up to 4",eli:"Global, current students or recent grads",tier:2,cross:true,desc:"Analyze open data on a sustainability topic and write a scientific report, no coding experience required",why:"Cross-school teams welcome - webinars and resources provided along the way",url:"https://stemfellowship.org/big-data-and-ai-inquiry-and-experiential-learning/big-data-courses/high-school-big-data-challenge-2/"},
+  {n:"Iron Viz: Student Edition",cat:"math",team:"Individual",eli:"Current high school or college students",tier:1,cross:true,desc:"Global Tableau data visualization contest - turn a real dataset into a visual story",why:"Individual entry - find a peer from any school to compare visualization approaches with",url:"https://www.tableau.com/academic/student-Iron-Viz"},
+  {n:"DIYA High School Data Science Contest",cat:"math",team:"Individual or team of 2",eli:"Grades 9-12, global",tier:2,cross:true,desc:"Data storytelling contest on a UN Sustainable Development Goal of your choice",why:"Cross-school teams welcome - needs data analysis and clear visual communication",url:"https://diya-research.org/2025-diya-data-science-contest/"},
+  {n:"ASEAN Data Science Explorers Competition",cat:"math",team:"Team of 2",eli:"Ages 15-30, ASEAN nationality required",tier:2,cross:false,desc:"Build a data-driven proposal for a UN Sustainable Development Goal using SAP Analytics Cloud",why:"Same-country team required - free training and tools provided",url:"https://aseandse.org/thecompetition/"},
+  {n:"Sports Analytics Symposium Data Challenge",cat:"math",team:"Team of up to 3",eli:"High school, undergraduate, and graduate students",tier:1,cross:true,desc:"Analyze real MLB pitch-level data using new metrics like bat speed and swing length",why:"Cross-school teams welcome - be aware you're competing against college and grad students too",url:"https://statds.org/events/csas2025/challenge.html"},
+  {n:"The BIG Idea Pitch Contest",cat:"business",team:"Individual or team",eli:"DuPage County, IL area students",tier:3,cross:false,desc:"Regional pitch contest ending in a live final at College of DuPage",why:"Local competition - find a fellow entrepreneur nearby to build your pitch with",url:"https://cdn.prod.website-files.com/656f733c6001e86fe0db7842/6980f79ffc86bf4cafe25a4a_67dc33fcc39d04c64743880c_bipc%20guidelines_2025.pdf"},
+  {n:"Vermont Pitch Challenge",cat:"business",team:"Individual or team of up to 3",eli:"Global, grades 10-12",tier:1,cross:true,desc:"Pitch a business idea for positive community impact - grand prize is a full UVM tuition scholarship",why:"Cross-school teams welcome - needs a clear pitch across written, video, or audio format",url:"https://www.uvm.edu/admissions/vermont-pitch-challenge"},
+  {n:"Young Entrepreneurs Academy (YEA!)",cat:"business",team:"Individual",eli:"Grades 6-12 - requires enrolling in a local YEA! chapter first",tier:2,cross:false,desc:"Year-long entrepreneurship program culminating in investor-style pitch competitions",why:"This requires joining a local chapter first - find a fellow YEA! student to build alongside",url:"https://yeausa.org"},
+  {n:"Project ECHO Teen Entrepreneurs' Business Plan Competition",cat:"business",team:"Team",eli:"Under 19 - requires completing Project ECHO's entrepreneurship program first",tier:2,cross:false,desc:"Business plan pitch competition for students who've completed Project ECHO's program",why:"This requires completing the ECHO program first - find a teammate from your cohort",url:"https://www.projectecho.org/2025competition"},
+  {n:"Pirates Pitch Competition",cat:"business",team:"Individual",eli:"US, sophomores-seniors with a 3.0+ GPA",tier:2,cross:"prep",desc:"Seton Hall-hosted pitch competition with real cash and tuition scholarships for finalists",why:"Individual entry - find a peer from any school for feedback on your pitch",url:"https://www.shu.edu/undergraduate-admissions/pirates-pitch-competition.html"},
+  {n:"tecBRIDGE High School Business Plan Competition",cat:"business",team:"Individual or team",eli:"Northeastern Pennsylvania area schools, grades 8-12",tier:3,cross:false,desc:"Regional STEAM-based business plan competition with a full written plan and live finals",why:"Local competition - find a fellow student nearby to co-write your business plan with",url:"https://www.tecbridgepa.org/high-school-business-plan-competition1382e2ca"},
+  {n:"John F. Kennedy Profile in Courage Essay Contest",cat:"writing",team:"Prep partner",eli:"US, grades 9-12",tier:1,cross:"prep",desc:"Research a real act of political courage by a US elected official and write its history",why:"Individual entry - find a peer from any school for feedback",url:"https://www.jfklibrary.org/learn/education/profile-in-courage-essay-contest"},
+  {n:"National History Bowl",cat:"writing",team:"Team",eli:"12th grade and younger",tier:1,cross:false,desc:"Buzzer-based team history tournament from regionals through national championships",why:"Same team required - needs broad historical knowledge and fast recall",url:"https://www.historybowl.com/"},
+  {n:"National WWII Museum Essay Contest",cat:"writing",team:"Prep partner",eli:"US, grades 7-12",tier:2,cross:"prep",desc:"Historical essay on an annual WWII-related prompt, reviewed by museum curators and educators",why:"Individual entry - find a peer from any school for feedback",url:"https://www.nationalww2museum.org/students-teachers/school-programs/student-writing-contest"},
+  {n:"Doodle for Google",cat:"arts",team:"Individual",eli:"US-enrolled high schoolers (including homeschool)",tier:1,cross:true,desc:"Design an original Google logo doodle around an annual theme - national winner gets $45,000",why:"Individual entry - find a peer from any school for feedback on your design",url:"https://doodles.google.com/d4g/"},
+  {n:"Coolidge Scholarship Essay Contest",cat:"writing",team:"Prep partner",eli:"US high school seniors and college entrants",tier:1,cross:"prep",desc:"Argumentative essay on a public-policy or historical issue, with an in-person finalist event in DC",why:"Individual entry - find a peer from any school for feedback",url:"https://www.coolidgereview.com/essay-contest"},
+  {n:"NSHSS Visual Arts Competition",cat:"arts",team:"Individual",eli:"US high schoolers, NSHSS members",tier:2,cross:"prep",desc:"Portfolio-based visual art competition across photography, painting, and mixed media",why:"Individual entry - find a fellow NSHSS member for feedback on your submission",url:"https://www.nshss.org/scholarships/s/nshss-visual-arts-scholarship-2026/"},
+  {n:"JASNA Essay Contest",cat:"writing",team:"Prep partner",eli:"High schoolers worldwide",tier:2,cross:"prep",desc:"Close-reading literary essay contest analyzing Jane Austen's novels against an annual prompt",why:"Individual entry - find a peer from any school for feedback",url:"https://jasna.org/programs/essay-contest/"},
+  {n:"Ayn Rand Institute Essay Contest",cat:"writing",team:"Prep partner",eli:"Grades 8-12",tier:2,cross:"prep",desc:"Argumentative essay responding to Ayn Rand's novels and philosophical themes, seasonal rounds",why:"Individual entry - find a peer from any school for feedback",url:"https://aynrand.org/students/essay-contests/"},
+  {n:"Princeton Legal Journal High School Essay Contest",cat:"law",team:"Prep partner",eli:"High schoolers worldwide",tier:2,cross:"prep",desc:"Legal analysis essay on a current legal theme, top essays published by the journal",why:"Individual entry - find a peer from any school for feedback",url:"https://legaljournal.princeton.edu/high-school-essay-contest/"},
+  {n:"Annual AFSF High School Design Competition",cat:"arts",team:"Individual or team",eli:"High schoolers worldwide",tier:2,cross:true,desc:"Real architectural brief design challenge, judged by the Architectural Foundation of San Francisco",why:"Cross-school teams welcome - needs architectural sketches, drawings, and a model",url:"https://www.afsf.org/programs/the-annual-architectural-design-competition-for-high-school-students/"},
+  {n:"ARTEFFECT Student Art Competition",cat:"arts",team:"Individual",eli:"Grades 9-12",tier:1,cross:"prep",desc:"Design a narrative art piece inspired by an underrecognized historical figure, real $6,000 grand prize",why:"Individual entry - find a peer from any school for feedback on your piece",url:"https://www.arteffectlmc.org/competition/overview"},
+  {n:"AIA Student Design Competition",cat:"arts",team:"Individual or team",eli:"Must first win your regional AIA chapter competition",tier:1,cross:false,desc:"National architecture design competition for regional AIA chapter winners",why:"This requires winning your regional round first - find a fellow architecture student to prep with",url:"https://www.aia.org/resource-center/k-12-initiatives/k-12-student-competition"},
+  {n:"Norwich University High School Architecture Design Competition",cat:"arts",team:"Individual or team",eli:"US residents",tier:1,cross:true,desc:"Architecture design competition with real scholarship prizes and feedback from Norwich faculty",why:"Cross-school teams welcome - needs drawings, renderings, or a physical model",url:"https://www.norwich.edu/academics/non-degree-and-high-school-student-programs/camps-hands-learning-experiences/high-school-architecture-design-competition-pocket-place"},
+  {n:"NASA Langley Student Art Contest",cat:"arts",team:"Individual",eli:"US, grades K-12",tier:2,cross:true,desc:"Space and aeronautics themed art contest, judged within your own grade level",why:"Individual entry - find a peer from any school for feedback on your piece",url:"https://www.nasa.gov/nasa-student-art-contest/"},
+  {n:"Western Governors' Foundation Celebrate the West Competition",cat:"arts",team:"Individual",eli:"Students in WGA member states/territories",tier:3,cross:true,desc:"Art and design competition inspired by your state or the American West region",why:"Local/regional competition - find a fellow artist nearby for feedback",url:"https://foundation.westgov.org/celebrate-the-west"},
+  {n:"AAPT High School Physics Photo Contest",cat:"science",team:"Individual",eli:"Grades 9-12",tier:2,cross:true,desc:"Photograph a real physics phenomenon and write a short analysis explaining the science behind it",why:"Individual entry - find a peer from any school for feedback on your shot and write-up",url:"https://www.aapt.org/Programs/photocontest/index.cfm"},
+  {n:"Future Problem Solving World Solutions Challenge",cat:"impact",team:"Individual or team of up to 4",eli:"Varies by regional affiliate",tier:2,cross:true,desc:"Research a future-facing global problem and develop a structured, actionable solution plan",why:"Cross-school teams welcome - needs systems thinking and clear written reasoning",url:"https://fpspi.org/global-issues-problem-solving/"},
+  {n:"Clean Tech Competition",cat:"science",team:"Individual or team",eli:"High schoolers worldwide",tier:1,cross:true,desc:"Design a technology-based solution to a real environmental or sustainability problem, $20,000 in prizes",why:"Cross-school teams welcome - needs research, technical design, and clear communication",url:"https://www.ecoschools.in/clean-tech-competition/"},
+  {n:"MIT THINK Scholars Program",cat:"science",team:"Individual or team",eli:"US residents",tier:1,cross:true,desc:"Propose an early-stage STEM project idea - selected students get mentorship and seed funding to build it",why:"Cross-school teams welcome - a great entry point if your project idea isn't finished yet",url:"https://think.mit.edu/"},
   {n:"Harvard International Review Academic Writing Contest",cat:"writing",team:"Prep partner",eli:"Global",tier:1,cross:"prep",desc:"Biannual analytical writing contest on international affairs, judged by HIR's editorial board",why:"Individual entry - find a research and editing partner from any school",url:"https://hir.harvard.edu/"},
   {n:"National Cyber League",cat:"tech",team:"Individual or team",eli:"US high school + college",tier:2,cross:true,desc:"Learning-centered cybersecurity competition across nine categories, with a shareable skills report",why:"Cross-school teams allowed - needs cryptography, forensics, and security skills",url:"https://nationalcyberleague.org/",subcat:"coding"},
   {n:"International Mathematical Olympiad (IMO)",cat:"math",team:"Prep partner",eli:"Global, under 20, pre-university",tier:1,cross:"prep",desc:"The oldest and most prestigious world championship math competition - national teams of up to 6",why:"Individual entry - find a study partner from any school to train for national selection",url:"https://www.imo-official.org/"},
   {n:"International Physics Olympiad (IPhO)",cat:"science",team:"Prep partner",eli:"Global - top national performers",tier:1,cross:"prep",desc:"The most prestigious physics competition for high schoolers - theoretical and experimental exams",why:"Individual entry - find a partner from any school to work through problem sets with",url:"https://www.ipho-new.org/"},
   {n:"World Scholar's Cup",cat:"impact",team:"Teams of 3",eli:"Global, ages up to 18",tier:2,cross:true,desc:"Interdisciplinary team competition across science, history, literature, and the arts",why:"Mixed-school teams allowed - needs debate, writing, and broad academic range",url:"https://scholarscup.org/"},
-  {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged",url:""},
-  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/",deadline:"01-15"},
+  {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged",url:"https://entrepreneurship.de/en/competition"},
+  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/"},
   {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product",url:"https://mlh.io/",subcat:"coding"},
   {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills",url:"https://www.firstinspires.org/",subcat:"robotics"},
   {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills",url:"https://www.roboticseducation.org/",subcat:"robotics"},
-  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:1,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed",url:"https://www.congressionalappchallenge.us/",deadline:"10-26",subcat:"coding"},
+  {n:"Congressional App Challenge",cat:"tech",team:"Up to 4 students",eli:"US residents",tier:1,cross:true,desc:"US House of Representatives coding competition - display at Capitol Hill",why:"Cross-school allowed within congressional district - coding, design, product needed",url:"https://www.congressionalappchallenge.us/",subcat:"coding"},
   {n:"John Locke Essay",cat:"writing",team:"Prep partner",eli:"Global - 150 countries",tier:1,cross:"prep",desc:"Most prestigious global essay contest - 63k students - Oxford and Princeton judges",why:"Individual entry - find an intellectual sparring partner from any school",url:"https://www.johnlockeinstitute.com/"},
-  {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's longest-running teen writing recognition - 28 categories",why:"Individual entry - find a writing partner from any school",url:"https://www.artandwriting.org/"},
-  {n:"Kennedy Profile in Courage Essay",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:1,cross:"prep",desc:"One of the most prestigious US essay competitions - $10k prize",why:"Individual entry - find a research and editing partner from any school",url:"https://www.jfklibrary.org/learn/education/profile-in-courage-essay-contest"},
-  {n:"Adroit Journal Prize",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Prestigious literary journal - winners published in The Adroit Journal",why:"Individual entry - find a peer from any school for feedback",url:"https://theadroitjournal.org/adroit-prizes/",deadline:"05-01"},
-  {n:"One Teen Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 13-19",tier:2,cross:"prep",desc:"Short fiction contest run by a literary magazine dedicated to teen writers",why:"Individual entry - find a peer from any school to trade drafts with",url:"https://one-story.com/write/one-teen-story-contest/",deadline:"12-01"},
+  {n:"Scholastic Art and Writing",cat:"writing",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's longest-running teen art and writing recognition - 28 categories across both disciplines, Gold Keys can win up to $12,500",why:"Individual entry - find a writing or art partner from any school",url:"https://www.artandwriting.org/"},
+  {n:"Adroit Journal Prize",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Prestigious literary journal - winners published in The Adroit Journal",why:"Individual entry - find a peer from any school for feedback",url:"https://theadroitjournal.org/adroit-prizes/"},
+  {n:"One Teen Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 13-19",tier:2,cross:"prep",desc:"Short fiction contest run by a literary magazine dedicated to teen writers",why:"Individual entry - find a peer from any school to trade drafts with",url:"https://one-story.com/write/one-teen-story-contest/"},
   {n:"Narrative Magazine High School Contest",cat:"writing",team:"Prep partner",eli:"US + international",tier:2,cross:"prep",desc:"Annual short fiction, essay, or poetry contest judged by Narrative Magazine's editors",why:"Individual entry - find a partner from any school for feedback before submitting",url:"https://www.narrativemagazine.com/narrative-for-schools/eleventh-annual-high-school-contest"},
-  {n:"Bennington Young Writers Awards",cat:"writing",team:"Prep partner",eli:"Global, grades 9-12",tier:1,cross:"prep",desc:"National writing competition with full-tuition Bennington College scholarships for winners who enroll",why:"Individual entry - find a writing partner from any school for feedback",url:"https://www.bennington.edu/news-and-features/announcing-winners-of-2025-2026-young-writers-awards",deadline:"11-01"},
-  {n:"Ocean Awareness Contest",cat:"impact",team:"Individual",eli:"Global, ages 11-18",tier:2,cross:true,desc:"International creative writing and arts contest responding to an annual ocean/climate theme",why:"Individual entry, cross-school peers welcome - needs writing or art plus environmental research",url:"https://bowseat.org/programs/ocean-awareness-contest/contest-overview/",deadline:"06-08"},
-  {n:"NSHSS Creative Writing Scholarship",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:2,cross:"prep",desc:"Fiction and poetry scholarship contest run by the National Society of High School Scholars",why:"Individual entry - find a peer from any school for feedback",url:"https://www.nshss.org/scholarships/s/nshss-creative-writing-scholarship/",deadline:"10-02"},
-  {n:"Parsec Short Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 19 and under",tier:2,cross:"prep",desc:"Speculative fiction contest with a dedicated Youth Story Prize for teen writers",why:"Individual entry - find a peer from any school for feedback",url:"https://parsec-sff.org/short-story-contest/",deadline:"03-31"},
-  {n:"Ann Arbor District Library Flash Fiction Contest",cat:"writing",team:"Individual",eli:"Ann Arbor area, grades 6-12",tier:3,cross:false,desc:"Local flash fiction competition run by the Ann Arbor District Library",why:"Local competition - find a fellow writer at your library or school",url:"https://aadl.org/teenswrite",deadline:"03-01"},
-  {n:"Polyphony Lit",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Recurring seasonal short fiction and poetry contest with blind judging by guest editors",why:"Individual entry - find a peer from any school for feedback",url:"https://www.polyphonylit.org/copy-of-fall-contest-2025-2",deadline:"03-31"},
+  {n:"Bennington Young Writers Awards",cat:"writing",team:"Prep partner",eli:"Global, grades 9-12",tier:1,cross:"prep",desc:"National writing competition with full-tuition Bennington College scholarships for winners who enroll",why:"Individual entry - find a writing partner from any school for feedback",url:"https://www.bennington.edu/news-and-features/announcing-winners-of-2025-2026-young-writers-awards"},
+  {n:"Ocean Awareness Contest",cat:"impact",team:"Individual",eli:"Global, ages 11-18",tier:2,cross:true,desc:"International creative writing and arts contest responding to an annual ocean/climate theme",why:"Individual entry, cross-school peers welcome - needs writing or art plus environmental research",url:"https://bowseat.org/programs/ocean-awareness-contest/contest-overview/"},
+  {n:"NSHSS Creative Writing Scholarship",cat:"writing",team:"Prep partner",eli:"US high schoolers",tier:2,cross:"prep",desc:"Fiction and poetry scholarship contest run by the National Society of High School Scholars",why:"Individual entry - find a peer from any school for feedback",url:"https://www.nshss.org/scholarships/s/nshss-creative-writing-scholarship/"},
+  {n:"Parsec Short Story Contest",cat:"writing",team:"Prep partner",eli:"Global, ages 19 and under",tier:2,cross:"prep",desc:"Speculative fiction contest with a dedicated Youth Story Prize for teen writers",why:"Individual entry - find a peer from any school for feedback",url:"https://parsec-sff.org/short-story-contest/"},
+  {n:"Ann Arbor District Library Flash Fiction Contest",cat:"writing",team:"Individual",eli:"Ann Arbor area, grades 6-12",tier:3,cross:false,desc:"Local flash fiction competition run by the Ann Arbor District Library",why:"Local competition - find a fellow writer at your library or school",url:"https://aadl.org/teenswrite"},
+  {n:"Polyphony Lit",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Recurring seasonal short fiction and poetry contest with blind judging by guest editors",why:"Individual entry - find a peer from any school for feedback",url:"https://www.polyphonylit.org/copy-of-fall-contest-2025-2"},
   {n:"The New York Times Student Contests",cat:"writing",team:"Individual",eli:"Global, ages 13-19",tier:1,cross:true,desc:"NYT Learning Network's yearly calendar of writing, photo essay, and multimedia contests",why:"Individual entry - find a peer from any school to workshop your submission with",url:"https://www.nytimes.com/2025/07/23/learning/our-2025-26-student-contest-calendar.html"},
-  {n:"The HG Wells Short Story Competition",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"International short fiction contest with a dedicated junior prize for writers 21 and under",why:"Individual entry - find a peer from any school for feedback",url:"https://hgwellscompetition.com",deadline:"07-07"},
+  {n:"The HG Wells Short Story Competition",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"International short fiction contest with a dedicated junior prize for writers 21 and under",why:"Individual entry - find a peer from any school for feedback",url:"https://hgwellscompetition.com"},
   {n:"Francine Ringold Awards for New Writers",cat:"writing",team:"Prep partner",eli:"Global",tier:2,cross:"prep",desc:"Fiction and poetry competition for emerging writers, run by Nimrod International Journal",why:"Individual entry - find a peer from any school for feedback",url:"https://nimrod.utulsa.edu/the-francine-ringold-awards-for-new-writers/"},
   {n:"Bucks County Community College Short Fiction Contest",cat:"writing",team:"Individual",eli:"Regional",tier:3,cross:false,desc:"Local short fiction contest hosted by Bucks County Community College's School of Language and Literature",why:"Local competition - find a fellow writer nearby",url:"https://www.bucks.edu/academics/schools/lang-lit/highschoolshortfictioncontest/"},
   {n:"YoungArts",cat:"arts",team:"Prep partner",eli:"US ages 15-18",tier:1,cross:"prep",desc:"Most prestigious US arts competition - up to $10k - Presidential Scholar eligible",why:"Individual entry - find a creative partner from any school",url:"https://www.youngarts.org/"},
-  {n:"Scholastic Art Award",cat:"arts",team:"Prep partner",eli:"US and Canada",tier:1,cross:"prep",desc:"Nation's most prestigious teen art recognition - Gold Keys win $12,500",why:"Individual entry - find a creative peer from any school",url:"https://www.artandwriting.org/"},
   {n:"Local / Regional Science Fair",cat:"science",team:"1-3 students",eli:"Local",tier:3,cross:false,desc:"Your local or regional fair - feeds into the ISEF pathway",why:"Usually same school or district - find a local lab partner",url:""}
 ];
 
@@ -1347,14 +1588,12 @@ function rWelcome(){
     "<div style=\"display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;\">startups · research · nonprofits · robotics · coding · finance · global</div>"+
     "<h2 style=\"font-size:24px;margin-bottom:0.5rem;\">Find the right student partner</h2>"+
     "<div class=\"sub\">Whether you're building a startup, launching a nonprofit, doing research, or competing globally — find the right partner matched by goal, role, and skill level. Not just who you already know.</div>"+
-    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:0.75rem;\">"+
+    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:0.75rem;\">"+
       "<div class=\"welcome-cat\" data-cats=\"science\" data-label=\"Research & Science\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-microscope\" style=\"font-size:21px;color:#0F6E56;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Research & Science</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Startups\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-chart-line\" style=\"font-size:21px;color:#3B6D11;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Startups</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Investment & Finance\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-coin\" style=\"font-size:21px;color:#854F0B;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Investment & Finance</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Business & Finance\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-chart-line\" style=\"font-size:21px;color:#3B6D11;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Business & Finance</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"impact\" data-label=\"Nonprofit & Impact\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-world\" style=\"font-size:21px;color:#1D9E75;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Nonprofit & Impact</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"robotics\" data-label=\"Robotics\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-robot\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Robotics</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"coding\" data-label=\"Coding\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-code\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Coding</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-subcat=\"none\" data-label=\"Engineering\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Engineering & Tech\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering & Tech</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"law\" data-label=\"Law\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-gavel\" style=\"font-size:21px;color:#7A2942;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Law</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:21px;color:#993C1D;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Arts & Writing</div></div>"+
     "</div>"+
     "<div style=\"text-align:center;font-size:11px;color:#6b6b6b;margin-bottom:1rem;\">Tap any category to browse real competitions — no account needed</div>"+
@@ -1385,6 +1624,7 @@ function rCompPreview(catIds,label,subcat){
     if(subcat)return c.subcat===subcat;
     return true;
   });
+  list.sort(compareComps);
   var h=logo()+
     "<button id=\"preview-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
     "<h2 style=\"margin-bottom:0.25rem;\">"+esc(label)+" competitions</h2>"+
@@ -1400,7 +1640,6 @@ function rCompPreview(catIds,label,subcat){
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
-        deadlineChipHtml(c.deadline)+
       "</div>"+
     "</div>";
   });
@@ -2081,7 +2320,7 @@ function openCompDetail(c,previewMode){
       "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
       "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
       "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
-      deadlineChipHtml(c.deadline)+
+      deadlineChipHtml(c.n)+
     "</div>"+
     "<div style=\"font-size:13px;color:#444;line-height:1.6;margin-bottom:12px;\">"+c.desc+"</div>"+
     "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;\">"+
@@ -2114,7 +2353,8 @@ function closeCompDetailOverlay(){
 }
 
 function renderCat(){
-  var list=activeCats.length?COMPS.filter(function(c){return activeCats.indexOf(c.cat)>=0;}):COMPS;
+  var list=activeCats.length?COMPS.filter(function(c){return activeCats.indexOf(c.cat)>=0;}):COMPS.slice();
+  list.sort(compareComps);
   var el=document.getElementById("clist");if(!el)return;
   el.innerHTML="";
   list.forEach(function(c){
@@ -2131,7 +2371,6 @@ function renderCat(){
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+tm.bg+";color:"+tm.tc+";\">"+tm.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\"><i class=\"ti "+xs.icon+"\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+xs.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
-        deadlineChipHtml(c.deadline)+
       "</div>"+
       "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
       (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
@@ -2268,7 +2507,6 @@ function renderInterestSuggestions(interestText,suggestions){
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\">"+xs.lbl+"</span>"+
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
-        deadlineChipHtml(c.deadline)+
       "</div>"+
       "<div style=\"font-size:12px;font-style:italic;color:"+cm.c+";margin-bottom:10px;\"><i class=\"ti ti-sparkles\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+esc(s.why)+"</div>"+
       (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-bottom:10px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
@@ -2682,7 +2920,9 @@ function submitWaitlist(){
   };
   xhr.send("email="+encodeURIComponent(email)+"&city="+encodeURIComponent(city)+"&_subject="+encodeURIComponent("New Partnr Waitlist Signup!"));
 }
+var CURRENT_TAB="matches";
 function showTab(tab){
+  CURRENT_TAB=tab;
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
   else if(tab==="recruit"){rRecruit();}
@@ -3119,7 +3359,7 @@ async function rManagePosting(projectId){
 
 function sTab(){
   var compOptions=["<option value=\"\">Any competition</option>"];
-  var catKeysForFilter=["science","math","business","impact","tech","writing","arts"];
+  var catKeysForFilter=["science","math","business","impact","tech","writing","arts","law"];
   compOptions.push("<optgroup label=\"By category (broader)\">"+
     catKeysForFilter.map(function(k){
       var cm=CM2[k]||{n:k};
@@ -3290,44 +3530,52 @@ function bindSE(){
 }
 
 function dCards(){
-  var withDeadline=COMPS.filter(function(c){return c.deadline;});
-  if(!withDeadline.length)return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No verified deadlines yet — check back as we confirm more.</div>";
+  if(!DEADLINE_DATA_LOADED){
+    return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Loading verified deadlines…</div>";
+  }
 
   var trackToCats={research:["science","math"],business:["business"],impact:["impact"],arts:["arts","writing"],tech:["tech"]};
   var myCats=trackToCats[S.track]||[];
 
-  function daysUntilFor(mmdd){
-    var parts=mmdd.split("-");
-    var m=parseInt(parts[0],10),d=parseInt(parts[1],10);
-    var now=new Date();now.setHours(0,0,0,0);
-    var target=new Date(now.getFullYear(),m-1,d);
-    if(target<now)target=new Date(now.getFullYear()+1,m-1,d);
-    return Math.round((target-now)/(1000*60*60*24));
+  // Main list: only genuinely confirmed, actionable deadlines - real
+  // dates the backend has independently verified are current.
+  var upcoming=COMPS.filter(function(c){
+    var d=DEADLINE_DATA[c.n];
+    return d&&d.status==="confirmed"&&d.deadline_date;
+  }).map(function(c){
+    return {comp:c,deadline_date:DEADLINE_DATA[c.n].deadline_date,sortDays:daysUntilISODate(DEADLINE_DATA[c.n].deadline_date)};
+  });
+  upcoming.sort(function(a,b){return a.sortDays-b.sortDays;});
+
+  // Secondary, honest section: competitions currently running (entry
+  // closed) with a real cycle-end date - useful status, not a deadline.
+  var running=COMPS.filter(function(c){
+    var d=DEADLINE_DATA[c.n];
+    return d&&d.status==="cycle_active"&&d.cycle_end_date;
+  }).map(function(c){
+    return {comp:c,cycle_end_date:DEADLINE_DATA[c.n].cycle_end_date};
+  });
+  running.sort(function(a,b){return parseISODate(a.cycle_end_date)-parseISODate(b.cycle_end_date);});
+
+  if(!upcoming.length&&!running.length){
+    return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No confirmed upcoming deadlines right now — check back as we verify new cycles.</div>";
   }
 
-  var items=withDeadline.map(function(c){
-    var status=deadlineStatus(c.deadline);
-    return {comp:c,status:status,sortDays:status.passed?9999+daysUntilFor(c.deadline):daysUntilFor(c.deadline)};
-  });
-  items.sort(function(a,b){return a.sortDays-b.sortDays;});
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
 
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>"+
-    "";
-
-  items.forEach(function(item){
+  upcoming.forEach(function(item){
     var c=item.comp;
     var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
     var isRecommended=myCats.indexOf(c.cat)>=0;
-    var passed=item.status.passed;
     var days=item.sortDays;
-    var urg=!passed&&days<=45,soon=!passed&&days>45&&days<=90;
-    var ubg=passed?"#F1EFE8":urg?"#FCEBEB":soon?"#FAEEDA":"#EAF3DE";
-    var uc=passed?"#8a8a86":urg?"#A32D2D":soon?"#854F0B":"#3B6D11";
-    var ut=passed?"Passed":urg?"Act now":soon?"Coming up":"Upcoming";
-    var parts=c.deadline.split("-");
-    var monthLabel=MONTH_NAMES[parseInt(parts[0],10)-1];
-    var dayLabel=parseInt(parts[1],10);
-    h+="<div class=\"dl\" style=\""+(isRecommended?"border-color:"+cm.c+";border-width:2px;":"")+(passed?"opacity:0.6;":"")+"\">"+
+    var urg=days<=45,soon=days>45&&days<=90;
+    var ubg=urg?"#FCEBEB":soon?"#FAEEDA":"#EAF3DE";
+    var uc=urg?"#A32D2D":soon?"#854F0B":"#3B6D11";
+    var ut=urg?"Act now":soon?"Coming up":"Upcoming";
+    var p=item.deadline_date.split("-");
+    var monthLabel=MONTH_NAMES[parseInt(p[1],10)-1];
+    var dayLabel=parseInt(p[2],10);
+    h+="<div class=\"dl\" style=\""+(isRecommended?"border-color:"+cm.c+";border-width:2px;":"")+"\">"+
       "<div style=\"text-align:center;min-width:46px;flex-shrink:0;\">"+
         "<div style=\"font-size:10px;font-weight:600;color:#6b6b6b;text-transform:uppercase;\">"+monthLabel+"</div>"+
         "<div style=\"font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1;\">"+dayLabel+"</div>"+
@@ -3342,12 +3590,33 @@ function dCards(){
         "<div style=\"display:flex;flex-wrap:wrap;gap:5px;align-items:center;\">"+
           "<span class=\"tag\" style=\"background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
           "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.eli+"</span>"+
-          (!passed?"<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+days+"d left</span>":"<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">Next date TBA</span>")+
+          "<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+days+"d left</span>"+
         "</div>"+
         (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site</a>":"")+
       "</div>"+
     "</div>";
   });
+
+  if(running.length){
+    h+="<div class=\"slabel\">Currently running (not accepting new entries)</div>";
+    running.forEach(function(item){
+      var c=item.comp;
+      var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+      h+="<div class=\"dl\" style=\"opacity:0.85;\">"+
+        "<div style=\"text-align:center;min-width:46px;flex-shrink:0;\">"+
+          "<div style=\"font-size:10px;font-weight:600;color:#6b6b6b;text-transform:uppercase;\">Thru</div>"+
+          "<div style=\"font-size:13px;font-weight:700;color:#1a1a1a;line-height:1.1;\">"+formatISODate(item.cycle_end_date)+"</div>"+
+        "</div>"+
+        "<div style=\"flex:1;\">"+
+          "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px;\">"+c.n+"</div>"+
+          "<div style=\"display:flex;flex-wrap:wrap;gap:5px;align-items:center;\">"+
+            "<span class=\"tag\" style=\"background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+            "<span style=\"font-size:11px;color:#6b6b6b;\">This year's cycle is running through "+formatISODate(item.cycle_end_date,true)+"</span>"+
+          "</div>"+
+        "</div>"+
+      "</div>";
+    });
+  }
   return h;
 }
 
@@ -3549,7 +3818,7 @@ function meTab(){
           "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;\"></i> School email verified (auto-detected)</span>":
           S.schoolVerification==="self_reported_multiple"?
           "<span style=\"font-size:11px;font-weight:600;color:#185FA5;\"><i class=\"ti ti-users\" style=\"font-size:12px;\"></i> Self-Reported (confirmed by multiple students)</span>":
-          "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"reqVerifyBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Request verification</button>")+"</div>"+
+          "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"verifyEmailBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Verify with school email</button> <button id=\"reqVerifyBtn\" style=\"background:none;border:none;color:#6b6b6b;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Request verification</button>")+"</div>"+
       "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
@@ -3914,6 +4183,68 @@ function bindMeTab(){
   if(rst)rst.addEventListener("click",resetAll);
   var blkBtn=document.getElementById("blocked-btn");
   if(blkBtn)blkBtn.addEventListener("click",renderBlockedList);
+  var vEmailBtn=document.getElementById("verifyEmailBtn");
+  if(vEmailBtn)vEmailBtn.addEventListener("click",async function(){
+    var wrap=vEmailBtn.parentNode;
+    var domain=getEmailDomain(S.email);
+    if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
+      var errBox=document.createElement("div");
+      errBox.style.cssText="margin-top:6px;font-size:12px;color:#A32D2D;";
+      errBox.textContent="This only works with a school email address, not a personal one like Gmail.";
+      wrap.appendChild(errBox);
+      return;
+    }
+    vEmailBtn.disabled=true;vEmailBtn.textContent="Generating code…";
+    function makeCode(){
+      var chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";var c="";
+      for(var i=0;i<6;i++)c+=chars[Math.floor(Math.random()*chars.length)];
+      return c;
+    }
+    try{
+      var session=await getSession();
+      var code=null,attempts=0;
+      while(attempts<3&&!code){
+        var candidate=makeCode();
+        var ins=await sba.from("school_email_verification_codes").insert({
+          student_id:session.user.id,code:candidate,expected_domain:domain
+        });
+        if(!ins.error)code=candidate;
+        attempts++;
+      }
+      if(!code){throw new Error("Could not generate a unique code");}
+      var box=document.createElement("div");
+      box.style.cssText="margin-top:8px;padding:10px;background:#F1EFE8;border-radius:8px;font-size:12px;color:#1a1a1a;line-height:1.5;";
+      box.innerHTML="Send an email from <strong>"+esc(S.email)+"</strong> to <strong>verify@projectpartnr.com</strong> with this code anywhere in the subject line:"+
+        "<div style=\"font-size:18px;font-weight:700;letter-spacing:2px;margin:8px 0;color:#534AB7;\">"+code+"</div>"+
+        "<button id=\"checkVerifyStatus\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">I've sent it - check now</button>"+
+        "<div id=\"verifyStatusMsg\" style=\"margin-top:6px;\"></div>";
+      wrap.appendChild(box);
+      vEmailBtn.style.display="none";
+      document.getElementById("checkVerifyStatus").addEventListener("click",async function(){
+        var btn=this;btn.disabled=true;btn.textContent="Checking…";
+        try{
+          var check=await sba.from("school_email_verification_codes").select("status").eq("code",code).maybeSingle();
+          var msgEl=document.getElementById("verifyStatusMsg");
+          if(check.data&&check.data.status==="verified"){
+            S.schoolVerification="verified";
+            var el=document.getElementById("tc");
+            if(el){el.innerHTML=meTab();bindMeTab();}
+          }else if(check.data&&check.data.status==="failed"){
+            msgEl.innerHTML="<span style=\"font-size:12px;color:#A32D2D;\">The email arrived, but not from the expected domain. Make sure you're sending from your real school account.</span>";
+            btn.disabled=false;btn.textContent="Check again";
+          }else{
+            msgEl.innerHTML="<span style=\"font-size:12px;color:#6b6b6b;\">Not received yet - school email can take a few minutes to arrive.</span>";
+            btn.disabled=false;btn.textContent="Check again";
+          }
+        }catch(ex){
+          btn.disabled=false;btn.textContent="Check again";
+        }
+      });
+    }catch(ex){
+      console.error("Verification code generation failed",ex);
+      vEmailBtn.disabled=false;vEmailBtn.textContent="Verify with school email";
+    }
+  });
   var reqBtn=document.getElementById("reqVerifyBtn");
   if(reqBtn)reqBtn.addEventListener("click",function(){
     var wrap=reqBtn.parentNode;
@@ -4053,7 +4384,7 @@ function demoSR(skill){
     {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",availability:"8 hrs/week",status:"has idea",bio:"Expert writer who pitched to the French Senate at 16. Has a social enterprise idea and needs a technical co-founder to build the product.",keySkill:skill,keyLevel:"Expert",otherSkills:["Public Speaking","French","Research"],competitions:["Diamond Challenge","Conrad Challenge"],portfolio:"leadubois.fr"}
   ];
   return[
-    {name:"Nina Kovac",school:"Gimnazija Bezigrad",country:"Slovenia",grade:"12th grade",avatar:"NK",avatarColor:"purple",track:"arts",role:"creative",availability:"8 hrs/week",status:"has project",bio:"Award-winning designer who created the visual identity for her city's youth council. Looking for a writer or researcher to collaborate with.",keySkill:skill,keyLevel:"Expert",otherSkills:["Illustration","Branding","Slovenian"],competitions:["YoungArts","Scholastic Art Award"],portfolio:"ninakovac.design"},
+    {name:"Nina Kovac",school:"Gimnazija Bezigrad",country:"Slovenia",grade:"12th grade",avatar:"NK",avatarColor:"purple",track:"arts",role:"creative",availability:"8 hrs/week",status:"has project",bio:"Award-winning designer who created the visual identity for her city's youth council. Looking for a writer or researcher to collaborate with.",keySkill:skill,keyLevel:"Expert",otherSkills:["Illustration","Branding","Slovenian"],competitions:["YoungArts","Scholastic Art and Writing"],portfolio:"ninakovac.design"},
     {name:"David Osei",school:"Achimota School",country:"Ghana",grade:"12th grade",avatar:"DO",avatarColor:"teal",track:"research",role:"res_r",availability:"10 hrs/week",status:"open to joining",bio:"Placed 2nd in the John Locke Essay Competition. Strong analytical writer looking for a research project to join.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Philosophy","Writing","Twi"],competitions:["John Locke Essay","Conrad Challenge"],portfolio:null},
     {name:"Mei Lin",school:"Shanghai High School",country:"China",grade:"11th grade",avatar:"ML",avatarColor:"blue",track:"tech",role:"tech_r",availability:"12 hrs/week",status:"has idea",bio:"Builder with three apps on the app store who wants to work on something with real social impact. Looking for a Vision partner.",keySkill:skill,keyLevel:"Advanced",otherSkills:["Swift","UI Design","Mandarin"],competitions:["Congressional App Challenge","Hackathon MLH"],portfolio:"github.com/mei-builds"},
     {name:"Rania Khalil",school:"AUC School",country:"Egypt",grade:"11th grade",avatar:"RK",avatarColor:"coral",track:"impact",role:"vision",availability:"6 hrs/week",status:"has idea",bio:"Social entrepreneur who launched a literacy program reaching 200+ students. Wants to scale it and needs a tech and ops partner.",keySkill:skill,keyLevel:"Intermediate",otherSkills:["Arabic","Community Organizing","Public Speaking"],competitions:["SAGE World Cup","Diamond Challenge Social"],portfolio:null}
