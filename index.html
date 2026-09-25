@@ -154,6 +154,12 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 // ── State ──────────────────────────────────
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],portfolioItems:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
+// Remembers the last real Skill Search (query/filters), so backing out
+// of a Report/Block flow can return to the actual results the student
+// was looking at instead of a reset, blank browse-by-category screen.
+// Without this, Cancel and a completed Block landed on the exact same
+// generic screen with no visible difference between them.
+var LAST_SKILL_SEARCH=null;
 var REMATCH_FEEDBACK="";
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
 var WORLD_CITIES=null,worldCitiesLoading=null;
@@ -706,6 +712,29 @@ function initialsFor(name){
 // safety review), this only affects how it's rendered in the app to
 // people who aren't the profile's own owner. A single-word name (or one
 // already this short) is returned unchanged rather than truncated oddly.
+// School is hidden from other students by default - the same kind of
+// identifying detail displayName() already protects by truncating last
+// names. It's shown only when it's actually load-bearing: a real,
+// currently-shared target competition that requires same school (the
+// whole point of that match is confirming that), or once a connection
+// is genuinely accepted. Falls back to city, which tells another
+// student everything they actually need (can we meet, what hours
+// overlap) without handing a stranger the exact school a minor attends.
+function locationLine(school,city,country,showSchool){
+  var head=(showSchool&&school)?school:(city||"");
+  return esc(head)+(country?" · "+esc(country):"");
+}
+// True only when a competition both students are actually targeting
+// requires the same school - not just any shared interest.
+function sharesSchoolRequiredComp(theirComps){
+  if(!theirComps||!theirComps.length||!S.comps||!S.comps.length)return false;
+  return theirComps.some(function(name){
+    if(S.comps.indexOf(name)<0)return false;
+    var c=COMPS.find(function(x){return x.n===name;});
+    return c&&c.cross===false;
+  });
+}
+
 function displayName(name){
   var parts=(name||"").trim().split(/\s+/);
   if(parts.length<2)return name||"";
@@ -725,12 +754,13 @@ async function searchRealStudents(opts,excludeId){
   var school=(opts.school||"").trim();
   var competition=(opts.competition||"").trim();
   var category=(opts.category||"").trim();
-  if(!query&&!city&&!school&&!competition&&!category)return [];
+  var subcat=(opts.subcat||"").trim();
+  if(!query&&!city&&!school&&!competition&&!category&&!subcat)return [];
 
   var idList=null; // null = no id-narrowing needed (pure city/school filter)
   var skillMatch={};
 
-  if(query||competition||category){
+  if(query||competition||category||subcat){
     var ids={};
     if(query){
       var wc=query;
@@ -782,6 +812,25 @@ async function searchRealStudents(opts,excludeId){
         ids=catIds;
       }
     }
+    if(subcat){
+      // Coding and Robotics are already tagged on real competitions
+      // (subcat), but until now nothing in the UI ever let a student
+      // filter by them — this makes that existing data reachable.
+      var namesInSubcat=COMPS.filter(function(c){return c.subcat===subcat;}).map(function(c){return c.n;});
+      var subIds={};
+      if(namesInSubcat.length){
+        var subCompRes=await sba.from("competitions").select("student_id").in("competition_name",namesInSubcat);
+        if(subCompRes.error)throw subCompRes.error;
+        (subCompRes.data||[]).forEach(function(r){subIds[r.student_id]=true;});
+      }
+      if(query||competition||category){
+        var narrowedSub={};
+        Object.keys(ids).forEach(function(id){if(subIds[id])narrowedSub[id]=true;});
+        ids=narrowedSub;
+      } else {
+        ids=subIds;
+      }
+    }
     idList=Object.keys(ids);
     if(!idList.length)return [];
   }
@@ -818,7 +867,7 @@ async function searchRealStudents(opts,excludeId){
     var keyLevel=(matched&&matched.level)||(mySkills[0]&&mySkills[0].level)||"Intermediate";
     var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
     return {
-      name:s.name,school:s.school,country:s.country,grade:s.grade,
+      name:s.name,school:s.school,city:s.city,country:s.country,grade:s.grade,
       avatar:initialsFor(s.name),avatarColor:colorForId(s.id),
       track:s.track,role:s.role,
       availability:s.availability||"Not specified",
@@ -1102,9 +1151,9 @@ var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D1
 var CM2={
   science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
   math:{n:"Math",c:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  business:{n:"Business",c:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
-  impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},
-  tech:{n:"Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
+  business:{n:"Business & Finance",c:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
+  impact:{n:"Nonprofit & Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},
+  tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
   writing:{n:"Writing",c:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
   arts:{n:"Arts",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
   law:{n:"Law",c:"#7A2942",bg:"#F5E7EC",tc:"#5C1F32"},
@@ -1494,7 +1543,7 @@ var SKILL_CATS=[
    items:["Fusion 360","SolidWorks","Onshape","AutoCAD","SketchUp","3D Printing","Laser Cutting","Robotics - FIRST / VEX","Robot Programming (Java / C++)","ROS","FIRST - Drive Coach / Strategy","FIRST - Scouting & Data Analysis","Circuit Design / PCB","Soldering / Electronics","Electrical Wiring","Mechanical Design","Aerospace / Rocketry","Cybersecurity / Networks","Embedded Systems"]},
   {id:"design",label:"Design & Creative Tools",question:"What design tools and creative skills do you use?",icon:"ti-palette",type:"level",hint:"List tools you actually open and use regularly",
    items:["Figma / UI Design","Adobe Photoshop","Adobe Illustrator","Adobe Premiere / Video Editing","After Effects / Motion Graphics","DaVinci Resolve","Blender / 3D Modeling","Procreate / Digital Art","Photography","Canva","Brand Identity / Logos","Illustration / Drawing","Animation","Game Art / Pixel Art","Architecture Design"]},
-  {id:"business",label:"Business & Finance",question:"What business skills do you actually know?",icon:"ti-chart-line",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
+  {id:"business",label:"Business & Finance",question:"What business skills do you know?",icon:"ti-chart-line",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
    items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Fundraising","Economics","Product Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
   {id:"writing",label:"Writing & Communication",question:"What writing and communication skills do you have?",icon:"ti-pencil",type:"level",hint:"Select skills you actively and regularly use",
    items:["Research & Academic Writing","Essay Writing","Journalism / Reporting","Creative Writing","Technical Writing","Grant Writing","Screenwriting / Scripts","Poetry","Public Speaking","Debate","Social Media Content"]},
@@ -1606,7 +1655,6 @@ function gradeOpts(){
 // ── Welcome ─────────────────────────────────
 function rWelcome(){
   R(logo()+
-    "<div style=\"display:inline-block;font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;padding:4px 12px;border-radius:20px;margin-bottom:1rem;\">startups · research · nonprofits · robotics · coding · finance · global</div>"+
     "<h2 style=\"font-size:24px;margin-bottom:0.5rem;\">Find the right student partner</h2>"+
     "<div class=\"sub\">Whether you're building a startup, launching a nonprofit, doing research, or competing globally — find the right partner matched by goal, role, and skill level. Not just who you already know.</div>"+
     "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:0.75rem;\">"+
@@ -1921,9 +1969,14 @@ function rTrack(){
   }).join("");
   var rHTML=roles.map(function(r){
     var sel=S.role===r.val;
+    // Description leads (this is what a student actually recognizes
+    // about themselves, across every track - not just startups). The
+    // CEO/CTO label survives only as a small footnote, useful for us
+    // talking about "the CEO role" internally, not the first thing a
+    // 15-year-old is asked to identify with.
     return "<div class=\"rc"+(sel?" on":"")+"\" role=\"button\" tabindex=\"0\" aria-pressed=\""+(sel?"true":"false")+"\" data-role=\""+r.val+"\">" +
       "<i class=\"ti "+r.icon+"\" style=\"font-size:20px;color:"+r.color+";\"></i>" +
-      "<div class=\"rn\">"+r.name+"</div><div class=\"rd\">"+r.desc+"</div></div>";
+      "<div class=\"rn\">"+r.desc+"</div><div class=\"rd\">"+r.name+"</div></div>";
   }).join("");
   R(logo()+sb(2)+
     "<h2>Your track & role</h2>"+
@@ -1931,7 +1984,7 @@ function rTrack(){
     "<div class=\"slabel\" style=\"margin-top:0;\">Track"+req()+"</div>"+
     "<div id=\"tg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+tHTML+"</div>"+
     "<div class=\"slabel\">Your role"+req()+"</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">A CEO gets matched with a CTO. A researcher gets matched with an engineer.</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Tell us what you enjoy contributing. We'll help you find complementary teammates.</div>"+
     "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
     "<div class=\"slabel\">Status"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
@@ -1940,7 +1993,7 @@ function rTrack(){
     "<button class=\"bp\" id=\"s3\" style=\"opacity:"+(S.track&&S.role?"1":"0.4")+"\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
-  mkChips("status",["I have a project — need partners","I have skills — open to joining","I have an idea — need co-founders","Just exploring"],[S.status],true);
+  mkChips("status",["I have a project — need teammates","Open to joining a project","Just exploring"],[S.status],true);
   var secTracks=Object.keys(TR).map(function(k){return TR[k].n;}).filter(function(n){return !S.track||n!==TR[S.track].n;});
   mkChips("secondary",secTracks,Array.isArray(S.secondary)?S.secondary:[],false);
   // Enforce max 2 secondary
@@ -2102,7 +2155,7 @@ function rSkills(){
         "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
       "</div>"+
       "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 4px;\">Portfolio</div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Add a few real projects — a paper, a pitch deck, a repo, a video. Visible to other students, since this is what actually gets you matched.</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Add a few real projects — a paper, a pitch deck, a repo, a video, a class project. Helps potential teammates understand what you enjoy working on.</div>"+
       "<div id=\"portfolio-list\">"+portfolioHTML+"</div>"+
       (S.portfolioItems.length<6?
         "<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
@@ -2465,6 +2518,38 @@ function renderCat(){
       });
     } else {d.querySelector("button").disabled=true;}
     el.appendChild(d);
+  });
+}
+
+// Restores whatever Skill Search the student actually had active before
+// stepping into a Report/Block flow, instead of dropping them on a
+// reset, blank browse-by-category screen. If a real block just
+// happened, re-running the same search naturally shows one fewer
+// result (RLS hides the blocked student), which is exactly the visible
+// confirmation that was missing - Cancel leaves the results unchanged,
+// a completed block visibly removes that one person.
+function returnToSkillSearch(){
+  showTab("search");
+  if(!LAST_SKILL_SEARCH)return;
+  var qEl=document.getElementById("ss");
+  var compEl=document.getElementById("filter-comp");
+  var cityChipEl=document.getElementById("filter-city");
+  var schoolChipEl=document.getElementById("filter-school");
+  if(qEl)qEl.value=LAST_SKILL_SEARCH.qRaw;
+  if(compEl)compEl.value=LAST_SKILL_SEARCH.compRawValue;
+  if(cityChipEl&&LAST_SKILL_SEARCH.cityOn)cityChipEl.classList.add("on");
+  if(schoolChipEl&&LAST_SKILL_SEARCH.schoolOn)schoolChipEl.classList.add("on");
+  var compRaw=LAST_SKILL_SEARCH.compRawValue||"";
+  var comp=(compRaw.indexOf("cat:")===0||compRaw.indexOf("subcat:")===0)?"":compRaw;
+  var category=compRaw.indexOf("cat:")===0?compRaw.slice(4):"";
+  var subcat=compRaw.indexOf("subcat:")===0?compRaw.slice(7):"";
+  var browseEl=document.getElementById("skill-browse");
+  var drillEl=document.getElementById("skill-drill");
+  if(browseEl)browseEl.style.display="none";
+  if(drillEl)drillEl.style.display="none";
+  srchSkill({
+    query:LAST_SKILL_SEARCH.qRaw,competition:comp,category:category,subcat:subcat,
+    city:LAST_SKILL_SEARCH.cityOn?S.city:"",school:LAST_SKILL_SEARCH.schoolOn?S.school:""
   });
 }
 
@@ -3230,7 +3315,7 @@ async function loadRealProjects(){
   var projects=(res.data||[]).filter(function(p){return p.student_id!==myId;});
   if(!projects.length)return [];
   var authorIds=projects.map(function(p){return p.student_id;});
-  var authorsRes=await sba.from("students").select("id,name,school,country,role,track").in("id",authorIds);
+  var authorsRes=await sba.from("students").select("id,name,school,city,country,role,track").in("id",authorIds);
   var authorsById={};
   (authorsRes.data||[]).forEach(function(a){authorsById[a.id]=a;});
   // Prioritize postings that need the viewer's own role — same
@@ -3283,7 +3368,7 @@ async function rRecruit(){
         h+="<div class=\"card\">"+
           "<div style=\"display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;\">"+
             "<div style=\"flex:1;\"><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
-            "<div style=\"font-size:12px;color:#6b6b6b;margin-top:1px;\">"+esc(displayName(author?author.name:"A student"))+(author?" · "+esc(author.school||"")+", "+esc(author.country||""):"")+"</div></div>"+
+            "<div style=\"font-size:12px;color:#6b6b6b;margin-top:1px;\">"+esc(displayName(author?author.name:"A student"))+(author?" · "+locationLine(author.school,author.city,author.country,sharesSchoolRequiredComp(p.competition_name?[p.competition_name]:[])):"")+"</div></div>"+
             "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";flex-shrink:0;\">"+p.spots+" spot"+(p.spots>1?"s":"")+"</span>"+
           "</div>"+
           "<div style=\"font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;\">"+esc(p.description)+"</div>"+
@@ -3441,7 +3526,7 @@ async function rManagePosting(projectId){
     var applicantIds=apps.map(function(a){return a.applicant_id;});
     var applicantsById={};
     if(applicantIds.length){
-      var studentsRes=await sba.from("students").select("id,name,school,country").in("id",applicantIds);
+      var studentsRes=await sba.from("students").select("id,name,school,city,country").in("id",applicantIds);
       (studentsRes.data||[]).forEach(function(s){applicantsById[s.id]=s;});
     }
     var h="<button id=\"mp-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
@@ -3453,7 +3538,7 @@ async function rManagePosting(projectId){
         var applicant=applicantsById[a.applicant_id];
         h+="<div class=\"card\">"+
           "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:2px;\">"+esc(displayName(applicant?applicant.name:"A student"))+"</div>"+
-          "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">"+esc(applicant?applicant.school:"")+(applicant&&applicant.country?", "+esc(applicant.country):"")+"</div>"+
+          "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">"+(applicant?locationLine(null,applicant.city,applicant.country,false):"")+"</div>"+
           (a.message?"<div class=\"why\" style=\"margin-bottom:10px;\">"+esc(a.message)+"</div>":"")+
           (a.status==="pending"?
             "<div style=\"display:flex;gap:8px;\"><button class=\"bc app-accept\" data-id=\""+esc(a.id)+"\" data-applicant=\""+esc(a.applicant_id)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button><button class=\"bo app-decline\" data-id=\""+esc(a.id)+"\">Decline</button></div>":
@@ -3492,7 +3577,10 @@ function sTab(){
     catKeysForFilter.map(function(k){
       var cm=CM2[k]||{n:k};
       return "<option value=\"cat:"+k+"\">All "+esc(cm.n)+" competitions</option>";
-    }).join("")+"</optgroup>");
+    }).join("")+
+    "<option value=\"subcat:coding\">All Coding competitions</option>"+
+    "<option value=\"subcat:robotics\">All Robotics competitions</option>"+
+  "</optgroup>");
   compOptions.push("<optgroup label=\"By exact competition\">"+
     COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}).join("")+
   "</optgroup>");
@@ -3592,11 +3680,12 @@ function bindSE(){
   function runSkillSearch(){
     var q=document.getElementById("ss").value.trim();
     var compRaw=document.getElementById("filter-comp").value;
-    var comp=compRaw.indexOf("cat:")===0?"":compRaw;
+    var comp=(compRaw.indexOf("cat:")===0||compRaw.indexOf("subcat:")===0)?"":compRaw;
     var category=compRaw.indexOf("cat:")===0?compRaw.slice(4):"";
+    var subcat=compRaw.indexOf("subcat:")===0?compRaw.slice(7):"";
     var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
     var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
-    if(!q&&!comp&&!category&&!city&&!school){
+    if(!q&&!comp&&!category&&!subcat&&!city&&!school){
       // Everything's cleared — restore the browse-by-category view
       // instead of leaving a blank pane. This is the fix for the bug
       // where browse-by-category vanished after any search and never
@@ -3604,11 +3693,13 @@ function bindSE(){
       document.getElementById("skill-browse").style.display="block";
       document.getElementById("skill-drill").style.display="none";
       document.getElementById("sr").innerHTML="";
+      LAST_SKILL_SEARCH=null;
       return;
     }
     document.getElementById("skill-browse").style.display="none";
     document.getElementById("skill-drill").style.display="none";
-    srchSkill({query:q,competition:comp,category:category,city:city,school:school});
+    LAST_SKILL_SEARCH={qRaw:q,compRawValue:compRaw,cityOn:!!(cityChip&&cityChip.classList.contains("on")),schoolOn:!!(schoolChip&&schoolChip.classList.contains("on"))};
+    srchSkill({query:q,competition:comp,category:category,subcat:subcat,city:city,school:school});
   }
 
   document.getElementById("ssb").addEventListener("click",runSkillSearch);
@@ -3762,7 +3853,7 @@ async function loadRealConnections(){
   if(!rows.length)return {incoming:[],outgoing:[],accepted:[],me:me};
 
   var otherIds=rows.map(function(r){return r.student_a_id===me?r.student_b_id:r.student_a_id;});
-  var pplRes=await sba.from("students").select("id,name,school,country,track,role").in("id",otherIds);
+  var pplRes=await sba.from("students").select("id,name,school,city,country,track,role").in("id",otherIds);
   var ppl={};
   (pplRes.data||[]).forEach(function(p){ppl[p.id]=p;});
 
@@ -3794,7 +3885,7 @@ function connPersonRow(item,extraHtml){
       "<div class=\"av\" style=\"width:40px;height:40px;font-size:13px;background:"+t.bg+";color:"+t.tc+";\">"+esc(initialsFor(p.name))+"</div>"+
       "<div style=\"flex:1;min-width:0;\">"+
         "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(p.name))+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc(p.school||"")+(p.country?" · "+esc(p.country):"")+"</div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;\">"+locationLine(p.school,p.city,p.country,item.row.status==="accepted")+"</div>"+
       "</div>"+
       "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(r.n)+"</span>"+
     "</div>"+
@@ -4485,14 +4576,17 @@ async function srchSkill(opts){
   var query=(opts.query||"").trim();
   var competition=(opts.competition||"").trim();
   var category=(opts.category||"").trim();
+  var subcat=(opts.subcat||"").trim();
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
-  var isFilterOnly=!query&&(competition||category||city||school); // no typed text, pure structured filter
+  var SUBCAT_LABELS={coding:"Coding",robotics:"Robotics"};
+  var isFilterOnly=!query&&(competition||category||subcat||city||school); // no typed text, pure structured filter
 
   var descParts=[];
   if(query)descParts.push("\""+query+"\"");
   if(competition)descParts.push(competition);
   if(category)descParts.push("all "+((CM2[category]&&CM2[category].n)||category)+" competitions");
+  if(subcat)descParts.push("all "+(SUBCAT_LABELS[subcat]||subcat)+" competitions");
   if(city)descParts.push("in "+city);
   if(school)descParts.push("at "+school);
   var desc=descParts.join(" · ")||"partners";
@@ -4502,7 +4596,7 @@ async function srchSkill(opts){
   try{
     var session=await getSession();
     var myId=session&&session.user?session.user.id:null;
-    var real=await searchRealStudents({query:query,competition:competition,category:category,city:city,school:school},myId);
+    var real=await searchRealStudents({query:query,competition:competition,category:category,subcat:subcat,city:city,school:school},myId);
     if(real.length){renderSR(real,desc,false);return;}
   }catch(ex){
     console.error("[Partnr search] failed:",ex);
@@ -4587,7 +4681,7 @@ function renderSR(results,skill,isDemo){
           "<span style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(r.name))+"</span>"+
           "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+r.status+"</span>"+
         "</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;\">"+r.school+" · "+r.country+" · "+r.grade+"</div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;\">"+locationLine(r.school,r.city,r.country,sharesSchoolRequiredComp(r.competitions))+" · "+esc(r.grade)+"</div>"+
         "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.5;\">"+r.bio+"</div>"+
         "<div class=\"tags\" style=\"margin-bottom:8px;\">"+
           "<span class=\"tag\" style=\"background:"+(LB[r.keyLevel]||"#EEEDFE")+";color:"+(LT[r.keyLevel]||"#3C3489")+";font-weight:600;\">"+r.keySkill+" · "+r.keyLevel+"</span>"+
@@ -4614,7 +4708,7 @@ function renderSR(results,skill,isDemo){
   });
   document.querySelectorAll(".sr-report").forEach(function(btn){
     btn.addEventListener("click",function(){
-      openReportModal(this.dataset.realid,this.dataset.name,"profile",null,function(){showTab("search");});
+      openReportModal(this.dataset.realid,this.dataset.name,"profile",null,returnToSkillSearch);
     });
   });
 }
@@ -4637,7 +4731,7 @@ function openSearchConnectModal(realId,name){
       "</div>"+
     "</div>"
   );
-  document.getElementById("srcbtn").addEventListener("click",function(){showTab("search");});
+  document.getElementById("srcbtn").addEventListener("click",returnToSkillSearch);
   document.getElementById("srsbtn").addEventListener("click",async function(){
     var msg=document.getElementById("srmsg").value.trim();
     if(!msg){showErr("srmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
@@ -4650,7 +4744,7 @@ function openSearchConnectModal(realId,name){
         return;
       }
       R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
-      document.getElementById("srdbn").addEventListener("click",function(){showTab("search");});
+      document.getElementById("srdbn").addEventListener("click",returnToSkillSearch);
     }catch(ex){
       console.error("Search connect failed",ex);
       btn.disabled=false;btn.textContent="Send request →";
