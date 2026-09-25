@@ -2495,7 +2495,21 @@ function renderPills(){
 // state a fact (deadline, prize) not already in the list. Even so,
 // every returned name is checked against the real COMPS array before
 // rendering, so a model slip can never surface a fabricated result.
+// If the student already wrote something in the main idea box, that
+// same text IS their stated interest - asking them to type it again in
+// a popup was pure redundancy, and worse, whatever they typed here
+// never made it back into the main box, so the two could silently
+// disagree. Now: already-typed text skips straight to suggestions, and
+// whichever text is actually used always gets written back to S.idea,
+// so returning to Goals always shows the interest that was really used.
 function openInterestSuggestModal(){
+  var ideaEl=document.getElementById("iidea");
+  var existingIdea=ideaEl?ideaEl.value.trim():S.idea.trim();
+  if(existingIdea){
+    S.idea=existingIdea;
+    runInterestSuggestions(existingIdea);
+    return;
+  }
   R(logo()+
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
       "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">What are you interested in?</div>"+
@@ -2510,18 +2524,27 @@ function openInterestSuggestModal(){
     var text=document.getElementById("interest-text").value.trim();
     if(!text){showErr("interest-text","Tell us a bit about what you're interested in");scrollToFirstErr();return;}
     var btn=this;btn.disabled=true;btn.textContent="Thinking…";
-    try{
-      var suggestions=await fetchCompetitionSuggestions(text);
-      renderInterestSuggestions(text,suggestions);
-    }catch(ex){
-      console.error("[Partnr] competition suggestion failed:",ex);
-      var notSignedIn=ex&&ex.code==="not_signed_in";
-      var errTitle=notSignedIn?"You've been signed out":"Couldn't get suggestions";
-      var errBody=notSignedIn?"Please sign in again to get suggestions — you can still browse by category without signing in.":"Something went wrong — you can still browse by category instead.";
-      R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">"+errTitle+"</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">"+errBody+"</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
-      document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
-    }
+    S.idea=text;
+    await runInterestSuggestions(text);
   });
+}
+
+// Shared by both entry points above - shows a lightweight loading
+// state, fetches suggestions, and handles the error case identically
+// whether the student typed just now or had already written their idea.
+async function runInterestSuggestions(text){
+  R(logo()+"<div style=\"text-align:center;padding:3rem 1rem;\"><div class=\"spin\"></div><div style=\"font-size:14px;color:#6b6b6b;\">Thinking…</div></div>");
+  try{
+    var suggestions=await fetchCompetitionSuggestions(text);
+    renderInterestSuggestions(text,suggestions);
+  }catch(ex){
+    console.error("[Partnr] competition suggestion failed:",ex);
+    var notSignedIn=ex&&ex.code==="not_signed_in";
+    var errTitle=notSignedIn?"You've been signed out":"Couldn't get suggestions";
+    var errBody=notSignedIn?"Please sign in again to get suggestions — you can still browse by category without signing in.":"Something went wrong — you can still browse by category instead.";
+    R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">"+errTitle+"</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">"+errBody+"</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
+    document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
+  }
 }
 
 // Calls the edge function in 'suggest_competitions' mode with the full
