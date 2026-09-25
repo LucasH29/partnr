@@ -2515,7 +2515,10 @@ function openInterestSuggestModal(){
       renderInterestSuggestions(text,suggestions);
     }catch(ex){
       console.error("[Partnr] competition suggestion failed:",ex);
-      R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">Couldn't get suggestions</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">Something went wrong — you can still browse by category instead.</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
+      var notSignedIn=ex&&ex.code==="not_signed_in";
+      var errTitle=notSignedIn?"You've been signed out":"Couldn't get suggestions";
+      var errBody=notSignedIn?"Please sign in again to get suggestions — you can still browse by category without signing in.":"Something went wrong — you can still browse by category instead.";
+      R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">"+errTitle+"</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">"+errBody+"</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
       document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
     }
   });
@@ -2527,7 +2530,18 @@ function openInterestSuggestModal(){
 // accurate entries — never invent a new one or a fact not given here.
 async function fetchCompetitionSuggestions(interestText){
   var session=await getSession();
-  if(!session)throw new Error("no session");
+  if(!session){
+    // getSession() reads from local storage and doesn't always force a
+    // refresh - a session that looks stale here often isn't actually
+    // gone, just not re-validated yet. One explicit refresh attempt
+    // before treating this as a real sign-out avoids failing a request
+    // for a student who is, in fact, still signed in.
+    try{
+      var refreshed=await sba.auth.refreshSession();
+      session=refreshed&&refreshed.data?refreshed.data.session:null;
+    }catch(ex){/* fall through to the not-signed-in error below */}
+  }
+  if(!session){var e=new Error("You're not signed in anymore");e.code="not_signed_in";throw e;}
   var compList=COMPS.map(function(c){
     var catName=(CM2[c.cat]&&CM2[c.cat].n)||c.cat;
     var typeLabel=c.cross===true?"cross-school ok":c.cross==="prep"?"prep partner":"same school";
