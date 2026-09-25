@@ -287,6 +287,17 @@ async function signInWithMicrosoft(){
   });
   return res.error;
 }
+// GitHub is a real sign-in convenience only - never a school-email
+// verification signal (a personal GitHub account proves nothing about
+// school affiliation), so this is intentionally separate from
+// getSSOConfirmedDomain() above.
+async function signInWithGithub(){
+  var res=await sba.auth.signInWithOAuth({
+    provider:"github",
+    options:{redirectTo:PRODUCTION_URL}
+  });
+  return res.error;
+}
 // Google includes an "hd" (hosted domain) claim ONLY for real school/
 // work Google Workspace accounts — never for personal Gmail. This is
 // Google itself cryptographically confirming domain ownership, which
@@ -853,16 +864,20 @@ async function boot(){
         return;
       }
       // Session exists but no students row yet.
-      // Case 1: signed in via Google OR Microsoft directly from
-      // Welcome — neither gives us school/country/city/etc, so route
-      // to the full signup form (pre-filled) instead of skipping
-      // straight to Track & Role.
+      // Case 1: signed in via Google, Microsoft, or GitHub directly
+      // from Welcome — none of these give us school/country/city/etc,
+      // so route to the full signup form (pre-filled) instead of
+      // skipping straight to Track & Role.
       var provider=session.user.app_metadata&&session.user.app_metadata.provider;
-      if(provider==="google"||provider==="azure"){
+      if(provider==="google"||provider==="azure"||provider==="github"){
         var ssoMeta=session.user.user_metadata||{};
         S.name=ssoMeta.full_name||ssoMeta.name||"";
         S.email=session.user.email||"";
-        PENDING_GOOGLE_SESSION=session; // name kept for simplicity; covers either provider
+        // GitHub is the one provider that also hands us something
+        // directly useful for Portfolio: the account's real username,
+        // which becomes a ready-made profile link.
+        if(provider==="github"&&ssoMeta.user_name)S.github="github.com/"+ssoMeta.user_name;
+        PENDING_GOOGLE_SESSION=session; // name kept for simplicity; covers every SSO provider
         goTo("signup");
         return;
       }
@@ -1507,6 +1522,11 @@ function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
 // 5-step progress bar
 function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+// Marks a required field/section label. A single small red asterisk,
+// consistent everywhere a field or section is actually enforced by
+// step validation - not applied to optional fields (Portfolio, GitHub,
+// Experience & Awards, secondary interests, "what kind of partner").
+function req(){return " <span style=\"color:#C53030;\">*</span>";}
 
 function showErr(id,msg){
   var el=document.getElementById(id);if(!el)return;
@@ -1668,6 +1688,7 @@ function rSignIn(){
     "</div>"+
     "<button class=\"bp\" id=\"googleSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-google\"></i> Sign in with Google</button>"+
     "<button class=\"bp\" id=\"msSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-windows\"></i> Sign in with Microsoft</button>"+
+    "<button class=\"bp\" id=\"ghSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-github\"></i> Sign in with GitHub</button>"+
     "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-top:1rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Some schools block third-party sign-in until their IT admin approves it. If Google or Microsoft doesn't work, use your email instead — it always works and doesn't require any approval.</div>"+
     "<button class=\"bkbtn\" id=\"toWelcome\" style=\"margin-top:1rem;\">New to Partnr? Get started</button>"
   );
@@ -1712,6 +1733,16 @@ function rSignIn(){
       showToast("Couldn't start Microsoft sign-in — please try again");
     }
   });
+  var ghBtn=document.getElementById("ghSignIn");
+  ghBtn.addEventListener("click",async function(){
+    ghBtn.disabled=true;ghBtn.innerHTML="Redirecting to GitHub…";
+    var err=await signInWithGithub();
+    if(err){
+      ghBtn.disabled=false;
+      ghBtn.innerHTML="<i class=\"ti ti-brand-github\"></i> Sign in with GitHub";
+      showToast("Couldn't start GitHub sign-in — please try again");
+    }
+  });
 }
 
 // ── Signup ──────────────────────────────────
@@ -1722,21 +1753,21 @@ function rSignup(){
     "<h2>Create your profile</h2>"+
     "<div class=\"sub\">Any email works. We recommend a personal one so you never lose access if your school blocks automated messages — you can still tell us your school below.</div>"+
     (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google — email verified</div>":"")+
-    "<div class=\"fi\"><label for=\"iname\">Full name</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"iemail\">Email</label><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
-    "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">High school name</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
+    "<div class=\"fi\"><label for=\"iname\">Full name"+req()+"</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
+    "<div class=\"fi\"><label for=\"iemail\">Email"+req()+"</label><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">High school name"+req()+"</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
       "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
-    "<div class=\"fi\"><label for=\"icountry\">Country</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
-    "<div class=\"fi\" style=\"position:relative;\"><label for=\"icity\">City</label><input id=\"icity\" autocomplete=\"off\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/>"+
+    "<div class=\"fi\"><label for=\"icountry\">Country"+req()+"</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"icity\">City"+req()+"</label><input id=\"icity\" autocomplete=\"off\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/>"+
       "<div id=\"citySuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
     "<div id=\"zipwrap\" style=\""+(co&&hasZip(co)?"":"display:none;")+"\">"+
-      "<div class=\"fi\"><label for=\"izip\">Zip / Postal code</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
+      "<div class=\"fi\"><label for=\"izip\">Zip / Postal code"+(co&&hasZip(co)?req():"")+"</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
     "</div>"+
-    "<div class=\"fi\"><label for=\"igrade\">Grade / Year</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
-    "<div class=\"fi\"><label for=\"idob\">Date of birth</label><input id=\"idob\" type=\"date\" value=\""+esc(S.dob)+"\"/></div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken</div>"+
+    "<div class=\"fi\"><label for=\"igrade\">Grade / Year"+req()+"</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
+    "<div class=\"fi\"><label for=\"idob\">Date of birth"+req()+"</label><input id=\"idob\" type=\"date\" value=\""+esc(S.dob)+"\"/></div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken"+req()+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Your country's languages appear first. Select all that apply.</div>"+
     "<div id=\"lang-suggested\" style=\""+(COUNTRY_LANGS[co]?"":"display:none;")+"\">"+
       "<div style=\"font-size:11px;font-weight:600;color:#534AB7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;\">Suggested for your country</div>"+
@@ -1897,12 +1928,12 @@ function rTrack(){
   R(logo()+sb(2)+
     "<h2>Your track & role</h2>"+
     "<div class=\"sub\">Pick your focus and the role you bring to a team. You'll be matched with complementary roles.</div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Track</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Track"+req()+"</div>"+
     "<div id=\"tg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+tHTML+"</div>"+
-    "<div class=\"slabel\">Your role</div>"+
+    "<div class=\"slabel\">Your role"+req()+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">A CEO gets matched with a CTO. A researcher gets matched with an engineer.</div>"+
     "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
-    "<div class=\"slabel\">Status</div>"+
+    "<div class=\"slabel\">Status"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
     "<div class=\"slabel\">Secondary interests <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional — pick up to 2)</span></div>"+
     "<div class=\"cgrow\" id=\"secondary\"></div>"+
@@ -2039,7 +2070,7 @@ function rSkills(){
 
   R(logo()+sb(3)+
     "<h2>Your skills</h2>"+
-    "<div class=\"sub\">Select specific skills, courses, and tools you know. The more specific, the better your matches.</div>"+
+    "<div class=\"sub\">Select specific skills, courses, and tools you know. The more specific, the better your matches.<span style=\"color:#C53030;\"> * at least one required</span></div>"+
     "<div id=\"skill-cats\">"+html+"</div>"+
     "<div id=\"ssum\" style=\"font-size:13px;color:#6b6b6b;margin:1rem 0;\"></div>"+
     "<div class=\"slabel\">Don't see your skill?</div>"+
@@ -2048,7 +2079,7 @@ function rSkills(){
       "<button id=\"addskillbtn\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>"+
     "<div id=\"custom-skills-row\" style=\"display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem;\"></div>"+
-    "<div class=\"slabel\">Weekly availability</div>"+
+    "<div class=\"slabel\">Weekly availability"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"avail\"></div>"+
     "<div class=\"slabel\">Portfolio / GitHub <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
     "<div class=\"fi\"><input id=\"igh\" placeholder=\"github.com/yourname or portfolio URL\" value=\""+esc(S.github)+"\"/></div>"+
@@ -2236,7 +2267,7 @@ function rGoals(){
   var catKeys=Object.keys(CM2).filter(function(k){return k!=="custom";});
   R(logo()+sb(4)+
     "<h2>Your project & goals</h2>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Project stage</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Project stage"+req()+"</div>"+
     "<div id=\"stg\" class=\"stbar\">"+
       ["Spark|Just an idea|spark","Planning|Researching|planning","Building|Active work|building","Submitting|Competition ready|submitting","Open|No idea yet|open"].map(function(x){
         var p=x.split("|");
@@ -2256,11 +2287,11 @@ function rGoals(){
       "</div>"+
       "<div id=\"clist\"></div>"+
     "</div>"+
-    "<div class=\"fi\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner</label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div class=\"fi\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition above)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app...\">"+esc(S.idea)+"</textarea></div>"+
     "<div class=\"fi\"><label for=\"iskillsneeded\">What kind of partner are you looking for? <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><input id=\"iskillsneeded\" placeholder=\"e.g. a biology partner, someone who can build an app, someone to help write a research paper...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
-    "<div class=\"slabel\">Commitment</div>"+
+    "<div class=\"slabel\">Commitment"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
-    "<div class=\"slabel\">Who do you want to connect with?</div>"+
+    "<div class=\"slabel\">Who do you want to connect with?"+req()+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">You can change this anytime from your matches page.</div>"+
     "<div id=\"loc-pref\" style=\"display:grid;gap:8px;margin-bottom:1rem;\">"+
     ["🏣 Students at my school","📍 Students in my city / region","🌍 Anyone in the world"].map(function(opt){
