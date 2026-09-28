@@ -11,6 +11,7 @@
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f8f6;color:#1a1a1a;min-height:100vh;}
 .app{max-width:680px;margin:0 auto;padding:1.5rem 1rem 3rem;}
 .logo{font-size:26px;font-weight:600;color:#1a1a1a;letter-spacing:-0.5px;margin-bottom:1.5rem;}
+.logo.big{font-size:60px;line-height:1;margin-bottom:1.5rem;}
 .logo span{color:#7F77DD;}
 h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .sub{font-size:14px;color:#666;line-height:1.6;margin-bottom:1.25rem;}
@@ -83,9 +84,13 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .exbtn:hover{background:#f8f8f6;}
 .expp{display:none;border:1px solid #e8e8e4;border-radius:12px;overflow:hidden;margin-bottom:10px;}
 .expp.open{display:block;}
-.ctabs{display:flex;overflow-x:auto;border-bottom:1px solid #e8e8e4;background:#f8f8f6;}
-.ctab{padding:9px 13px;font-size:12px;cursor:pointer;color:#6b6b6b;background:none;border:none;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;font-weight:500;user-select:none;}
-.ctab.on{border-bottom-color:currentColor;font-weight:600;}
+.ctabs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-bottom:1px solid #e8e8e4;background:#f8f8f6;}
+.ctab{padding:6px 12px;font-size:12px;cursor:pointer;color:#6b6b6b;background:white;border:1px solid #ddd;border-radius:20px;white-space:nowrap;font-family:inherit;font-weight:500;user-select:none;}
+.ctab.on{border-color:currentColor;font-weight:600;}
+.ex2{justify-content:center;margin-bottom:0;padding:12px 10px;font-size:13px;border-style:solid;}
+.ex2.on{border-color:#AFA9EC;background:#EEEDFE;color:#3C3489;}
+.wgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:420px){.wgrid{grid-template-columns:repeat(2,1fr);}}
 .citem{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid #f0f0ec;background:white;}
 .citem:last-child{border-bottom:none;}
 .citem:hover{background:#f8f8f6;}
@@ -152,8 +157,8 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],portfolioItems:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
-var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,activeCats=[],modalTarget=null;
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
+var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,notSureActiveTab="browse",activeCats=[],modalTarget=null;
 // Remembers the last real Skill Search (query/filters), so backing out
 // of a Report/Block flow can return to the actual results the student
 // was looking at instead of a reset, blank browse-by-category screen.
@@ -483,7 +488,7 @@ async function saveProfile(){
     id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
     zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
-    location_pref:S.locationPref,experience:S.experience,awards:S.awards||[],portfolio_items:S.portfolioItems||[],
+    location_pref:S.locationPref,links:S.links||[],proof_of_work:S.proofOfWork||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null
   });
   if(upsertRes.error)return upsertRes;
@@ -521,7 +526,7 @@ async function loadProfileIntoState(uid){
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
   S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
-  S.experience=p.experience||[];S.awards=p.awards||[];S.portfolioItems=p.portfolio_items||[];S.stage=p.stage||"";
+  S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
   S.dob=p.dob||"";
   S.skillsNeeded=p.skills_needed||"";
@@ -636,7 +641,7 @@ function openReportModal(reportedId,name,context,contextId,onDone){
   });
   document.getElementById("rep-submit").addEventListener("click",async function(){
     var reason=getChips("rep-reasons")[0]||"";
-    if(!reason){showSecErr("rep-reasons","Please choose what happened");scrollToFirstErr();return;}
+    if(!reason){showSecErr("rep-reasons","Choose what happened");scrollToFirstErr();return;}
     var btn=this;btn.disabled=true;btn.textContent="Submitting\u2026";
     var alsoBlock=document.getElementById("rep-block").checked;
     var details=document.getElementById("rep-details").value.trim();
@@ -746,6 +751,50 @@ function displayName(name){
 // targeting that exact competition. city/school are plain columns on
 // students, so they're applied directly; competition and free-text query
 // narrow via a candidate-id set first, same as the original approach.
+// Toggling a save is a private, personal action - persist it immediately
+// rather than waiting for the student to hit Continue somewhere else.
+async function toggleSaveProfile(id){
+  var on=S.savedIds.indexOf(id)>=0;
+  S.savedIds=on?S.savedIds.filter(function(x){return x!==id;}):S.savedIds.concat([id]);
+  var session=await getSession();
+  if(!session)return !on;
+  await sba.from("students").update({saved_profiles:S.savedIds}).eq("id",session.user.id);
+  return !on;
+}
+async function fetchSavedStudents(){
+  if(!S.savedIds.length)return [];
+  var studentsRes=await sba.from("students").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
+  if(studentsRes.error)throw studentsRes.error;
+  var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
+  if(!students.length)return [];
+  var finalIds=students.map(function(s){return s.id;});
+  var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",finalIds);
+  var skillsByStudent={};
+  (allSkillsRes.data||[]).forEach(function(r){(skillsByStudent[r.student_id]=skillsByStudent[r.student_id]||[]).push(r);});
+  var allCompsRes=await sba.from("competitions").select("student_id,competition_name").in("student_id",finalIds);
+  var compsByStudent={};
+  (allCompsRes.data||[]).forEach(function(r){(compsByStudent[r.student_id]=compsByStudent[r.student_id]||[]).push(r.competition_name);});
+  return students.map(function(s){
+    var mySkills=skillsByStudent[s.id]||[];
+    var keySkill=mySkills[0]?mySkills[0].skill_name:"Partner";
+    var keyLevel=(mySkills[0]&&mySkills[0].level)||"Intermediate";
+    var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
+    return {
+      name:s.name,school:s.school,city:s.city,country:s.country,grade:s.grade,
+      avatar:initialsFor(s.name),avatarColor:colorForId(s.id),
+      track:s.track,role:s.role,
+      availability:s.availability||"Not specified",
+      status:s.status||"Open to connecting",
+      bio:s.idea||"Hasn't added a bio yet.",
+      keySkill:keySkill,keyLevel:keyLevel,
+      otherSkills:otherSkills,
+      competitions:compsByStudent[s.id]||[],
+      proofOfWork:s.proof_of_work||[],
+      links:s.links||[],
+      _realId:s.id
+    };
+  });
+}
 async function searchRealStudents(opts,excludeId){
   if(typeof opts==="string")opts={query:opts};
   opts=opts||{};
@@ -835,7 +884,7 @@ async function searchRealStudents(opts,excludeId){
     if(!idList.length)return [];
   }
 
-  var studentsQuery=sba.from("students").select("*").eq("onboarded",true).limit(40);
+  var studentsQuery=sba.from("students").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(40);
   if(idList!==null)studentsQuery=studentsQuery.in("id",idList);
   if(city)studentsQuery=studentsQuery.ilike("city",city);
   if(school)studentsQuery=studentsQuery.ilike("school",school);
@@ -876,8 +925,8 @@ async function searchRealStudents(opts,excludeId){
       keySkill:keySkill||fallbackLabel,keyLevel:keyLevel,
       otherSkills:otherSkills,
       competitions:compsByStudent[s.id]||[],
-      portfolio:s.github||null,
-      portfolioItems:s.portfolio_items||[],
+      proofOfWork:s.proof_of_work||[],
+      links:s.links||[],
       _realId:s.id
     };
   });
@@ -923,9 +972,10 @@ async function boot(){
         S.name=ssoMeta.full_name||ssoMeta.name||"";
         S.email=session.user.email||"";
         // GitHub is the one provider that also hands us something
-        // directly useful for Portfolio: the account's real username,
-        // which becomes a ready-made profile link.
-        if(provider==="github"&&ssoMeta.user_name)S.github="github.com/"+ssoMeta.user_name;
+        // directly useful: the account's real username, which becomes
+        // a ready-made entry in Your Links - actually shown to other
+        // students, unlike the old standalone field it replaces.
+        if(provider==="github"&&ssoMeta.user_name)S.links=[{url:"https://github.com/"+ssoMeta.user_name}];
         PENDING_GOOGLE_SESSION=session; // name kept for simplicity; covers every SSO provider
         goTo("signup");
         return;
@@ -1016,7 +1066,7 @@ function rUnderageBlock(){
     "<div style=\"text-align:center;padding:2rem 1rem;\">"+
       "<i class=\"ti ti-shield-check\" style=\"font-size:44px;color:#534AB7;\"></i>"+
       "<h2 style=\"margin:12px 0 6px;\">Partnr is for students 13 and up</h2>"+
-      "<div class=\"sub\" style=\"max-width:380px;margin:0 auto 1.25rem;\">Based on the date of birth entered, we're not able to create an account right now. Nothing you entered has been saved.</div>"+
+      "<div class=\"sub\" style=\"max-width:380px;margin:0 auto 1.25rem;\">Based on your date of birth, we can't create an account right now. Nothing you entered has been saved.</div>"+
       "<button class=\"bp\" id=\"underage-back\" style=\"max-width:280px;margin:0 auto;display:block;\">← Back</button>"+
     "</div>"
   );
@@ -1136,11 +1186,12 @@ function renderLangSections(country,selected){
 // ── Core data ───────────────────────────────
 // Track colors — Research=teal, Business=green (updated from doc 23)
 var TR={
-  research:{n:"Research & Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
-  business:{n:"Build a Business",c:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
-  impact:{n:"Social Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},
-  arts:{n:"Arts & Writing",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
-  tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"}
+  research:{n:"Research & Science",c:"#3E96DB",bg:"#E8F3FC",tc:"#1A5C99"},
+  business:{n:"Business & Finance",c:"#4A7F1E",bg:"#EAF3DE",tc:"#2C5010"},
+  impact:{n:"Nonprofit & Impact",c:"#B8456E",bg:"#FBEAF0",tc:"#72243E"},
+  arts:{n:"Arts & Writing",c:"#C9691A",bg:"#FCEEDD",tc:"#7A3D0C"},
+  tech:{n:"Engineering & Tech",c:"#2A5DB0",bg:"#E6ECF9",tc:"#163E7D"},
+  law:{n:"Law",c:"#6D3F94",bg:"#F1E9F7",tc:"#45285F"}
 };
 var RO={vision:{n:"Vision / CEO",i:"ti-bulb"},tech_r:{n:"Tech / CTO",i:"ti-code"},mktg:{n:"Marketing / CMO",i:"ti-speakerphone"},ops:{n:"Operations / COO",i:"ti-list-check"},res_r:{n:"Research Lead",i:"ti-microscope"},creative:{n:"Creative Lead",i:"ti-palette"}};
 var CM={purple:{bg:"#EEEDFE",c:"#534AB7"},teal:{bg:"#E1F5EE",c:"#0F6E56"},coral:{bg:"#FAECE7",c:"#993C1D"},blue:{bg:"#E6F1FB",c:"#185FA5"},green:{bg:"#EAF3DE",c:"#3B6D11"}};
@@ -1149,14 +1200,14 @@ var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D1
 
 // Competition category colors — unique per category
 var CM2={
-  science:{n:"Science",c:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
-  math:{n:"Math",c:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  business:{n:"Business & Finance",c:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
-  impact:{n:"Nonprofit & Impact",c:"#1D9E75",bg:"#E1F5EE",tc:"#085041"},
-  tech:{n:"Engineering & Tech",c:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
-  writing:{n:"Writing",c:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
-  arts:{n:"Arts",c:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
-  law:{n:"Law",c:"#7A2942",bg:"#F5E7EC",tc:"#5C1F32"},
+  science:{n:"Science",c:"#3E96DB",bg:"#E8F3FC",tc:"#1A5C99"},
+  math:{n:"Math",c:"#5B6470",bg:"#EEF0F3",tc:"#3A414B"},
+  business:{n:"Business & Finance",c:"#4A7F1E",bg:"#EAF3DE",tc:"#2C5010"},
+  impact:{n:"Nonprofit & Impact",c:"#B8456E",bg:"#FBEAF0",tc:"#72243E"},
+  tech:{n:"Engineering & Tech",c:"#2A5DB0",bg:"#E6ECF9",tc:"#163E7D"},
+  writing:{n:"Writing",c:"#C9691A",bg:"#FCEEDD",tc:"#7A3D0C"},
+  arts:{n:"Arts",c:"#C9691A",bg:"#FCEEDD",tc:"#7A3D0C"},
+  law:{n:"Law",c:"#6D3F94",bg:"#F1E9F7",tc:"#45285F"},
   custom:{n:"Custom",c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"}
 };
 
@@ -1273,10 +1324,10 @@ var COMPS=[
   {n:"HMMT Harvard-MIT Math",cat:"math",team:"Teams of 4-8",eli:"International",tier:1,cross:true,desc:"Most prestigious team math tournament for high schoolers",why:"Cross-school teams allowed - coordinate strategy across rounds",url:"https://www.hmmt.org/"},
   {n:"PUMaC Princeton Math",cat:"math",team:"Teams of 6-8",eli:"International",tier:2,cross:true,desc:"Annual Princeton team math competition",why:"Cross-school teams allowed - team round requires coordinated problem solving",url:"https://pumac.princeton.edu/"},
   {n:"HiMCM Math Modeling",cat:"math",team:"Teams of 2-4",eli:"International",tier:2,cross:true,desc:"International math modeling contest",why:"Cross-school teams allowed - needs math and research writing",url:"https://www.comap.com/highschool/contests/himcm/"},
-  {n:"AMC / AIME Prep Partner",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
+  {n:"AMC / AIME",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
   {n:"DECA ICDC",cat:"business",team:"Same-school chapter",eli:"Global",tier:2,cross:false,desc:"International business and marketing - 230k+ students - chapter based",why:"Same-school chapter required - find teammates at your school",url:"https://www.deca.org/"},
   {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design",url:"https://blueoceancompetition.org/"},
-  {n:"Diamond Challenge",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:2,cross:true,desc:"University of Delaware - business and social innovation tracks",why:"Cross-school teams allowed - ideal pairing is Vision/CEO with Tech/CTO",url:"https://diamondchallenge.org/"},
+  {n:"Diamond Challenge",cat:"impact",team:"2-4 students",eli:"Global ages 14-18",tier:1,cross:true,desc:"University of Delaware - two co-equal tracks: Business Innovation and Social Innovation",why:"Cross-school teams allowed - pick either track, ideal pairing is a builder with a researcher or writer",url:"https://diamondchallenge.org/"},
   {n:"FBLA Competitive Events",cat:"business",team:"Same-school chapter",eli:"US + intl chapters",tier:2,cross:false,desc:"Future Business Leaders - chapter based, same school required",why:"Same school required - find teammates at your school",url:"https://www.fbla.org/"},
   {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,cross:true,desc:"Free global investment strategy competition - 6,000+ students",why:"Cross-school teams welcome - needs finance, research, and presentation",url:"https://globalyouth.wharton.upenn.edu/investment-competition/"},
   {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Cross-school teams allowed - social enterprise needs business and research",url:"https://sageglobal.org/"},
@@ -1521,30 +1572,30 @@ var COMPS=[
 
 // Skill category colors — unique per category, consistent with competition colors
 var SKILL_CAT_COLORS={
-  math:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  coding:{color:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
-  science:{color:"#0F6E56",bg:"#E1F5EE",tc:"#085041"},
-  engineering:{color:"#185FA5",bg:"#E6F1FB",tc:"#0C447C"},
-  design:{color:"#993C1D",bg:"#FAECE7",tc:"#712B13"},
-  business:{color:"#3B6D11",bg:"#EAF3DE",tc:"#27500A"},
-  writing:{color:"#854F0B",bg:"#FAEEDA",tc:"#633806"},
-  humanities:{color:"#534AB7",bg:"#EEEDFE",tc:"#3C3489"},
-  social:{color:"#1D9E75",bg:"#E1F5EE",tc:"#085041"}
+  math:{color:"#5B6470",bg:"#EEF0F3",tc:"#3A414B"},
+  coding:{color:"#1E8CA8",bg:"#E2F3F7",tc:"#0F5468"},
+  science:{color:"#3E96DB",bg:"#E8F3FC",tc:"#1A5C99"},
+  engineering:{color:"#2A5DB0",bg:"#E6ECF9",tc:"#163E7D"},
+  design:{color:"#C4573A",bg:"#FCEBE5",tc:"#82301A"},
+  business:{color:"#4A7F1E",bg:"#EAF3DE",tc:"#2C5010"},
+  writing:{color:"#C9691A",bg:"#FCEEDD",tc:"#7A3D0C"},
+  humanities:{color:"#8A6A3F",bg:"#F4EDE2",tc:"#5A4326"},
+  social:{color:"#B8456E",bg:"#FBEAF0",tc:"#72243E"}
 };
 
 var SKILL_CATS=[
   {id:"math",label:"Math",question:"What math courses have you taken?",icon:"ti-math-function",type:"course",hint:"The course itself tells us your level - select everything you have studied",
    items:["Algebra 1","Algebra 2","Geometry","Trigonometry","Pre-Calculus","Statistics & Probability","Calculus (AB/BC)","Linear Algebra","Multivariable Calculus","Differential Equations","Number Theory","Combinatorics & Discrete Math","Real Analysis"]},
-  {id:"coding",label:"Coding & CS",question:"What languages and tools do you use?",icon:"ti-code",type:"level",hint:"Select every language or tool you can actually use - then tap your level",
+  {id:"coding",label:"Coding & CS",question:"What programming languages and tools do you use?",icon:"ti-code",type:"level",hint:"Select every programming language or tool you know - then tap your level. Spoken languages are on your profile already.",
    items:["Python","JavaScript","Java","C / C++","Swift","Kotlin","Go","R","MATLAB","SQL","HTML / CSS","React / Next.js","Node.js","TensorFlow / PyTorch","Firebase / Databases","API Development","Cybersecurity","Git / GitHub","Arduino","Raspberry Pi","Unity / Game Dev","Bash / Linux","No-code (Webflow / Bubble / Zapier)"]},
   {id:"science",label:"Science & Research",question:"What science fields do you know or work in?",icon:"ti-microscope",type:"level",hint:"Select fields you have genuinely studied, researched, or worked in",
-   items:["Molecular Biology","Genetics / Gene Editing","Neuroscience","Anatomy & Physiology","Ecology / Environmental Science","Biochemistry","Organic Chemistry","Inorganic Chemistry","Physics","Astrophysics / Astronomy","Earth Science / Geology","Synthetic Biology","Bioinformatics","Forensic Science","Statistics / Data Analysis","Experimental Design","Scientific Writing"]},
+   items:["Biology","Animal Sciences","Plant Sciences","Microbiology","Molecular Biology","Genetics / Gene Editing","Neuroscience","Biomedical / Translational Medicine","Anatomy & Physiology","Ecology / Environmental Science","Biochemistry","Chemistry","Materials Science","Physics","Astrophysics / Astronomy","Earth Science / Geology","Synthetic Biology","Bioinformatics","Forensic Science","Statistics / Data Analysis","Experimental Design","Scientific Writing"]},
   {id:"engineering",label:"Engineering & Hardware",question:"What can you build, design, or engineer?",icon:"ti-cpu",type:"level",hint:"Select tools and capabilities you actually use - not just interests",
    items:["Fusion 360","SolidWorks","Onshape","AutoCAD","SketchUp","3D Printing","Laser Cutting","Robotics - FIRST / VEX","Robot Programming (Java / C++)","ROS","FIRST - Drive Coach / Strategy","FIRST - Scouting & Data Analysis","Circuit Design / PCB","Soldering / Electronics","Electrical Wiring","Mechanical Design","Aerospace / Rocketry","Cybersecurity / Networks","Embedded Systems"]},
   {id:"design",label:"Design & Creative Tools",question:"What design tools and creative skills do you use?",icon:"ti-palette",type:"level",hint:"List tools you actually open and use regularly",
    items:["Figma / UI Design","Adobe Photoshop","Adobe Illustrator","Adobe Premiere / Video Editing","After Effects / Motion Graphics","DaVinci Resolve","Blender / 3D Modeling","Procreate / Digital Art","Photography","Canva","Brand Identity / Logos","Illustration / Drawing","Animation","Game Art / Pixel Art","Architecture Design"]},
   {id:"business",label:"Business & Finance",question:"What business skills do you know?",icon:"ti-chart-line",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
-   items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Fundraising","Economics","Product Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
+   items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Fundraising","Hospitality Management","Economics","Product Management","Project Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
   {id:"writing",label:"Writing & Communication",question:"What writing and communication skills do you have?",icon:"ti-pencil",type:"level",hint:"Select skills you actively and regularly use",
    items:["Research & Academic Writing","Essay Writing","Journalism / Reporting","Creative Writing","Technical Writing","Grant Writing","Screenwriting / Scripts","Poetry","Public Speaking","Debate","Social Media Content"]},
   {id:"humanities",label:"Humanities & Social Sciences",question:"What humanities disciplines do you know?",icon:"ti-book",type:"level",hint:"Key for John Locke Essay, Model UN, Mock Trial, and policy competitions",
@@ -1552,7 +1603,33 @@ var SKILL_CATS=[
   {id:"social",label:"Social Impact & Leadership",question:"What impact and leadership skills do you have?",icon:"ti-world",type:"level",hint:"Skills from clubs, volunteering, organizing, or community projects",
    items:["Community Organizing","Nonprofit Management","Volunteer Coordination","International Development","Civic Engagement","Education / Tutoring","Fundraising","Event Planning","Project Management"]}
 ];
-var LEVELS=["Beginner","Intermediate","Advanced","Expert"];
+// Three concrete, behavior-anchored tiers instead of four subjective
+// ones (Beginner/Intermediate/Advanced/Expert meant something different
+// to every student rating themselves). Each tier keeps its familiar
+// short label but is grounded by a one-line definition shown inline
+// when it's selected, so nobody has to guess what "Advanced" means.
+var LEVELS=["Beginner","Intermediate","Advanced"];
+var LEVEL_DEFS={"Beginner":"Just started learning this","Intermediate":"Used it in a class or project","Advanced":"Comfortable enough to lead this part"};
+// Math is a different kind of question ("what have you taken", not
+// "how good are you") so it gets its own two-tag system rather than
+// being forced into the same proficiency scale as a tool or subject.
+var MATH_TAGS=["Completed","Currently taking"];
+var accordionOpen={};
+var powTypePicked="Project";
+// Each interest pulls full, uncurated skill categories - not a
+// hand-picked subset. A student's suggested list is the union of every
+// category their picked interest(s) actually touch, since a research
+// project needs a writer as much as a scientist, a business idea needs
+// a coder and a designer as much as a spreadsheet. Math is handled
+// separately and always shown, regardless of interest.
+var TRACK_TO_SKILLCATS={
+  research:["science","writing","coding"],
+  business:["business","design","writing","coding"],
+  impact:["social","writing","business"],
+  tech:["coding","engineering","design"],
+  arts:["design","writing"],
+  law:["humanities","writing"]
+};
 
 // ── Helpers ────────────────────────────────
 function R(h){document.getElementById("ROOT").innerHTML=h;}
@@ -1563,13 +1640,13 @@ function goTo(p){
   else if(p==="signup")rSignup();
   else if(p==="track")rTrack();
   else if(p==="skills")rSkills();
-  else if(p==="goals")rGoals();
+  else if(p==="goals")rTrack(); // legacy alias - Goals merged into the Interests & Goals page
   else if(p==="loading")rLoading();
   else if(p==="matches")rMatches();
 }
-function logo(){return "<div class=\"logo\">Partn<span>r</span></div>";}
+function logo(big){return "<div class=\"logo"+(big?" big":"")+"\">Partn<span>r</span></div>";}
 // 5-step progress bar
-function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=5;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
+function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=4;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 // Marks a required field/section label. A single small red asterisk,
 // consistent everywhere a field or section is actually enforced by
@@ -1654,22 +1731,23 @@ function gradeOpts(){
 
 // ── Welcome ─────────────────────────────────
 function rWelcome(){
-  R(logo()+
-    "<h2 style=\"font-size:24px;margin-bottom:0.5rem;\">Find the right student partner</h2>"+
-    "<div class=\"sub\">Whether you're building a startup, launching a nonprofit, doing research, or competing globally — find the right partner matched by goal, role, and skill level. Not just who you already know.</div>"+
-    "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:0.75rem;\">"+
-      "<div class=\"welcome-cat\" data-cats=\"science\" data-label=\"Research & Science\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-microscope\" style=\"font-size:21px;color:#0F6E56;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Research & Science</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Business & Finance\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-chart-line\" style=\"font-size:21px;color:#3B6D11;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Business & Finance</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"impact\" data-label=\"Nonprofit & Impact\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-world\" style=\"font-size:21px;color:#1D9E75;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Nonprofit & Impact</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Engineering & Tech\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-cpu\" style=\"font-size:21px;color:#185FA5;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Engineering & Tech</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"law\" data-label=\"Law\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-gavel\" style=\"font-size:21px;color:#7A2942;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Law</div></div>"+
-      "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:12px 6px;border-radius:12px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:21px;color:#993C1D;\"></i><div style=\"font-size:11px;font-weight:600;color:#1a1a1a;margin-top:6px;line-height:1.2;\">Arts & Writing</div></div>"+
+  R(logo(true)+
+    "<h2 style=\"font-size:28px;line-height:1.15;margin-bottom:0.75rem;\">Find your next project partner.</h2>"+
+    "<div style=\"font-size:15px;color:#1a1a1a;line-height:1.6;margin-bottom:0.75rem;\">Ever wanted to enter a competition, publish research, launch a business, or start a nonprofit, but didn’t know where to start or who to do it with?</div>"+
+    "<div style=\"font-size:15px;color:#1a1a1a;line-height:1.6;margin-bottom:0.75rem;\">Partnr connects you with high school students who share your ambition, at your school, in your city, or around the world.</div>"+
+    "<div style=\"font-size:14px;color:#1a1a1a;line-height:1.6;margin-bottom:1.25rem;\">Bring your ideas and skills. Find a project that excites you. Build something together.</div>"+
+    "<div class=\"wgrid\" style=\"margin-bottom:0.75rem;\">"+
+      "<div class=\"welcome-cat\" data-cats=\"science\" data-label=\"Research & Science\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-microscope\" style=\"font-size:28px;color:#3E96DB;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Research & Science</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Business & Finance\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-trending-up\" style=\"font-size:28px;color:#4A7F1E;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Business & Finance</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"impact\" data-label=\"Nonprofit & Impact\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-world\" style=\"font-size:28px;color:#B8456E;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Nonprofit & Impact</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"tech\" data-label=\"Engineering & Tech\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-code\" style=\"font-size:28px;color:#2A5DB0;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Engineering & Tech</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"law\" data-label=\"Law\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-gavel\" style=\"font-size:28px;color:#6D3F94;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Law</div></div>"+
+      "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:28px;color:#C9691A;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Arts & Writing</div></div>"+
     "</div>"+
-    "<div style=\"text-align:center;font-size:11px;color:#6b6b6b;margin-bottom:1rem;\">Tap any category to browse real competitions — no account needed</div>"+
-    "<div style=\"text-align:center;font-size:12px;color:#6b6b6b;margin-bottom:1.5rem;\"><i class=\"ti ti-trophy\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;color:#854F0B;\"></i>"+COMPS.length+"+ competitions — from ISEF and DECA to Congressional App Challenge</div>"+
-    "<button class=\"bp\" id=\"gs\">Get started →</button>"+
-    "<button class=\"bkbtn\" id=\"toSignin\">Already have an account? Sign in</button>"+
-    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#6b6b6b;\">Free · Beta</div>"
+    "<div style=\"text-align:center;font-size:12px;color:#1a1a1a;margin-bottom:1.5rem;\">Tap a category to explore "+COMPS.length+"+ real competitions. No account needed.</div>"+
+    "<button class=\"bp\" id=\"gs\">Find my project partner →</button>"+
+    "<button class=\"bkbtn\" id=\"toSignin\" style=\"color:#1a1a1a;\">Already on Partnr? Sign in</button>"+
+    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#1a1a1a;\">Free to join · Currently in beta</div>"
   );
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
   document.getElementById("toSignin").addEventListener("click",function(){goTo("signin");});
@@ -1738,12 +1816,12 @@ function rSignIn(){
     "<button class=\"bp\" id=\"msSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-windows\"></i> Sign in with Microsoft</button>"+
     "<button class=\"bp\" id=\"ghSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-github\"></i> Sign in with GitHub</button>"+
     "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-top:1rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Some schools block third-party sign-in until their IT admin approves it. If Google or Microsoft doesn't work, use your email instead — it always works and doesn't require any approval.</div>"+
-    "<button class=\"bkbtn\" id=\"toWelcome\" style=\"margin-top:1rem;\">New to Partnr? Get started</button>"
+    "<button class=\"bkbtn\" id=\"toWelcome\" style=\"margin-top:1rem;\">New to Partnr? Create an account</button>"
   );
-  document.getElementById("toWelcome").addEventListener("click",function(){goTo("welcome");});
+  document.getElementById("toWelcome").addEventListener("click",function(){goTo("signup");});
   document.getElementById("siSend").addEventListener("click",function(){
     var email=document.getElementById("siEmail").value.trim();
-    if(!email||!email.includes("@")){showErr("siEmail","Please enter a valid email address");scrollToFirstErr();return;}
+    if(!email||!email.includes("@")){showErr("siEmail","Enter a valid email address");scrollToFirstErr();return;}
     var btn=document.getElementById("siSend");
     btn.disabled=true;btn.textContent="Sending link…";
     S.email=email;
@@ -1943,405 +2021,58 @@ function rSignup(){
   });
 }
 
-// ── Track ───────────────────────────────────
+// ── Interests & Goals (combined) ─────────────
+// Formerly split across three screens: Track+Role, then Skills, then a
+// separate Goals page at the very end. Role is gone entirely - it was
+// largely a lower-resolution restatement of what Skills + "what kind of
+// partner" already say, and the same 6 startup-shaped labels never fit
+// every track (ISEF, mock trial, a novel) as naturally as a business
+// track. Project Stage is gone too - "how far along" is exactly the
+// kind of nuance the free-text idea box already carries on its own.
+// Target Competitions moves up from the old Goals page to live here,
+// since a student who already knows what they're targeting (Regeneron,
+// DECA, etc.) shouldn't have to pick an abstract interest category
+// first - picking a real competition can set the interest directly.
+// Interest lives in exactly one place now: inline inside "Tell us your
+// interests" (chips + free text together), instead of a separate tile
+// grid plus a separate Secondary Interest section plus a separate popup
+// that also asked for interest a third time. Whichever signal is most
+// concrete always determines Primary Interest, most-recent-wins: a
+// picked competition (unambiguous) overrides an AI read of typed text,
+// which overrides a plain chip tap - see addComp() and
+// runInlineSuggestions() below.
 function rTrack(){
-  var tracks=[
-    {val:"research",icon:"ti-microscope",color:"#0F6E56",border:"#5DCAA5",name:"Research & Science",sub:"ISEF · iGEM · Science Olympiad"},
-    {val:"business",icon:"ti-chart-line",color:"#3B6D11",border:"#C0DD97",name:"Build a Business",sub:"DECA · Blue Ocean · Conrad"},
-    {val:"impact",icon:"ti-world",color:"#1D9E75",border:"#5DCAA5",name:"Social Impact",sub:"Diamond · CEC · SAGE"},
-    {val:"arts",icon:"ti-pencil",color:"#993C1D",border:"#F0997B",name:"Arts & Writing",sub:"Scholastic · YoungArts · John Locke"},
-    {val:"tech",icon:"ti-cpu",color:"#185FA5",border:"#85B7EB",name:"Engineering & Tech",sub:"Hackathons · FIRST · Congressional App"}
-  ];
-  var roles=[
-    {val:"vision",icon:"ti-bulb",color:"#534AB7",name:"Vision / CEO",desc:"I have the idea and lead direction"},
-    {val:"tech_r",icon:"ti-code",color:"#185FA5",name:"Tech / CTO",desc:"I build — code, data, engineering"},
-    {val:"mktg",icon:"ti-speakerphone",color:"#993C1D",name:"Marketing / CMO",desc:"I pitch, promote, tell the story"},
-    {val:"ops",icon:"ti-list-check",color:"#0F6E56",name:"Operations / COO",desc:"I organize and make things happen"},
-    {val:"res_r",icon:"ti-microscope",color:"#1D9E75",name:"Research Lead",desc:"I do deep research, analysis, writing"},
-    {val:"creative",icon:"ti-palette",color:"#D85A30",name:"Creative Lead",desc:"I design, illustrate, create"}
-  ];
-  var tHTML=tracks.map(function(t){
-    var sel=S.track===t.val;
-    return "<div class=\"tc"+(sel?" on":"")+"\" role=\"button\" tabindex=\"0\" aria-pressed=\""+(sel?"true":"false")+"\" data-val=\""+t.val+"\" style=\"border-color:"+t.border+";"+(sel?"background:"+TR[t.val].bg+";":"")+"\">" +
-      "<i class=\"ti "+t.icon+"\" style=\"font-size:20px;color:"+t.color+";\"></i>" +
-      "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:5px;\">"+t.name+"</div>" +
-      "<div style=\"font-size:11px;color:"+t.color+";margin-top:3px;\">"+t.sub+"</div></div>";
-  }).join("");
-  var rHTML=roles.map(function(r){
-    var sel=S.role===r.val;
-    // Description leads (this is what a student actually recognizes
-    // about themselves, across every track - not just startups). The
-    // CEO/CTO label survives only as a small footnote, useful for us
-    // talking about "the CEO role" internally, not the first thing a
-    // 15-year-old is asked to identify with.
-    return "<div class=\"rc"+(sel?" on":"")+"\" role=\"button\" tabindex=\"0\" aria-pressed=\""+(sel?"true":"false")+"\" data-role=\""+r.val+"\">" +
-      "<i class=\"ti "+r.icon+"\" style=\"font-size:20px;color:"+r.color+";\"></i>" +
-      "<div class=\"rn\">"+r.desc+"</div><div class=\"rd\">"+r.name+"</div></div>";
-  }).join("");
-  R(logo()+sb(2)+
-    "<h2>Your track & role</h2>"+
-    "<div class=\"sub\">Pick your focus and the role you bring to a team. You'll be matched with complementary roles.</div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Track"+req()+"</div>"+
-    "<div id=\"tg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;\">"+tHTML+"</div>"+
-    "<div class=\"slabel\">Your role"+req()+"</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Tell us what you enjoy contributing. We'll help you find complementary teammates.</div>"+
-    "<div id=\"rg\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;\">"+rHTML+"</div>"+
-    "<div class=\"slabel\">Status"+req()+"</div>"+
-    "<div class=\"cgrow\" id=\"status\"></div>"+
-    "<div class=\"slabel\">Secondary interests <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional — pick up to 2)</span></div>"+
-    "<div class=\"cgrow\" id=\"secondary\"></div>"+
-    "<button class=\"bp\" id=\"s3\" style=\"opacity:"+(S.track&&S.role?"1":"0.4")+"\">Continue →</button>"+
-    "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
-  );
-  mkChips("status",["I have a project — need teammates","Open to joining a project","Just exploring"],[S.status],true);
-  var secTracks=Object.keys(TR).map(function(k){return TR[k].n;}).filter(function(n){return !S.track||n!==TR[S.track].n;});
-  mkChips("secondary",secTracks,Array.isArray(S.secondary)?S.secondary:[],false);
-  // Enforce max 2 secondary
-  document.querySelectorAll("#secondary .chip").forEach(function(c){
-    c.addEventListener("click",function(){
-      var sel=document.querySelectorAll("#secondary .chip.on");
-      if(sel.length>2){this.classList.remove("on");}
-    });
-  });
-  document.querySelectorAll(".tc").forEach(function(el){
-    el.addEventListener("click",function(){
-      var newPrimary=this.dataset.val;
-      var secOpts=Object.keys(TR).filter(function(k){return k!==newPrimary;}).map(function(k){return TR[k].n;});
-      if(Array.isArray(S.secondary))S.secondary=S.secondary.filter(function(s){return s!==TR[newPrimary].n;});
-      mkChips("secondary",secOpts,Array.isArray(S.secondary)?S.secondary:[],false);
-      document.querySelectorAll("#secondary .chip").forEach(function(c){
-        c.addEventListener("click",function(){
-          var sel=document.querySelectorAll("#secondary .chip.on");
-          if(sel.length>2){this.classList.remove("on");}
-        });
-      });
-    });
-  });
-  if(S.track){var e=document.querySelector("[data-val=\""+S.track+"\"]");if(e){e.classList.add("on");e.style.background=TR[S.track].bg;}}
-  if(S.role){var e2=document.querySelector("[data-role=\""+S.role+"\"]");if(e2)e2.classList.add("on");}
-  document.getElementById("s3").addEventListener("click",step3);
-  document.getElementById("bk").addEventListener("click",function(){goTo("signup");});
-  document.querySelectorAll(".tc").forEach(function(el){
-    addKbdActivation(el);
-    el.addEventListener("click",function(){
-      S.track=this.dataset.val;
-      document.querySelectorAll(".tc").forEach(function(c){c.classList.remove("on");c.style.background="";c.setAttribute("aria-pressed","false");});
-      this.classList.add("on");this.style.background=TR[S.track].bg;this.setAttribute("aria-pressed","true");
-      document.getElementById("s3").style.opacity=(S.track&&S.role)?"1":"0.4";
-    });
-  });
-  document.querySelectorAll(".rc").forEach(function(el){
-    addKbdActivation(el);
-    el.addEventListener("click",function(){
-      S.role=this.dataset.role;
-      document.querySelectorAll(".rc").forEach(function(c){c.classList.remove("on");c.setAttribute("aria-pressed","false");});
-      this.classList.add("on");this.setAttribute("aria-pressed","true");
-      document.getElementById("s3").style.opacity=(S.track&&S.role)?"1":"0.4";
-    });
-  });
-}
-
-// ── Skills ──────────────────────────────────
-function rSkills(){
-  var html=SKILL_CATS.map(function(cat){
-    var cc=SKILL_CAT_COLORS[cat.id]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
-    var sel=cat.items.filter(function(item){return S.skillLevels[cat.id+":"+item]!==undefined;});
-    var isOpen=sel.length>0;
-    var itemsHtml=cat.items.map(function(item){
-      var key=cat.id+":"+item;
-      var on=S.skillLevels[key]!==undefined;
-      var lv=S.skillLevels[key]||null;
-      var lvHtml="";
-      if(cat.type==="level"){
-        lvHtml="<div class=\"lv-inline"+(on?" show":"")+"\" id=\"lv-"+key.replace(/[^a-z0-9]/gi,"_")+"\">"+
-          LEVELS.map(function(l){return "<div class=\"lv"+(lv===l?" on":"")+"\" data-lv=\""+l+"\" data-key=\""+key+"\">"+l+"</div>";}).join("")+
-        "</div>";
-      }
-      return "<div class=\"skill-item"+(on?" on":"")+"\" data-key=\""+key+"\" data-type=\""+cat.type+"\">"+
-        "<div class=\"skill-item-top\">"+
-          "<div class=\"skill-item-check"+(on?" on":"")+"\">"+
-            (on?"<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>":"")+
-          "</div>"+
-          "<span class=\"skill-item-name\">"+item+"</span>"+
-        "</div>"+lvHtml+"</div>";
-    }).join("");
-    return "<div class=\"skill-cat\">"+
-      "<div class=\"skill-cat-header\" data-cat=\""+cat.id+"\">"+
-        "<div style=\"display:flex;align-items:center;gap:10px;\">"+
-          "<div style=\"width:32px;height:32px;border-radius:8px;background:"+cc.bg+";display:flex;align-items:center;justify-content:center;flex-shrink:0;\">"+
-            "<i class=\"ti "+cat.icon+"\" style=\"font-size:16px;color:"+cc.color+";\"></i>"+
-          "</div>"+
-          "<div>"+
-            "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cat.label+"</div>"+
-            "<div style=\"font-size:12px;color:#6b6b6b;margin-top:1px;\">"+cat.question+"</div>"+
-          "</div>"+
-        "</div>"+
-        "<div style=\"display:flex;align-items:center;gap:8px;flex-shrink:0;\">"+
-          (sel.length?"<span style=\"font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:"+cc.bg+";color:"+cc.tc+"\">"+sel.length+" selected</span>":"")+
-          "<i class=\"ti "+(isOpen?"ti-chevron-up":"ti-chevron-down")+"\" style=\"font-size:16px;color:#6b6b6b;\" id=\"chev-"+cat.id+"\"></i>"+
-        "</div>"+
-      "</div>"+
-      "<div class=\"skill-cat-body\" id=\"body-"+cat.id+"\" style=\"display:"+(isOpen?"block":"none")+";padding:12px 14px;border-top:1px solid #f0f0ec;\">"+
-        "<div class=\"hint\">"+cat.hint+"</div>"+
-        "<div class=\"skill-items-grid\">"+itemsHtml+"</div>"+
-      "</div>"+
-    "</div>";
-  }).join("");
-
-  // Build experience list HTML from state
-  var expHTML=S.experience.map(function(e,i){
-    return "<div class=\"exp-pill\">"+
-      "<div style=\"flex:1;\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div>"+
-      (e.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+esc(e.desc)+"</div>":"")+
-      "</div>"+
-      "<button class=\"exp-pill-del\" data-ei=\""+i+"\" aria-label=\"Remove this entry\"><i class=\"ti ti-x\"></i></button>"+
-    "</div>";
-  }).join("");
-
-  var awardHTML=S.awards.map(function(a,i){
-    return "<div style=\"display:flex;align-items:center;gap:8px;padding:6px 10px;background:#EAF3DE;border-radius:8px;margin-bottom:6px;\">"+
-      "<i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;flex-shrink:0;\"></i>"+
-      "<span style=\"flex:1;font-size:13px;color:#1a1a1a;\">"+esc(a)+"</span>"+
-      "<button data-ai=\""+i+"\" aria-label=\"Remove award: "+esc(a)+"\" style=\"background:none;border:none;cursor:pointer;color:#6b6b6b;font-size:15px;padding:0;line-height:1;\">×</button>"+
-    "</div>";
-  }).join("");
-
-  // Real project entries — not GitHub-only, since Partnr matches across
-  // research, business, impact, and arts/writing tracks too, not just
-  // tech. A link is optional (GitHub repo, Google Doc, video, anything)
-  // since not every project has one worth sharing.
-  var portfolioHTML=S.portfolioItems.map(function(p,i){
-    return "<div class=\"exp-pill\">"+
-      "<div style=\"flex:1;\">"+
-      "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
-      (p.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.4;\">"+esc(p.desc)+"</div>":"")+
-      (p.link?"<a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(p.link)+"</a>":"")+
-      "</div>"+
-      "<button class=\"portfolio-pill-del\" data-pi=\""+i+"\" aria-label=\"Remove this project\"><i class=\"ti ti-x\"></i></button>"+
-    "</div>";
-  }).join("");
-
-  R(logo()+sb(3)+
-    "<h2>Your skills</h2>"+
-    "<div class=\"sub\">Select specific skills, courses, and tools you know. The more specific, the better your matches.<span style=\"color:#C53030;\"> * at least one required</span></div>"+
-    "<div id=\"skill-cats\">"+html+"</div>"+
-    "<div id=\"ssum\" style=\"font-size:13px;color:#6b6b6b;margin:1rem 0;\"></div>"+
-    "<div class=\"slabel\">Don't see your skill?</div>"+
-    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
-      "<input id=\"customskill\" placeholder=\"e.g. VHDL, Competitive Chess, Mandarin Calligraphy...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
-      "<button id=\"addskillbtn\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
-    "</div>"+
-    "<div id=\"custom-skills-row\" style=\"display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem;\"></div>"+
-    "<div class=\"slabel\">Weekly availability"+req()+"</div>"+
-    "<div class=\"cgrow\" id=\"avail\"></div>"+
-    "<div class=\"slabel\">Portfolio / GitHub <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
-    "<div class=\"fi\"><input id=\"igh\" placeholder=\"github.com/yourname or portfolio URL\" value=\""+esc(S.github)+"\"/></div>"+
-    // Optional experience & awards section
-    "<div style=\"background:#f8f8f6;border-radius:12px;padding:14px;margin-bottom:1rem;\">"+
-      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;\">Experience & Awards <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Add internships, competitions, projects, or awards. Skip if you're just getting started — that's totally fine.</div>"+
-      "<div id=\"exp-list\">"+expHTML+"</div>"+
-      (S.experience.length<5?
-        "<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
-          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"exp-title\">Title</label><input id=\"exp-title\" placeholder=\"e.g. ISEF Semifinalist, Research Internship, DECA State Champion\"/></div>"+
-          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"exp-desc\">Description <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><textarea id=\"exp-desc\" style=\"height:60px;\" placeholder=\"What did you build, research, or accomplish?\"></textarea></div>"+
-          "<button id=\"exp-add\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add experience</button>"+
-        "</div>"
-        : "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\">Maximum 5 experiences reached.</div>")+
-      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;\">Awards & Recognition</div>"+
-      "<div id=\"award-list\">"+awardHTML+"</div>"+
-      "<div style=\"display:flex;gap:8px;margin-top:4px;\">"+
-        "<input id=\"award-inp\" placeholder=\"e.g. 1st place regional science fair 2024\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
-        "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
-      "</div>"+
-      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 4px;\">Portfolio</div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Add a few real projects — a paper, a pitch deck, a repo, a video, a class project. Helps potential teammates understand what you enjoy working on.</div>"+
-      "<div id=\"portfolio-list\">"+portfolioHTML+"</div>"+
-      (S.portfolioItems.length<6?
-        "<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
-          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-title\">Project title</label><input id=\"port-title\" placeholder=\"e.g. ISEF Project: Microplastics in Groundwater\"/></div>"+
-          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-desc\">Description <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><textarea id=\"port-desc\" style=\"height:60px;\" placeholder=\"What is it, and what did you do?\"></textarea></div>"+
-          "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"port-link\">Link <span style=\"font-weight:400;color:#6b6b6b;\">(optional — GitHub, a doc, a video, anything)</span></label><input id=\"port-link\" placeholder=\"https://...\"/></div>"+
-          "<button id=\"port-add\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add project</button>"+
-        "</div>"
-        : "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\">Maximum 6 projects reached.</div>")+
-    "</div>"+
-    "<button class=\"bp\" id=\"s4\">Continue →</button>"+
-    "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
-  );
-
-  mkChips("avail",["1-3 hrs/week","4-8 hrs/week","10+ hrs/week","Weekends only"],[S.availability],true);
-
-  document.querySelectorAll(".skill-cat-header").forEach(function(hdr){
-    hdr.addEventListener("click",function(){
-      var cid=this.dataset.cat;
-      var body=document.getElementById("body-"+cid);
-      var chev=document.getElementById("chev-"+cid);
-      var open=body.style.display!=="none";
-      body.style.display=open?"none":"block";
-      chev.className="ti "+(open?"ti-chevron-down":"ti-chevron-up");
-      chev.style.fontSize="16px";chev.style.color="#888";
-    });
-  });
-
-  document.querySelectorAll(".skill-item").forEach(function(item){
-    item.addEventListener("click",function(e){
-      if(e.target.classList.contains("lv"))return;
-      var key=this.dataset.key;var type=this.dataset.type;
-      var on=this.classList.contains("on");
-      var chk=this.querySelector(".skill-item-check");
-      var lvRow=this.querySelector(".lv-inline");
-      if(on){
-        this.classList.remove("on");delete S.skillLevels[key];
-        chk.classList.remove("on");chk.innerHTML="";
-        if(lvRow)lvRow.classList.remove("show");
-      } else {
-        this.classList.add("on");
-        S.skillLevels[key]=type==="course"?"studied":null;
-        chk.classList.add("on");chk.innerHTML="<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>";
-        if(lvRow)lvRow.classList.add("show");
-      }
-      updSS();
-    });
-    item.querySelectorAll(".lv").forEach(function(lv){
-      lv.addEventListener("click",function(e){
-        e.stopPropagation();
-        var key=this.dataset.key;
-        var par=this.closest(".skill-item");
-        par.querySelectorAll(".lv").forEach(function(x){x.classList.remove("on");});
-        this.classList.add("on");S.skillLevels[key]=this.dataset.lv;
-        if(!par.classList.contains("on")){
-          par.classList.add("on");
-          var chk=par.querySelector(".skill-item-check");
-          chk.classList.add("on");chk.innerHTML="<i class=\"ti ti-check\" style=\"font-size:10px;color:white;\"></i>";
-          var lvRow=par.querySelector(".lv-inline");
-          if(lvRow)lvRow.classList.add("show");
-        }
-        updSS();
-      });
-    });
-  });
-
-  document.getElementById("addskillbtn").addEventListener("click",function(){
-    var inp=document.getElementById("customskill");
-    var val=inp.value.trim();if(!val)return;
-    val=val.charAt(0).toUpperCase()+val.slice(1);
-    var key="custom:"+val;
-    if(S.skillLevels[key]!==undefined){inp.value="";return;}
-    S.skillLevels[key]="noted";
-    var row=document.getElementById("custom-skills-row");
-    var pill=document.createElement("span");
-    pill.style.cssText="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;background:#EEEDFE;color:#3C3489;";
-    pill.textContent=val+" ";
-    var x=document.createElement("button");
-    x.textContent="×";x.style.cssText="background:none;border:none;cursor:pointer;font-size:14px;padding:0;opacity:0.6;line-height:1;";
-    x.addEventListener("click",function(){delete S.skillLevels[key];row.removeChild(pill);updSS();});
-    pill.appendChild(x);row.appendChild(pill);
-    inp.value="";updSS();
-  });
-  document.getElementById("customskill").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("addskillbtn").click();}});
-
-  // Experience add
-  var expAddBtn=document.getElementById("exp-add");
-  if(expAddBtn){
-    expAddBtn.addEventListener("click",function(){
-      var t=document.getElementById("exp-title").value.trim();
-      if(!t)return;
-      S.experience.push({title:t,desc:document.getElementById("exp-desc").value.trim()});
-      rSkills();
-    });
-    var expTitleEl=document.getElementById("exp-title");
-    if(expTitleEl)expTitleEl.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();expAddBtn.click();}});
-  }
-  document.querySelectorAll(".exp-pill-del").forEach(function(b){
-    b.addEventListener("click",function(){S.experience.splice(parseInt(this.dataset.ei),1);rSkills();});
-  });
-
-  // Award add
-  document.getElementById("award-add").addEventListener("click",function(){
-    var val=document.getElementById("award-inp").value.trim();
-    if(!val)return;
-    S.awards.push(val);rSkills();
-  });
-  document.getElementById("award-inp").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("award-add").click();}});
-  document.querySelectorAll("[data-ai]").forEach(function(b){
-    b.addEventListener("click",function(){S.awards.splice(parseInt(this.dataset.ai),1);rSkills();});
-  });
-
-  var portAddBtn=document.getElementById("port-add");
-  if(portAddBtn){
-    portAddBtn.addEventListener("click",function(){
-      var t=document.getElementById("port-title").value.trim();
-      if(!t)return;
-      var link=document.getElementById("port-link").value.trim();
-      if(link&&!/^https?:\/\//i.test(link)){
-        showErr("port-link","Links must start with http:// or https://");
-        scrollToFirstErr();
-        return;
-      }
-      S.portfolioItems.push({title:t,desc:document.getElementById("port-desc").value.trim(),link:link});
-      rSkills();
-    });
-    var portTitleEl=document.getElementById("port-title");
-    if(portTitleEl)portTitleEl.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();portAddBtn.click();}});
-  }
-  document.querySelectorAll(".portfolio-pill-del").forEach(function(b){
-    b.addEventListener("click",function(){S.portfolioItems.splice(parseInt(this.dataset.pi),1);rSkills();});
-  });
-
-  document.getElementById("s4").addEventListener("click",step4);
-  document.getElementById("bk").addEventListener("click",function(){goTo("track");});
-  updSS();
-}
-
-function updSS(){
-  var el=document.getElementById("ssum");if(!el)return;
-  var all=Object.keys(S.skillLevels);
-  var total=all.length;
-  var needLv=all.filter(function(k){
-    var cat=SKILL_CATS.find(function(c){return k.indexOf(c.id+":")===0;});
-    return cat&&cat.type==="level"&&!S.skillLevels[k];
-  });
-  if(!total){el.textContent="No skills selected yet — open a category above to add skills.";return;}
-  el.innerHTML=total+" skill"+(total>1?"s":"")+" selected"+
-    (needLv.length?" · <span style=\"color:#854F0B;\">"+needLv.length+" still need a level ←</span>":
-    " <span style=\"color:#3B6D11;font-weight:600;\">✓ All set</span>");
-}
-function skStr(){
-  return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){
-    var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
-    if(lv==="studied"||lv==="noted")return skill;
-    return skill+" ("+lv+")";
-  }).join(", ");
-}
-
-// ── Goals ───────────────────────────────────
-function rGoals(){
   var catKeys=Object.keys(CM2).filter(function(k){return k!=="custom";});
-  R(logo()+sb(4)+
-    "<h2>Your project & goals</h2>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Project stage"+req()+"</div>"+
-    "<div id=\"stg\" class=\"stbar\">"+
-      ["Spark|Just an idea|spark","Planning|Researching|planning","Building|Active work|building","Submitting|Competition ready|submitting","Open|No idea yet|open"].map(function(x){
-        var p=x.split("|");
-        return "<div class=\"stb"+(S.stage===p[2]?" on":"")+"\" data-val=\""+p[2]+"\">"+p[0]+"<br><span style=\"font-size:9px;\">"+p[1]+"</span></div>";
-      }).join("")+
-    "</div>"+
-    "<div class=\"slabel\">Target competitions</div>"+
-    "<div class=\"hint\">All competitions here support teams or prep partners. Search by name or browse by category below.</div>"+
+  R(logo()+sb(2)+
+    "<h2>Your interests & goals</h2>"+
+    "<div class=\"sub\">Tell us what you're working on and who you're looking for.</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Target competitions</div>"+
+    "<div class=\"hint\">Already have a competition in mind? Enter the name below — add as many as you're targeting.</div>"+
     "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search — ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
     "<div id=\"pills\" style=\"display:flex;flex-wrap:wrap;gap:5px;min-height:10px;margin-bottom:1rem;\"></div>"+
-    "<button class=\"exbtn\" id=\"exbtn\"><i class=\"ti ti-compass\" style=\"font-size:18px;color:#7F77DD;\"></i><span>Not sure what's out there? Browse by category</span><i class=\"ti ti-chevron-down\" id=\"exch\" style=\"font-size:15px;margin-left:auto;\"></i></button>"+
-    "<button class=\"exbtn\" id=\"suggestbtn\"><i class=\"ti ti-sparkles\" style=\"font-size:18px;color:#7F77DD;\"></i><span>Tell us your interests, we'll suggest competitions</span></button>"+
-    "<div class=\"expp\" id=\"expp\">"+
-      "<div class=\"ctabs\" id=\"ctabs\">"+
-        "<button class=\"ctab on\" data-cat=\"all\" style=\"color:#7F77DD;\">All</button>"+
-        catKeys.map(function(c){return "<button class=\"ctab\" data-cat=\""+c+"\">"+CM2[c].n+"</button>";}).join("")+
-      "</div>"+
-      "<div id=\"clist\"></div>"+
+    "<div id=\"exbtn\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;\">"+
+      "<button class=\"exbtn ex2\" id=\"exb-browse\" data-tab=\"browse\"><i class=\"ti ti-layout-grid\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Browse by category</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
+      "<button class=\"exbtn ex2\" id=\"exb-ai\" data-tab=\"ai\"><i class=\"ti ti-compass\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Not sure? Help me pick</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
     "</div>"+
-    "<div class=\"fi\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition above)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste. Looking for a technical co-founder who can build the app...\">"+esc(S.idea)+"</textarea></div>"+
-    "<div class=\"fi\"><label for=\"iskillsneeded\">What kind of partner are you looking for? <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><input id=\"iskillsneeded\" placeholder=\"e.g. a biology partner, someone who can build an app, someone to help write a research paper...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
+    "<div class=\"expp\" id=\"expp\">"+
+      "<div id=\"notsure-browse\" style=\"display:block;\">"+
+        "<div class=\"ctabs\" id=\"ctabs\">"+
+          "<button class=\"ctab on\" data-cat=\"all\" style=\"color:#7F77DD;\">All</button>"+
+          catKeys.map(function(c){return "<button class=\"ctab\" data-cat=\""+c+"\">"+CM2[c].n+"</button>";}).join("")+
+        "</div>"+
+        "<div id=\"clist\"></div>"+
+      "</div>"+
+      "<div id=\"notsure-ai\" style=\"display:none;padding:14px;\">"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Pick up to 2, and/or describe it in your own words below.</div>"+
+        "<div class=\"cgrow\" id=\"interest-chips\" style=\"margin-bottom:10px;\"></div>"+
+        "<textarea id=\"interest-text\" placeholder=\"e.g. I'm into AI and want to build something useful, or: I like biology and want to do research...\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;height:70px;resize:none;margin-bottom:10px;\"></textarea>"+
+        "<button class=\"bp\" id=\"interest-go\" style=\"margin-top:0;\">Suggest competitions →</button>"+
+        "<div id=\"interest-results\" style=\"margin-top:10px;\"></div>"+
+      "</div>"+
+    "</div>"+
+    "<div class=\"slabel\">Status"+req()+"</div>"+
+    "<div class=\"cgrow\" id=\"status\"></div>"+
+    "<div class=\"fi\" style=\"margin-top:1rem;\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition above)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste and need a technical co-founder, or: I know Python and I'm looking for a biology research project to join...\">"+esc(S.idea)+"</textarea></div>"+
     "<div class=\"slabel\">Commitment"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
     "<div class=\"slabel\">Who do you want to connect with?"+req()+"</div>"+
@@ -2352,10 +2083,14 @@ function rGoals(){
       return "<button class=\"loc-opt\" data-val=\""+esc(opt)+"\" style=\"width:100%;padding:12px 16px;border:2px solid "+(sel?"#7F77DD":"#e8e8e4")+";border-radius:10px;cursor:pointer;background:"+(sel?"#EEEDFE":"white")+";font-size:14px;font-weight:"+(sel?"600":"400")+";color:"+(sel?"#3C3489":"#444")+";text-align:left;font-family:inherit;\">"+ opt +"</button>";
     }).join("")+
     "</div>"+
-    "<button class=\"bp\" id=\"gf\">Find my partners →</button>"+
+    "<button class=\"bp\" id=\"s3\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
+  mkChips("status",["I have a project — need teammates","Open to joining a project","Just exploring"],[S.status],true);
   mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
+  renderInterestChips();
+  document.getElementById("s3").addEventListener("click",step3);
+  document.getElementById("bk").addEventListener("click",function(){goTo("signup");});
   document.querySelectorAll(".loc-opt").forEach(function(el){
     el.addEventListener("click",function(){
       S.locationPref=this.dataset.val;
@@ -2368,20 +2103,30 @@ function rGoals(){
       });
     });
   });
-  document.querySelectorAll("#stg .stb").forEach(function(el){
-    el.addEventListener("click",function(){document.querySelectorAll("#stg .stb").forEach(function(b){b.classList.remove("on");});this.classList.add("on");S.stage=this.dataset.val;});
-  });
   var ci=document.getElementById("ci");
   ci.addEventListener("input",function(){doSearch(this.value);});
   ci.addEventListener("focus",function(){if(this.value.length>=1)doSearch(this.value);});
   document.addEventListener("click",function(e){var d=document.getElementById("cdd");if(d&&!e.target.closest("#ci")&&!e.target.closest("#cdd"))d.style.display="none";});
-  document.getElementById("exbtn").addEventListener("click",function(){
-    exploreOpen=!exploreOpen;
+  // Two side-by-side options, each drops its own panel open. Tapping the
+  // open one closes it; tapping the other switches to it.
+  exploreOpen=false;notSureActiveTab="browse";
+  function setExplore(tab){
+    if(exploreOpen&&notSureActiveTab===tab){exploreOpen=false;}
+    else{exploreOpen=true;notSureActiveTab=tab;}
     document.getElementById("expp").classList.toggle("open",exploreOpen);
-    document.getElementById("exch").style.transform=exploreOpen?"rotate(180deg)":"";
-    if(exploreOpen)renderCat();
+    document.querySelectorAll(".ex2").forEach(function(b){
+      var on=exploreOpen&&b.dataset.tab===notSureActiveTab;
+      b.classList.toggle("on",on);
+      b.querySelector(".exch2").style.transform=on?"rotate(180deg)":"";
+    });
+    document.getElementById("notsure-browse").style.display=notSureActiveTab==="browse"?"block":"none";
+    document.getElementById("notsure-ai").style.display=notSureActiveTab==="ai"?"block":"none";
+    if(exploreOpen&&notSureActiveTab==="browse")renderCat();
+  }
+  document.querySelectorAll(".ex2").forEach(function(b){
+    b.addEventListener("click",function(){setExplore(b.dataset.tab);});
   });
-  document.getElementById("suggestbtn").addEventListener("click",openInterestSuggestModal);
+  document.getElementById("interest-go").addEventListener("click",runInlineSuggestions);
   document.querySelectorAll(".ctab").forEach(function(t){
     t.addEventListener("click",function(){
       var cat=this.dataset.cat;
@@ -2400,9 +2145,364 @@ function rGoals(){
       renderCat();
     });
   });
-  document.getElementById("gf").addEventListener("click",goFind);
-  document.getElementById("bk").addEventListener("click",function(){goTo("skills");});
   renderPills();
+}
+
+// Renders/refreshes the small Interest chips inside the panel from
+// current S.track/S.secondary - called on page load and again any time
+// a stronger signal (a picked competition, or an AI-read of typed
+// interest text) updates the interest programmatically, so the chips
+// never silently disagree with what's actually stored.
+function renderInterestChips(){
+  var el=document.getElementById("interest-chips");if(!el)return;
+  var keys=["research","business","impact","tech","law","arts"];
+  el.innerHTML="";
+  keys.forEach(function(k){
+    var on=S.track===k||(Array.isArray(S.secondary)&&S.secondary.indexOf(TR[k].n)>=0);
+    var c=document.createElement("div");c.className="chip"+(on?" on":"");c.textContent=TR[k].n;c.dataset.key=k;
+    c.setAttribute("role","button");c.setAttribute("tabindex","0");c.setAttribute("aria-pressed",on?"true":"false");
+    if(on){c.style.background=TR[k].bg;c.style.borderColor=TR[k].c;c.style.color=TR[k].tc;c.style.fontWeight="600";}
+    c.addEventListener("click",function(){
+      var currentlyOn=S.track===k||(Array.isArray(S.secondary)&&S.secondary.indexOf(TR[k].n)>=0);
+      if(currentlyOn){
+        // Turning off: demote secondary to primary if needed, or just clear.
+        if(S.track===k){S.track=(Array.isArray(S.secondary)&&S.secondary[0])?Object.keys(TR).find(function(kk){return TR[kk].n===S.secondary[0];})||"":"";S.secondary=(S.secondary||[]).slice(1);}
+        else{S.secondary=(S.secondary||[]).filter(function(n){return n!==TR[k].n;});}
+      } else {
+        var onCount=(S.track?1:0)+((S.secondary||[]).length);
+        if(onCount>=2)return; // cap at 2 total, same as before
+        if(!S.track)S.track=k;else S.secondary=(S.secondary||[]).concat([TR[k].n]).slice(0,2);
+      }
+      renderInterestChips();
+    });
+    addKbdActivation(c);
+    el.appendChild(c);
+  });
+}
+
+// ── Skills ──────────────────────────────────
+function rSkills(){
+  var activeTrackKeys=[];
+  if(S.track)activeTrackKeys.push(S.track);
+  (S.secondary||[]).forEach(function(name){
+    var k=Object.keys(TR).find(function(kk){return TR[kk].n===name;});
+    if(k&&activeTrackKeys.indexOf(k)<0)activeTrackKeys.push(k);
+  });
+  var activeCatIds=[];
+  activeTrackKeys.forEach(function(tk){
+    (TRACK_TO_SKILLCATS[tk]||[]).forEach(function(cid){if(activeCatIds.indexOf(cid)<0)activeCatIds.push(cid);});
+  });
+  var mathCat=SKILL_CATS.find(function(c){return c.id==="math";});
+  var activeCats=activeCatIds.map(function(id){return SKILL_CATS.find(function(c){return c.id===id;});}).filter(Boolean);
+  var extraCats=SKILL_CATS.filter(function(c){return c.id!=="math"&&activeCatIds.indexOf(c.id)<0;});
+
+  var expEntries=S.proofOfWork.filter(function(item){return item.type!=="Award";});
+  var awardEntries=S.proofOfWork.filter(function(item){return item.type==="Award";});
+  function entryPillHTML(item){
+    var realIndex=S.proofOfWork.indexOf(item);
+    return "<div class=\"exp-pill\">"+
+      "<div style=\"flex:1;\">"+
+      (item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+
+      "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+
+      (item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+
+      (item.desc?"<div style=\"font-size:12px;color:#666;margin-top:3px;line-height:1.4;\">"+esc(item.desc)+"</div>":"")+
+      (item.link?"<a href=\""+esc(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
+      "</div>"+
+      "<button class=\"pow-del\" data-pi=\""+realIndex+"\" aria-label=\"Remove this entry\"><i class=\"ti ti-x\"></i></button>"+
+    "</div>";
+  }
+  var expHTML2=expEntries.map(entryPillHTML).join("");
+  var awardsHTML=awardEntries.map(entryPillHTML).join("");
+  var expAddHTML="";
+  if(S.proofOfWork.length>=8){
+    expAddHTML="<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\">Maximum 8 entries reached.</div>";
+  } else {
+    var POW_LABELS={
+      Project:{title:"Title",titlePh:"e.g. ISEF Project: Microplastics in Groundwater",showRole:false,showLink:true,linkPh:"https://... (GitHub, blog, portfolio, paper, Google Drive)"},
+      Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"https://... (Instagram, club site, any social)"},
+      Internship:{title:"Organization name",titlePh:"e.g. Research Internship at XYZ Lab",showRole:true,showLink:false,linkPh:""}
+    };
+    var curLabels=POW_LABELS[powTypePicked]||POW_LABELS.Project;
+    expAddHTML="<div style=\"background:white;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #e8e8e4;\">"+
+      "<div style=\"display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;\">"+
+        ["Project","Club","Internship"].map(function(ty){
+          var on=powTypePicked===ty;
+          return "<button class=\"pow-type-pill"+(on?" on":"")+"\" data-type=\""+ty+"\" style=\"font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid "+(on?"#AFA9EC":"#ddd")+";background:"+(on?"#EEEDFE":"white")+";color:"+(on?"#3C3489":"#444")+";font-weight:"+(on?"600":"400")+";cursor:pointer;font-family:inherit;\">"+ty+"</button>";
+        }).join("")+
+      "</div>"+
+      "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"pow-title\" id=\"pow-title-label\">"+curLabels.title+"</label><input id=\"pow-title\" placeholder=\""+curLabels.titlePh+"\"/></div>"+
+      "<div class=\"fi\" id=\"pow-role-wrap\" style=\"margin-bottom:8px;display:"+(curLabels.showRole?"block":"none")+";\"><label for=\"pow-role\">Your role <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><input id=\"pow-role\" placeholder=\"e.g. President, Research Intern\"/></div>"+
+      "<div class=\"fi\" style=\"margin-bottom:8px;\"><label for=\"pow-desc\">Description <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><textarea id=\"pow-desc\" style=\"height:60px;\" placeholder=\"What is it, and what did you do?\"></textarea></div>"+
+      "<div class=\"fi\" id=\"pow-link-wrap\" style=\"margin-bottom:8px;display:"+(curLabels.showLink?"block":"none")+";\"><label for=\"pow-link\">Link <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><input id=\"pow-link\" placeholder=\""+curLabels.linkPh+"\"/></div>"+
+      "<button id=\"pow-add\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">+ Add</button>"+
+    "</div>";
+  }
+  var awardAddHTML=S.proofOfWork.length>=8?"":
+    "<div style=\"display:flex;gap:8px;margin-bottom:12px;\">"+
+      "<input id=\"award-title\" placeholder=\"e.g. 1st place regional science fair\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+      "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
+    "</div>";
+  R(logo()+sb(3)+
+    "<h2>Your skills</h2>"+
+    "<div class=\"sub\">Tap a category to see the options, and pick as many as fit.</div>"+
+    "<div id=\"math-group\"></div>"+
+    "<div style=\"font-size:12px;color:#854F0B;margin-bottom:1.2rem;\">We recommend at least 3-5 skills beyond math, for the best matches.</div>"+
+    "<div id=\"active-group\"></div>"+
+    "<div id=\"extra-group\"></div>"+
+    "<div id=\"skillrecap\" style=\"background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:1rem;\"></div>"+
+    "<div class=\"slabel\">Don't see it?</div>"+
+    "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
+      "<input id=\"customskill2\" placeholder=\"Still not there? Type it - e.g. VHDL, Falconry, Amateur Radio...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<button id=\"addskillbtn2\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
+    "</div>"+
+    "<div class=\"slabel\">Hours per week"+req()+"</div>"+
+    "<div class=\"cgrow\" id=\"avail-hours\"></div>"+
+    "<div class=\"slabel\">When"+req()+"</div>"+
+    "<div class=\"cgrow\" id=\"avail-when\"></div>"+
+    "<div style=\"background:#f8f8f6;border-radius:12px;padding:14px;margin-bottom:1rem;\">"+
+      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;\">Experience <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">A project, a club, an internship. Skip if you're just getting started — that's totally fine.</div>"+
+      "<div id=\"pow-list\">"+expHTML2+"</div>"+
+      expAddHTML+
+      "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 4px;\">Awards <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
+      "<div id=\"award-list\">"+awardsHTML+"</div>"+
+      awardAddHTML+
+    "</div>"+
+    "<button class=\"bp\" id=\"s4\">Continue →</button>"+
+    "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
+  );
+
+  var savedHours=(S.availability||"").split(" · ")[0]||"";
+  var savedWhen=(S.availability||"").split(" · ")[1]||"";
+  mkChips("avail-hours",["1-3 hrs/week","4-6 hrs/week","7-10 hrs/week","10+ hrs/week"],[savedHours],true);
+  mkChips("avail-when",["Weekdays","Weekends","Both"],[savedWhen],true);
+
+  renderGroup("math-group","Math courses"+req(),"Select every course you've completed or are currently taking.",[mathCat],false);
+  renderGroup("active-group","Based on your interests",null,activeCats,false);
+  renderGroup("extra-group","Select additional skills","The more you add, the better your matches.",extraCats,true);
+  renderSkillRecap();
+
+  document.getElementById("addskillbtn2").addEventListener("click",addCustomSkill);
+  document.getElementById("customskill2").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addCustomSkill();}});
+
+  var POW_LABELS_LIVE={
+    Project:{title:"Title",titlePh:"e.g. ISEF Project: Microplastics in Groundwater",showRole:false,showLink:true,linkPh:"https://... (GitHub, blog, portfolio, paper, Google Drive)"},
+    Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"https://... (Instagram, club site, any social)"},
+    Internship:{title:"Organization name",titlePh:"e.g. Research Internship at XYZ Lab",showRole:true,showLink:false,linkPh:""}
+  };
+  document.querySelectorAll(".pow-type-pill").forEach(function(b){
+    b.addEventListener("click",function(){
+      powTypePicked=this.dataset.type;
+      document.querySelectorAll(".pow-type-pill").forEach(function(x){
+        var on=x===b;
+        x.classList.toggle("on",on);
+        x.style.borderColor=on?"#AFA9EC":"#ddd";
+        x.style.background=on?"#EEEDFE":"white";
+        x.style.color=on?"#3C3489":"#444";
+        x.style.fontWeight=on?"600":"400";
+      });
+      var lbl=POW_LABELS_LIVE[powTypePicked]||POW_LABELS_LIVE.Project;
+      var titleLabelEl=document.getElementById("pow-title-label");
+      var titleInputEl=document.getElementById("pow-title");
+      var roleWrapEl=document.getElementById("pow-role-wrap");
+      var linkWrapEl=document.getElementById("pow-link-wrap");
+      var linkInputEl=document.getElementById("pow-link");
+      if(titleLabelEl)titleLabelEl.textContent=lbl.title;
+      if(titleInputEl)titleInputEl.placeholder=lbl.titlePh;
+      if(roleWrapEl)roleWrapEl.style.display=lbl.showRole?"block":"none";
+      if(linkWrapEl)linkWrapEl.style.display=lbl.showLink?"block":"none";
+      if(linkInputEl)linkInputEl.placeholder=lbl.linkPh;
+    });
+  });
+  var powAddBtn=document.getElementById("pow-add");
+  if(powAddBtn){
+    powAddBtn.addEventListener("click",function(){
+      var t=document.getElementById("pow-title").value.trim();
+      if(!t){
+        showErr("pow-title","Give this a title first");
+        scrollToFirstErr();
+        return;
+      }
+      var roleWrap=document.getElementById("pow-role-wrap");
+      var roleEl=document.getElementById("pow-role");
+      var role=(roleWrap&&roleWrap.style.display!=="none"&&roleEl)?roleEl.value.trim():"";
+      var linkWrap=document.getElementById("pow-link-wrap");
+      var linkEl=document.getElementById("pow-link");
+      var link=(linkWrap&&linkWrap.style.display!=="none"&&linkEl)?linkEl.value.trim():"";
+      if(link&&!/^https?:\/\//i.test(link))link="https://"+link;
+      S.proofOfWork.push({type:powTypePicked,title:t,role:role,desc:document.getElementById("pow-desc").value.trim(),link:link});
+      powTypePicked="Project";
+      rSkills();
+    });
+    var powTitleEl=document.getElementById("pow-title");
+    if(powTitleEl)powTitleEl.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();powAddBtn.click();}});
+  }
+  var awardAddBtn=document.getElementById("award-add");
+  if(awardAddBtn){
+    awardAddBtn.addEventListener("click",function(){
+      var t=document.getElementById("award-title").value.trim();
+      if(!t){
+        showErr("award-title","Give this a title first");
+        scrollToFirstErr();
+        return;
+      }
+      S.proofOfWork.push({type:"Award",title:t,desc:"",link:""});
+      rSkills();
+    });
+    document.getElementById("award-title").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();awardAddBtn.click();}});
+  }
+  document.querySelectorAll(".pow-del").forEach(function(b){
+    b.addEventListener("click",function(){S.proofOfWork.splice(parseInt(this.dataset.pi),1);rSkills();});
+  });
+
+  document.getElementById("s4").addEventListener("click",step4);
+  document.getElementById("bk").addEventListener("click",function(){goTo("track");});
+}
+
+// Math: horizontal chips, tap-cycle (Currently taking → Completed →
+// removed). Selecting immediately counts - the question here is "what
+// have you taken", already answered by naming the course.
+// Interest categories, "everything else", and Math all render the same
+// way: a collapsed accordion header naming the category and its real
+// count, expanding to plain horizontal chips. Only one chip's rating
+// is ever open at a time. Clicking a chip opens it (closing whatever
+// else was open); picking a tag sets it without closing, so you can
+// change your mind before moving on; clicking a different chip is what
+// actually closes the previous one - and it collapses back to a
+// compact label that still shows what you picked ("Python ·
+// Intermediate", "Algebra 2 · Currently taking"), so nothing is lost
+// from view, it just stops needing its own visible row once you've
+// moved on. Math uses its own two-tag set (Completed / Currently
+// taking) instead of the three proficiency tiers - checked by category
+// type here so a math course is never accidentally rendered with the
+// wrong tag set, wherever it's rendered from.
+var openSkillKey=null;
+function chipHTML(catId,item){
+  var cat=SKILL_CATS.find(function(c){return c.id===catId;});
+  var isMath=cat&&cat.type==="course";
+  var tagSet=isMath?MATH_TAGS:LEVELS;
+  var key=catId+":"+item;
+  var on=S.skillLevels[key]!==undefined;
+  var lv=S.skillLevels[key];
+  var isOpen=openSkillKey===key;
+  if(isOpen){
+    return "<div style=\"background:white;border:1px solid #AFA9EC;border-radius:8px;padding:8px 10px;\">"+
+      "<div style=\"font-size:13px;font-weight:500;color:#3C3489;margin-bottom:6px;\">"+esc(item)+"</div>"+
+      "<div style=\"display:flex;gap:4px;flex-wrap:wrap;\">"+
+        tagSet.map(function(l){return "<button class=\"rate-btn\" data-key=\""+key+"\" data-lv=\""+l+"\" style=\"font-size:11px;padding:4px 8px;border:1px solid "+(lv===l?"#7F77DD":"#ddd")+";border-radius:6px;background:"+(lv===l?"#EEEDFE":"white")+";color:"+(lv===l?"#3C3489":"#444")+";cursor:pointer;font-family:inherit;\">"+l+"</button>";}).join("")+
+      "</div>"+
+      (lv&&!isMath?"<div style=\"font-size:11px;color:#6b6b6b;margin-top:5px;\">"+LEVEL_DEFS[lv]+"</div>":"")+
+    "</div>";
+  }
+  var label=on&&lv?item+" · "+lv:item;
+  return "<button class=\"chip skill-chip"+(on?" on":"")+"\" data-key=\""+key+"\" data-item=\""+esc(item)+"\""+(on&&!lv?" style=\"border-color:#AFA9EC;\"":"")+">"+esc(label)+"</button>";
+}
+function wireChipContainer(container){
+  container.querySelectorAll(".skill-chip").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var key=this.dataset.key;
+      if(openSkillKey===key){
+        if(!S.skillLevels[key])delete S.skillLevels[key];
+        openSkillKey=null;
+      } else {
+        openSkillKey=key;
+        if(S.skillLevels[key]===undefined)S.skillLevels[key]=null;
+      }
+      rSkills();
+    });
+  });
+  container.querySelectorAll(".rate-btn").forEach(function(b){
+    b.addEventListener("click",function(e){
+      e.stopPropagation();
+      S.skillLevels[this.dataset.key]=this.dataset.lv;
+      rSkills();
+    });
+  });
+}
+
+// Interest categories and "everything else" render the same way: a
+// collapsed accordion header naming the category and its real count,
+// expanding to plain horizontal chips.
+function renderGroup(containerId,groupLabel,groupSub,cats,subAccent){
+  var container=document.getElementById(containerId);if(!container)return;
+  if(!cats.length){container.innerHTML="";return;}
+  var subStyle=subAccent?"font-size:12px;color:#534AB7;font-weight:600;margin-bottom:8px;":"font-size:12px;color:#6b6b6b;margin-bottom:8px;";
+  var h="<div style=\"margin-bottom:1.2rem;\">"+
+    "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:2px;\">"+groupLabel+"</div>"+
+    (groupSub?"<div style=\""+subStyle+"\">"+groupSub+"</div>":"<div style=\"margin-bottom:6px;\"></div>");
+  cats.forEach(function(cat){
+    var selCount=cat.items.filter(function(i){return S.skillLevels[cat.id+":"+i]!==undefined;}).length;
+    var isOpen=!!accordionOpen[cat.id];
+    h+="<div style=\"border:1px solid #e8e8e4;border-radius:10px;margin-bottom:8px;overflow:hidden;\">"+
+      "<button class=\"acc-toggle\" data-catid=\""+cat.id+"\" style=\"width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:white;border:none;cursor:pointer;font-family:inherit;text-align:left;\">"+
+        "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+cat.label+" <span style=\"font-weight:400;color:#6b6b6b;\">("+cat.items.length+")"+(selCount?" · "+selCount+" selected":"")+"</span></span>"+
+        "<i class=\"ti "+(isOpen?"ti-chevron-up":"ti-chevron-down")+"\" style=\"font-size:15px;color:#6b6b6b;\"></i>"+
+      "</button>"+
+      "<div class=\"acc-body\" style=\"display:"+(isOpen?"flex":"none")+";flex-wrap:wrap;align-items:flex-start;gap:6px;padding:10px 14px 12px;\">"+
+        cat.items.map(function(item){return chipHTML(cat.id,item);}).join("")+
+      "</div>"+
+    "</div>";
+  });
+  h+="</div>";
+  container.innerHTML=h;
+  container.querySelectorAll(".acc-toggle").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var cid=this.dataset.catid;
+      accordionOpen[cid]=!accordionOpen[cid];
+      rSkills();
+    });
+  });
+  wireChipContainer(container);
+}
+
+// A plain, read-only confirmation of everything selected so far - no
+// buttons, no editing here (that still happens by reopening the chip
+// itself). This exists purely so the full picture stays visible
+// without needing to expand every collapsed category to check.
+function renderSkillRecap(){
+  var el=document.getElementById("skillrecap");if(!el)return;
+  var keys=Object.keys(S.skillLevels);
+  if(!keys.length){
+    el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Nothing added yet.</div>";
+    return;
+  }
+  var pills=keys.map(function(k){
+    var name=k.indexOf(":")>=0?k.split(":")[1]:k;
+    var lv=S.skillLevels[k];
+    if(lv&&lv!=="noted"){
+      return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 10px;\">"+esc(name)+" · "+esc(lv)+"</span>";
+    }
+    if(lv==="noted"){
+      return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 10px;\">"+esc(name)+"</span>";
+    }
+    return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#854F0B;background:white;border:1px solid #FAC775;border-radius:20px;padding:4px 10px;\">"+esc(name)+" — needs a level</span>";
+  });
+  el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px;\">Selected ("+keys.length+")</div>"+
+    "<div style=\"display:flex;flex-wrap:wrap;gap:6px;\">"+pills.join("")+"</div>";
+}
+
+// Search reaches every real skill in every category, not just what's
+// suggested - the organized sections above narrow the default view,
+// they never hide anything from a direct search. Results use the exact
+// same chip behavior as the accordions.
+
+function addCustomSkill(){
+  var inp=document.getElementById("customskill2");
+  var val=inp.value.trim();if(!val)return;
+  val=val.charAt(0).toUpperCase()+val.slice(1);
+  var key="custom:"+val;
+  if(S.skillLevels[key]!==undefined){inp.value="";return;}
+  S.skillLevels[key]="noted";
+  inp.value="";
+  rSkills();
+}
+
+function skStr(){
+  return Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).map(function(k){
+    var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
+    if(lv==="studied"||lv==="noted")return skill;
+    return skill+" ("+lv+")";
+  }).join(", ");
 }
 
 function doSearch(v){
@@ -2553,7 +2653,25 @@ function returnToSkillSearch(){
   });
 }
 
-function addComp(c){if(selComps.some(function(s){return s.n===c.n;}))return;selComps.push(c);renderPills();if(exploreOpen)renderCat();}
+// Maps a competition's finer CM2 category to one of the 5 Interest
+// tracks. Law has no direct home among the 5 (it doesn't map cleanly
+// onto any of them) so it's left unset there deliberately, rather than
+// forced into a track it doesn't fit.
+var CAT_TO_TRACK={science:"research",math:"research",business:"business",impact:"impact",arts:"arts",writing:"arts",tech:"tech"};
+function addComp(c){
+  if(selComps.some(function(s){return s.n===c.n;}))return;
+  selComps.push(c);
+  // A picked, real competition is the strongest interest signal there
+  // is - always sets Primary Interest, overriding a prior chip tap or
+  // AI read, since nothing is more concrete than a competition someone
+  // already knows they're targeting.
+  var mappedTrack=CAT_TO_TRACK[c.cat];
+  if(mappedTrack){
+    S.track=mappedTrack;
+    renderInterestChips();
+  }
+  renderPills();if(exploreOpen)renderCat();
+}
 function removeComp(name){selComps=selComps.filter(function(c){return c.n!==name;});renderPills();if(exploreOpen)renderCat();}
 function renderPills(){
   var el=document.getElementById("pills");if(!el)return;
@@ -2587,56 +2705,60 @@ function renderPills(){
 // disagree. Now: already-typed text skips straight to suggestions, and
 // whichever text is actually used always gets written back to S.idea,
 // so returning to Goals always shows the interest that was really used.
-function openInterestSuggestModal(){
-  var ideaEl=document.getElementById("iidea");
-  var existingIdea=ideaEl?ideaEl.value.trim():S.idea.trim();
-  if(existingIdea){
-    S.idea=existingIdea;
-    runInterestSuggestions(existingIdea);
+
+// Reads whatever's in the inline interests panel (chips and/or typed
+// text) and gets real competition suggestions - no separate screen, no
+// popup, results render right inside the same panel the student is
+// already looking at.
+async function runInlineSuggestions(){
+  var text=document.getElementById("interest-text").value.trim();
+  var chipKeys=Array.from(document.querySelectorAll("#interest-chips .chip.on")).map(function(c){return c.dataset.key;});
+  var resultsEl=document.getElementById("interest-results");
+  if(!text&&!chipKeys.length){
+    resultsEl.innerHTML="<div class=\"sec-err\" style=\"margin-top:0;\"><i class=\"ti ti-alert-circle\" style=\"font-size:14px;flex-shrink:0;\"></i>Pick a chip or describe your interest first.</div>";
     return;
   }
-  R(logo()+
-    "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
-      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">What are you interested in?</div>"+
-      "<div class=\"sub\">Tell us in your own words — even something vague like \"I like science but don't know what's out there\" works.</div>"+
-      "<div class=\"fi\"><textarea id=\"interest-text\" placeholder=\"e.g. I'm into AI and want to build something useful, or: I like biology and want to do research...\">"+esc(S.idea)+"</textarea></div>"+
-      "<button class=\"bp\" id=\"interest-go\">Suggest competitions →</button>"+
-      "<button class=\"bkbtn\" id=\"interest-cancel\">Cancel</button>"+
-    "</div>"
-  );
-  document.getElementById("interest-cancel").addEventListener("click",function(){goTo("goals");});
-  document.getElementById("interest-go").addEventListener("click",async function(){
-    var text=document.getElementById("interest-text").value.trim();
-    if(!text){showErr("interest-text","Tell us a bit about what you're interested in");scrollToFirstErr();return;}
-    var btn=this;btn.disabled=true;btn.textContent="Thinking…";
-    S.idea=text;
-    await runInterestSuggestions(text);
-  });
-}
-
-// Shared by both entry points above - shows a lightweight loading
-// state, fetches suggestions, and handles the error case identically
-// whether the student typed just now or had already written their idea.
-async function runInterestSuggestions(text){
-  R(logo()+"<div style=\"text-align:center;padding:3rem 1rem;\"><div class=\"spin\"></div><div style=\"font-size:14px;color:#6b6b6b;\">Thinking…</div></div>");
+  var btn=document.getElementById("interest-go");
+  btn.disabled=true;btn.textContent="Thinking…";
+  resultsEl.innerHTML="<div style=\"text-align:center;padding:1rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div>";
   try{
-    var suggestions=await fetchCompetitionSuggestions(text);
-    renderInterestSuggestions(text,suggestions);
+    if(text){
+      // Typed text goes to the AI, which also reads a category out of
+      // it - that read is more informed than a plain chip tap (it's
+      // seen the actual description), so it's allowed to override
+      // whatever chips happen to be selected right now.
+      var result=await fetchCompetitionSuggestions(text,chipKeys.map(function(k){return TR[k].n;}));
+      if(result.primaryCategory&&TR[result.primaryCategory]){
+        S.track=result.primaryCategory;
+        renderInterestChips();
+      }
+      renderInlineSuggestionResults(result.suggestions,text);
+    } else {
+      // Chips only, no text - no need for an AI call at all, just
+      // filter the real competition list by the selected categories
+      // directly. Cheaper and more literal than asking the AI to
+      // interpret something the student never actually described.
+      var picks=COMPS.filter(function(c){return chipKeys.indexOf(c.cat)>=0;})
+        .sort(compareComps).slice(0,6)
+        .map(function(c){return {comp:c,why:c.why};});
+      renderInlineSuggestionResults(picks,chipKeys.map(function(k){return TR[k].n;}).join(", "));
+    }
   }catch(ex){
     console.error("[Partnr] competition suggestion failed:",ex);
     var notSignedIn=ex&&ex.code==="not_signed_in";
-    var errTitle=notSignedIn?"You've been signed out":"Couldn't get suggestions";
-    var errBody=notSignedIn?"Please sign in again to get suggestions — you can still browse by category without signing in.":"Something went wrong — you can still browse by category instead.";
-    R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-alert-circle\" style=\"font-size:32px;color:#C53030;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">"+errTitle+"</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">"+errBody+"</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
-    document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
+    resultsEl.innerHTML="<div class=\"sec-err\" style=\"margin-top:0;\">"+(notSignedIn?"You've been signed out — please sign in again.":"Something went wrong — please try again.")+"</div>";
   }
+  btn.disabled=false;btn.textContent="Suggest competitions →";
 }
 
 // Calls the edge function in 'suggest_competitions' mode with the full
 // real competition list (name, category, team requirement, eligibility,
 // cross type, description) so the model can only choose among real,
 // accurate entries — never invent a new one or a fact not given here.
-async function fetchCompetitionSuggestions(interestText){
+// Also asks it to read a single best-fit category out of the same
+// text, so a typed description can set Primary Interest directly
+// instead of relying on whichever chip happened to be tapped.
+async function fetchCompetitionSuggestions(interestText,alsoInterestedIn){
   var session=await getSession();
   if(!session){
     // getSession() reads from local storage and doesn't always force a
@@ -2655,12 +2777,14 @@ async function fetchCompetitionSuggestions(interestText){
     var typeLabel=c.cross===true?"cross-school ok":c.cross==="prep"?"prep partner":"same school";
     return c.n+" | "+catName+" | "+c.team+" | "+c.eli+" | "+typeLabel+" | "+c.desc;
   }).join("\n");
-  var prompt="A high school student described their interest as: \""+interestText+"\"\n\n"+
+  var auxLine=(alsoInterestedIn&&alsoInterestedIn.length)?("\nThey also separately marked interest in: "+alsoInterestedIn.join(", ")+" - weigh this alongside their own words, but their own words are the stronger signal if they conflict."):"";
+  var prompt="A high school student described their interest as: \""+interestText+"\""+auxLine+"\n\n"+
     "Here is the COMPLETE real list of competitions available on Partnr (name | category | team size | eligibility | type | description):\n"+compList+"\n\n"+
     "Pick the 3 to 5 BEST-FITTING competitions from this exact list for this student's stated interest. "+
     "You MUST only use competition names EXACTLY as they appear above — never invent a new competition, and never state a deadline or prize amount, since none are given here. "+
-    "For each pick, write one specific sentence on why it fits what they said.\n\n"+
-    "Return ONLY valid JSON: {\"suggestions\":[{\"name\":\"exact name from the list\",\"why\":\"one sentence\"}]}";
+    "For each pick, write one specific sentence on why it fits what they said. "+
+    "Also read their description and pick the single best-fitting category from this list: research, business, impact, tech, law, arts.\n\n"+
+    "Return ONLY valid JSON: {\"primaryCategory\":\"one of research|business|impact|tech|law|arts\",\"suggestions\":[{\"name\":\"exact name from the list\",\"why\":\"one sentence\"}]}";
   var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
     method:"POST",
     headers:{
@@ -2678,76 +2802,53 @@ async function fetchCompetitionSuggestions(interestText){
   var raw=parsed.suggestions||[];
   // Defensive: only keep suggestions whose name exactly matches a real
   // competition. Anything else is dropped silently — a model slip
-  // should never surface a fabricated competition to a student.
+  // should never surface a fabricated competition to a student. Same
+  // defensiveness for primaryCategory - only ever accept one of the
+  // real track keys, never whatever raw string the model returned.
   var kept=[];
   raw.forEach(function(s){
     var real=COMPS.find(function(c){return c.n===s.name;});
     if(real)kept.push({comp:real,why:s.why||real.why});
   });
-  return kept;
+  var validCats=["research","business","impact","tech","law","arts"];
+  var primaryCategory=validCats.indexOf(parsed.primaryCategory)>=0?parsed.primaryCategory:null;
+  return {suggestions:kept,primaryCategory:primaryCategory};
 }
 
-function renderInterestSuggestions(interestText,suggestions){
+// Renders suggestion results right inside the same inline panel -
+// never a separate screen, so the student never loses their place.
+function renderInlineSuggestionResults(suggestions,basedOnText){
+  var resultsEl=document.getElementById("interest-results");if(!resultsEl)return;
   if(!suggestions.length){
-    R(logo()+"<div style=\"text-align:center;padding:2rem 1rem;\"><i class=\"ti ti-search\" style=\"font-size:32px;color:#AFA9EC;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">No clear fit found</div><div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1rem;\">Try browsing by category instead, or describe your interest differently.</div><button class=\"bp\" id=\"interest-back\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to goals</button></div>");
-    document.getElementById("interest-back").addEventListener("click",function(){goTo("goals");});
+    resultsEl.innerHTML="<div style=\"font-size:12px;color:#6b6b6b;padding:8px 0;\">No clear fit found — try describing it differently, or browse by category above.</div>";
     return;
   }
-  var shortText=interestText.length>60?interestText.slice(0,60)+"…":interestText;
-  var h=logo()+
-    "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Based on \""+esc(shortText)+"\"</div>"+
-    "<div class=\"sub\">Here's what looks like a fit. Add any to your targets, or see who's already working on it.</div>";
+  var shortText=basedOnText.length>60?basedOnText.slice(0,60)+"…":basedOnText;
+  var h="<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">Based on \""+esc(shortText)+"\":</div>";
   suggestions.forEach(function(s,i){
     var c=s.comp;
     var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
-    var xs=getCrossStyle(c.cross);
     var added=selComps.some(function(sc){return sc.n===c.n;});
-    h+="<div class=\"card\">"+
-      "<div class=\"comp-detail-open\" data-name=\""+esc(c.n)+"\" style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;\">"+c.n+"</div>"+
-      "<div style=\"display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap;\">"+
-        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
-        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:"+xs.bg+";color:"+xs.tc+";\">"+xs.lbl+"</span>"+
-        "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
-      "</div>"+
-      "<div style=\"font-size:12px;font-style:italic;color:"+cm.c+";margin-bottom:10px;\"><i class=\"ti ti-sparkles\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+esc(s.why)+"</div>"+
-      (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-bottom:10px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
-      "<div style=\"display:flex;gap:8px;\">"+
-        "<button class=\"bc suggest-add\" data-i=\""+i+"\" style=\"flex:1;background:"+(added?"#3B6D11":cm.c)+";\" "+(added?"disabled":"")+">"+(added?"Added ✓":"+ Add to my targets")+"</button>"+
-        "<button class=\"bo suggest-find\" data-i=\""+i+"\">Find students →</button>"+
-      "</div>"+
+    h+="<div style=\"background:white;border:1px solid #e8e8e4;border-radius:8px;padding:10px 12px;margin-bottom:6px;\">"+
+      "<div class=\"comp-detail-open\" data-name=\""+esc(c.n)+"\" style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:2px;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;\">"+c.n+"</div>"+
+      "<div style=\"font-size:11px;color:"+cm.c+";margin-bottom:6px;\"><i class=\"ti ti-sparkles\" style=\"font-size:10px;vertical-align:-1px;margin-right:2px;\"></i>"+esc(s.why)+"</div>"+
+      "<button class=\"suggest-add\" data-i=\""+i+"\" style=\"padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:white;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\" "+(added?"disabled":"")+">"+(added?"Added ✓":"+ Add to targets")+"</button>"+
     "</div>";
   });
-  h+="<button class=\"bkbtn\" id=\"interest-back2\">← Back to goals</button>";
-  R(h);
-  document.querySelectorAll(".comp-detail-open").forEach(function(el){
+  resultsEl.innerHTML=h;
+  resultsEl.querySelectorAll(".comp-detail-open").forEach(function(el){
     el.addEventListener("click",function(){
       var s=suggestions.find(function(x){return x.comp.n===el.dataset.name;});
       if(s)openCompDetail(s.comp);
     });
   });
-  document.querySelectorAll(".suggest-add").forEach(function(btn){
+  resultsEl.querySelectorAll(".suggest-add").forEach(function(btn){
     btn.addEventListener("click",function(){
       var s=suggestions[parseInt(this.dataset.i)];
       addComp(s.comp);
       this.textContent="Added ✓";this.style.background="#3B6D11";this.disabled=true;
     });
   });
-  document.querySelectorAll(".suggest-find").forEach(function(btn){
-    btn.addEventListener("click",function(){
-      var s=suggestions[parseInt(this.dataset.i)];
-      // Jump straight into Skill Search, pre-filtered to this exact real
-      // competition — the recommendation hands off to real people, not
-      // more AI guessing.
-      goTo("matches");
-      document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});
-      var searchTabBtn=document.getElementById("nb-search");
-      if(searchTabBtn)searchTabBtn.classList.add("on");
-      showTab("search");
-      var sel=document.getElementById("filter-comp");
-      if(sel){sel.value=s.comp.n;sel.dispatchEvent(new Event("change"));}
-    });
-  });
-  document.getElementById("interest-back2").addEventListener("click",function(){goTo("goals");});
 }
 
 // ── Step validation ──────────────────────────
@@ -2759,21 +2860,21 @@ async function step2(){
   var co=document.getElementById("icountry").value;
   var dob=document.getElementById("idob").value;
   var valid=true;
-  if(!n){showErr("iname","Please enter your name");valid=false;}
-  if(!e){showErr("iemail","Please enter your school email");valid=false;}
-  else if(!e.includes("@")){showErr("iemail","Please enter a valid email address");valid=false;}
-  if(!sc){showErr("ischool","Please enter your school name");valid=false;}
-  if(!g){showErr("igrade","Please select your grade");valid=false;}
-  if(!co){showErr("icountry","Please select your country");valid=false;}
-  if(!dob){showErr("idob","Please enter your date of birth");valid=false;}
+  if(!n){showErr("iname","Enter your name");valid=false;}
+  if(!e){showErr("iemail","Enter your school email");valid=false;}
+  else if(!e.includes("@")){showErr("iemail","Enter a valid email address");valid=false;}
+  if(!sc){showErr("ischool","Enter your school name");valid=false;}
+  if(!g){showErr("igrade","Select your grade");valid=false;}
+  if(!co){showErr("icountry","Select your country");valid=false;}
+  if(!dob){showErr("idob","Enter your date of birth");valid=false;}
   var langs=getAllSelectedLangs();
-  if(!langs.length){showSecErr("lang-other-wrap","Please select at least one language you speak");valid=false;}
+  if(!langs.length){showSecErr("lang-other-wrap","Select at least one language you speak");valid=false;}
   var city=document.getElementById("icity").value.trim();
-  if(!city){showErr("icity","Please enter your city");valid=false;}
+  if(!city){showErr("icity","Enter your city");valid=false;}
   var zipVal="";
   if(co&&hasZip(co)){
     zipVal=document.getElementById("izip").value.trim();
-    if(!zipVal){showErr("izip","Please enter your zip / postal code");valid=false;}
+    if(!zipVal){showErr("izip","Enter your zip / postal code");valid=false;}
   }
   if(!valid){scrollToFirstErr();return;}
   // COPPA age screen: this stops signup outright for under-13 — it does
@@ -2829,48 +2930,39 @@ async function step2(){
 }
 function step3(){
   var valid=true;
-  if(!S.track){showSecErr("tg","Please choose a track");valid=false;}
-  if(!S.role){showSecErr("rg","Please choose your role");valid=false;}
+  if(!S.track){showSecErr("exbtn","Pick an interest below, or search for a competition above");valid=false;}
   var statusSel=getChips("status")[0]||"";
-  if(!statusSel){showSecErr("status","Please select your current status");valid=false;}
+  if(!statusSel){showSecErr("status","Select your current status");valid=false;}
+  var idea=document.getElementById("iidea").value.trim();
+  if(!idea&&!selComps.length){showSecErr("iidea","Describe your project or add at least one competition");valid=false;}
+  var commit=getChips("commit")[0]||"";
+  if(!commit){showSecErr("commit","Select your commitment level");valid=false;}
+  if(!S.locationPref){showSecErr("loc-pref","Select who you want to connect with");valid=false;}
   if(!valid){scrollToFirstErr();return;}
   S.status=statusSel;
-  S.secondary=getChips("secondary").slice(0,2);
-  saveSignupLead({email:S.email,track:S.track,role:S.role,stage:"track_role"});
+  S.comps=selComps.map(function(c){return c.n;});
+  S.idea=idea;S.commit=commit;S.location=S.locationPref;
+  saveSignupLead({email:S.email,track:S.track,stage:"interests_goals"});
   goTo("skills");
 }
 function step4(){
-  var rated=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];});
-  var needLevel=Object.keys(S.skillLevels).filter(function(k){
-    var cat=SKILL_CATS.find(function(c){return k.indexOf(c.id+":")===0;});
-    return cat&&cat.type==="level"&&!S.skillLevels[k];
-  });
-  if(!rated.length){
-    showSecErr("skill-cats","Please select and rate at least one skill — open any category above");
+  // Math is the one thing every student can honestly answer - every
+  // other skill is genuinely optional, just encouraged.
+  var mathKeys=Object.keys(S.skillLevels).filter(function(k){return k.indexOf("math:")===0;});
+  if(!mathKeys.length){
+    showSecErr("math-group","Select at least one math course");
     scrollToFirstErr();return;
   }
+  var needLevel=Object.keys(S.skillLevels).filter(function(k){return !S.skillLevels[k];});
   if(needLevel.length){
-    showSecErr("ssum",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level — tap Beginner, Intermediate, Advanced, or Expert");
+    showSecErr("math-group",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level or tag — reopen it and tap one");
     scrollToFirstErr();return;
   }
-  var avail=getChips("avail")[0]||"";
-  if(!avail){showSecErr("avail","Please select your weekly availability");scrollToFirstErr();return;}
-  S.availability=avail;
-  S.github=document.getElementById("igh").value.trim();
-  goTo("goals");
-}
-function goFind(){
-  var valid=true;
-  if(!S.stage){showSecErr("stg","Please select your project stage");valid=false;}
-  var idea=document.getElementById("iidea").value.trim();
-  if(!idea&&!selComps.length){showSecErr("iidea","Please describe your project or add at least one competition");valid=false;}
-  var commit=getChips("commit")[0]||"";
-  if(!commit){showSecErr("commit","Please select your commitment level");valid=false;}
-  if(!S.locationPref){showSecErr("loc-pref","Please select who you want to connect with");valid=false;}
-  if(!valid){scrollToFirstErr();return;}
-  S.comps=selComps.map(function(c){return c.n;});
-  S.idea=idea;S.commit=commit;S.location=S.locationPref;
-  S.skillsNeeded=document.getElementById("iskillsneeded").value.trim();
+  var hours=getChips("avail-hours")[0]||"";
+  var when=getChips("avail-when")[0]||"";
+  if(!hours){showSecErr("avail-hours","Select how many hours a week");scrollToFirstErr();return;}
+  if(!when){showSecErr("avail-when","Select when you're usually available");scrollToFirstErr();return;}
+  S.availability=hours+" · "+when;
   goTo("loading");
   // The profile save is the most important write in the app. It used to
   // fail silently and send the student to the matches page anyway, which
@@ -2902,7 +2994,7 @@ function showSaveError(err){
       "<div class=\"sub\" style=\"max-width:380px;margin:0 auto 1rem;\">Nothing you entered was lost. Try again \u2014 if it keeps failing, send this message to whoever runs Partnr.</div>"+
       "<div style=\"font-size:12px;color:#C53030;background:#FFF5F5;border:1px solid #FEB2B2;border-radius:8px;padding:10px 12px;margin-bottom:1.25rem;text-align:left;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;\">"+esc(msg)+esc(code)+"</div>"+
       "<button class=\"bp\" id=\"save-retry\" style=\"max-width:280px;margin:0 auto;display:block;\">Try saving again</button>"+
-      "<button class=\"bkbtn\" id=\"save-back\" style=\"max-width:280px;margin:8px auto 0;display:block;\">\u2190 Back to my goals</button>"+
+      "<button class=\"bkbtn\" id=\"save-back\" style=\"max-width:280px;margin:8px auto 0;display:block;\">\u2190 Back to skills</button>"+
     "</div>"
   );
   document.getElementById("save-retry").addEventListener("click",function(){
@@ -2913,7 +3005,7 @@ function showSaveError(err){
       doFetch();
     }).catch(showSaveError);
   });
-  document.getElementById("save-back").addEventListener("click",function(){goTo("goals");});
+  document.getElementById("save-back").addEventListener("click",function(){goTo("skills");});
 }
 
 // ── Loading + API ───────────────────────────
@@ -2954,18 +3046,18 @@ function openRematchModal(){
 }
 
 async function doFetch(){
-  var t=TR[S.track]||{n:S.track};var r=RO[S.role]||{n:S.role};
+  var t=TR[S.track]||{n:S.track};
   var compInfo=selComps.map(function(c){
     var crossNote=c.cross===true?"(cross-school ok)":c.cross==="prep"?"(prep partner only)":"(same school required)";
     return c.n+" "+crossNote;
   }).join(", ")||"open";
-  var expStr=S.experience.map(function(e){return e.title+(e.desc?": "+e.desc:"");}).join("; ")||"none";
+  var powStr=S.proofOfWork.map(function(item){return item.type+": "+item.title+(item.role?" ("+item.role+")":"")+(item.desc?" - "+item.desc:"");}).join("; ")||"none";
   var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
   var neededStr=S.skillsNeeded||"open — infer from idea and role";
   var feedbackLine=REMATCH_FEEDBACK?("\nPrevious round feedback: "+REMATCH_FEEDBACK):"";
   REMATCH_FEEDBACK=""; // one-time use — consumed here so it never leaks into a later, unrelated call
   var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nExperience: "+expStr+"\nAwards: "+(S.awards.join(", ")||"none")+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 projects recruiting role \""+r.n+"\". Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nProof of work: "+powStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,city,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 fictional projects that could genuinely use this student's skills. Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     // Real matching now goes through a Supabase edge function that holds
     // the actual Anthropic key server-side — the previous direct
@@ -3041,7 +3133,7 @@ function rMatches(){
   var rootEl=document.getElementById("ROOT");
   var navEl=rootEl?rootEl.querySelector(".nav"):null;
   if(navEl)rootEl.insertBefore(locBar,navEl);
-  document.getElementById("loc-change").addEventListener("click",function(){goTo("goals");});
+  document.getElementById("loc-change").addEventListener("click",function(){goTo("track");});
   ["matches","recruit","search","deadlines","conns","me"].forEach(function(t){
     var b=document.getElementById("nb-"+t);
     if(b)b.addEventListener("click",function(){document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});this.classList.add("on");showTab(t);});
@@ -3177,7 +3269,7 @@ function mCards(){
       "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
         "<div class=\"av\" style=\"width:44px;height:44px;font-size:15px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
         "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;\">"+m.school+" · "+m.country+" · "+m.timezone+"</div></div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+" · "+m.timezone+"</div></div>"+
         "<div style=\"font-size:16px;font-weight:700;color:"+t.c+";\">"+m.matchScore+"%</div>"+
       "</div>"+
       "<div class=\"tags\">"+stags+
@@ -3231,7 +3323,7 @@ function openProfile(i){
           "<div class=\"av\" style=\"width:54px;height:54px;font-size:18px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
           "<div style=\"flex:1;\">"+
             "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
-            "<div style=\"font-size:13px;color:#6b6b6b;\">"+m.school+" · "+m.country+" · "+m.grade+"</div>"+
+            "<div style=\"font-size:13px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+" · "+m.grade+"</div>"+
             "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
               "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
               "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
@@ -3293,7 +3385,7 @@ function openModal(idx){
 }
 function sendConn(){
   var msg=document.getElementById("mmsg").value.trim();
-  if(!msg){showErr("mmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
+  if(!msg){showErr("mmsg","Write a short intro message before sending");scrollToFirstErr();return;}
   var m=modalTarget>=0&&modalTarget<MATCHES.length?MATCHES[modalTarget]:null;
   var name=m?m.name:"Partner";
   if(m&&!CONNS.some(function(c){return c.name===name;}))
@@ -3318,13 +3410,6 @@ async function loadRealProjects(){
   var authorsRes=await sba.from("students").select("id,name,school,city,country,role,track").in("id",authorIds);
   var authorsById={};
   (authorsRes.data||[]).forEach(function(a){authorsById[a.id]=a;});
-  // Prioritize postings that need the viewer's own role — same
-  // complementary-matching idea used everywhere else in Partnr.
-  projects.sort(function(a,b){
-    var aMatch=a.needed_role===S.role?0:1;
-    var bMatch=b.needed_role===S.role?0:1;
-    return aMatch-bMatch;
-  });
   return projects.map(function(p){return {project:p,author:authorsById[p.student_id]};});
 }
 
@@ -3427,7 +3512,7 @@ function rPostProject(){
   document.getElementById("pp-submit").addEventListener("click",async function(){
     var title=document.getElementById("pp-title").value.trim();
     var desc=document.getElementById("pp-desc").value.trim();
-    if(!title||!desc){showToast("Please add a title and description");return;}
+    if(!title||!desc){showToast("Add a title and description");return;}
     var role=document.getElementById("pp-role").value||null;
     var skills=document.getElementById("pp-skills").value.split(",").map(function(s){return s.trim();}).filter(Boolean);
     var comp=document.getElementById("pp-comp").value||null;
@@ -3467,7 +3552,7 @@ function openProjectApplyModal(projectId,title){
   document.getElementById("pa-cancel").addEventListener("click",function(){showTab("recruit");});
   document.getElementById("pa-send").addEventListener("click",async function(){
     var msg=document.getElementById("pa-msg").value.trim();
-    if(!msg){showErr("pa-msg","Please write a short message before sending");scrollToFirstErr();return;}
+    if(!msg){showErr("pa-msg","Write a short message before sending");scrollToFirstErr();return;}
     var session=await getSession();
     if(!session)return;
     var btn=this;btn.disabled=true;btn.textContent="Sending…";
@@ -3597,6 +3682,7 @@ function sTab(){
       "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;max-width:220px;\">"+compOptions+"</select>"+
       "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
       "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
+      "<div class=\"chip\" id=\"filter-saved\" role=\"button\" tabindex=\"0\">★ Saved ("+(S.savedIds||[]).length+")</div>"+
     "</div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Browse by category</div>"+
     "<div id=\"skill-browse\" style=\"margin-bottom:1rem;\"></div>"+
@@ -3672,6 +3758,22 @@ function bindSE(){
     chip.addEventListener("click",function(){chip.classList.toggle("on");runSkillSearch();});
     addKbdActivation(chip);
   });
+  var savedChip=document.getElementById("filter-saved");
+  if(savedChip){
+    savedChip.addEventListener("click",async function(){
+      var el=document.getElementById("sr");if(!el)return;
+      document.getElementById("skill-browse").style.display="none";
+      el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Loading your saved profiles...</div></div>";
+      try{
+        var saved=await fetchSavedStudents();
+        renderSR(saved,"your saved profiles",false);
+      }catch(ex){
+        console.error("[Partnr] loading saved profiles failed:",ex);
+        el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Couldn't load saved profiles — please try again.</div>";
+      }
+    });
+    addKbdActivation(savedChip);
+  }
 
   // Gathers the current query + all active filters and runs a search.
   // Filters alone (no typed text) are enough to trigger a real search —
@@ -3753,7 +3855,7 @@ function dCards(){
     return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Loading verified deadlines…</div>";
   }
 
-  var trackToCats={research:["science","math"],business:["business"],impact:["impact"],arts:["arts","writing"],tech:["tech"]};
+  var trackToCats={research:["science","math"],business:["business"],impact:["impact"],arts:["arts","writing"],tech:["tech"],law:["law"]};
   var myCats=trackToCats[S.track]||[];
 
   // Main list: only genuinely confirmed, actionable deadlines - real
@@ -4012,23 +4114,25 @@ async function renderConnections(){
 // ── My Profile tab with Edit Profile button ──
 function meTab(){
   var inits=S.name?S.name.split(" ").map(function(w){return w[0];}).join("").substring(0,2).toUpperCase():"?";
-  var t=TR[S.track]||{};var r=RO[S.role]||{};
+  var t=TR[S.track]||{};
   var tags=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).slice(0,6).map(function(k){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
     if(lv==="studied"||lv==="noted")return "<span class=\"tag\">"+skill+"</span>";
     return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+skill+" · "+lv+"</span>";
   }).join("");
   tags+=(S.comps||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+(c||"")+"</span>";}).join("");
-  var expHTML=S.experience.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Experience</div>"+
-    S.experience.map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div>"+(e.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(e.desc)+"</div>":"")+
-    "</div>";}).join(""):"";
-  var awdHTML=S.awards.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+
-    S.awards.map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:#3B6D11;\"></i>"+esc(a)+"</div>";}).join(""):"";
+  var expForView=S.proofOfWork.filter(function(item){return item.type!=="Award";});
+  var awardsForView=S.proofOfWork.filter(function(item){return item.type==="Award";});
+  function entryViewHTML(item){
+    return "<div class=\"ei\">"+(item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+"<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+(item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+(item.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(item.desc)+"</div>":"")+
+    (item.link?"<a href=\""+esc(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
+    "</div>";
+  }
+  var powViewHTML=(expForView.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Experience</div>"+expForView.map(entryViewHTML).join(""):"")+
+    (awardsForView.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+awardsForView.map(entryViewHTML).join(""):"");
   var neededHTML=S.skillsNeeded?"<div class=\"slabel\" style=\"margin-top:1rem;\">Looking for</div><div style=\"font-size:13px;color:#666;line-height:1.5;\">"+esc(S.skillsNeeded)+"</div>":"";
-  var portfolioViewHTML=S.portfolioItems.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Portfolio</div>"+
-    S.portfolioItems.map(function(p){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+(p.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(p.desc)+"</div>":"")+
-    (p.link?"<a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(p.link)+"</a>":"")+
-    "</div>";}).join(""):"";
+  var linksViewHTML=(S.links||[]).length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Links</div>"+
+    S.links.map(function(l){return "<a href=\""+esc(l.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#534AB7;text-decoration:none;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>"+esc(l.url)+"</a>";}).join(""):"";
   return "<div class=\"card\">"+
     "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
@@ -4045,12 +4149,11 @@ function meTab(){
       "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
-        "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;margin-top:3px;display:inline-block;\">"+(r.n||"")+"</div>"+
       "</div>"+
     "</div>"+
     "<div class=\"tags\">"+tags+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
-    expHTML+awdHTML+portfolioViewHTML+neededHTML+
+    linksViewHTML+powViewHTML+neededHTML+
   "</div>"+
   // Edit Profile button
   "<button class=\"bp\" id=\"edit-profile-btn\" style=\"margin-bottom:8px;\">Edit profile</button>"+
@@ -4145,8 +4248,8 @@ async function loadWorkspaceItems(connectionId){
 async function addWorkspaceLink(connectionId){
   var title=document.getElementById("ws-link-title").value.trim();
   var url=document.getElementById("ws-link-url").value.trim();
-  if(!title||!url){showToast("Please add both a title and a link");return;}
-  if(!/^https?:\/\//i.test(url)){showToast("Links must start with http:// or https://");return;}
+  if(!title||!url){showToast("Add both a title and a link");return;}
+  if(!/^https?:\/\//i.test(url))url="https://"+url;
   var session=await getSession();
   if(!session)return;
   var res=await sba.from("workspace_items").insert({
@@ -4443,7 +4546,7 @@ function bindMeTab(){
       var sendBtn=this;
       var existingErr=document.getElementById("verifyEmailErr");if(existingErr)existingErr.remove();
       if(!typedEmail||!typedEmail.includes("@")){
-        showVerifyEmailErr("Please enter a valid email address.");
+        showVerifyEmailErr("Enter a valid email address.");
         return;
       }
       if(!domain||PERSONAL_EMAIL_DOMAINS.indexOf(domain)>=0){
@@ -4547,18 +4650,13 @@ function bindMeTab(){
         "</button>"+
         "<button class=\"ep-step\" data-step=\"track\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
           "<i class=\"ti ti-compass\" style=\"font-size:18px;color:#0F6E56;display:block;margin-bottom:6px;\"></i>"+
-          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Track & Role</div>"+
-          "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Research, business, tech...</div>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Interests & Goals</div>"+
+          "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Competitions, idea, status</div>"+
         "</button>"+
         "<button class=\"ep-step\" data-step=\"skills\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
           "<i class=\"ti ti-code\" style=\"font-size:18px;color:#185FA5;display:block;margin-bottom:6px;\"></i>"+
           "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Skills</div>"+
           "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Your skills & experience</div>"+
-        "</button>"+
-        "<button class=\"ep-step\" data-step=\"goals\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
-          "<i class=\"ti ti-target\" style=\"font-size:18px;color:#993C1D;display:block;margin-bottom:6px;\"></i>"+
-          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Goals</div>"+
-          "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Stage, competitions, idea</div>"+
         "</button>"+
       "</div>"+
       "<button id=\"ep-cancel\" style=\"width:100%;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#6b6b6b;cursor:pointer;font-family:inherit;\">Cancel</button>";
@@ -4664,11 +4762,12 @@ function renderSR(results,skill,isDemo){
     (isDemo?"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>No real students matched yet — showing example profiles so you can see how search works.</div>":"");
   results.forEach(function(r){
     var cm=CM[r.avatarColor]||CM.purple;var t=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
+    var isSaved=r._realId&&(S.savedIds||[]).indexOf(r._realId)>=0;
     var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().indexOf(k)>=0;})||"exploring";
     var others=(r.otherSkills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
-    var portfolioLine=(r.portfolioItems&&r.portfolioItems.length)?
+    var portfolioLine=(r.proofOfWork&&r.proofOfWork.length)?
       "<div style=\"margin-bottom:8px;\">"+
-        r.portfolioItems.slice(0,2).map(function(p){
+        r.proofOfWork.slice(0,2).map(function(p){
           return "<div style=\"font-size:12px;color:#444;margin-bottom:2px;\"><i class=\"ti ti-briefcase\" style=\"font-size:11px;color:#7F77DD;vertical-align:-1px;margin-right:3px;\"></i>"+esc(p.title)+
             (p.link?" <a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;text-decoration:none;\">↗</a>":"")+
           "</div>";
@@ -4692,7 +4791,8 @@ function renderSR(results,skill,isDemo){
         portfolioLine+
         "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId||"")+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
-          (r.portfolio?"<a href=\"https://"+r.portfolio+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>Portfolio</a>":"")+
+          ((r.links&&r.links[0])?"<a href=\""+esc(r.links[0].url)+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>"+esc(r.links[0].url)+"</a>":"")+
+          (r._realId?"<button class=\"bg2 sr-save\" data-realid=\""+esc(r._realId)+"\" title=\""+(isSaved?"Remove from saved":"Save privately")+"\" aria-label=\""+(isSaved?"Remove ":"Save ")+esc(r.name)+"\"><i class=\"ti "+(isSaved?"ti-star-filled":"ti-star")+"\" style=\"font-size:14px;color:"+(isSaved?"#BA7517":"inherit")+";\"></i></button>":"")+
           (r._realId?"<button class=\"bg2 sr-report\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(r.name)+"\" style=\"margin-left:auto;\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>":"")+
         "</div>"+
       "</div>"+
@@ -4709,6 +4809,18 @@ function renderSR(results,skill,isDemo){
   document.querySelectorAll(".sr-report").forEach(function(btn){
     btn.addEventListener("click",function(){
       openReportModal(this.dataset.realid,this.dataset.name,"profile",null,returnToSkillSearch);
+    });
+  });
+  document.querySelectorAll(".sr-save").forEach(function(btn){
+    btn.addEventListener("click",async function(){
+      var id=this.dataset.realid;
+      var icon=this.querySelector("i");
+      var nowSaved=await toggleSaveProfile(id);
+      icon.className="ti "+(nowSaved?"ti-star-filled":"ti-star");
+      icon.style.color=nowSaved?"#BA7517":"inherit";
+      this.title=nowSaved?"Remove from saved":"Save privately";
+      var savedChipEl=document.getElementById("filter-saved");
+      if(savedChipEl)savedChipEl.textContent="★ Saved ("+S.savedIds.length+")";
     });
   });
 }
@@ -4734,7 +4846,7 @@ function openSearchConnectModal(realId,name){
   document.getElementById("srcbtn").addEventListener("click",returnToSkillSearch);
   document.getElementById("srsbtn").addEventListener("click",async function(){
     var msg=document.getElementById("srmsg").value.trim();
-    if(!msg){showErr("srmsg","Please write a short intro message before sending");scrollToFirstErr();return;}
+    if(!msg){showErr("srmsg","Write a short intro message before sending");scrollToFirstErr();return;}
     var btn=this;btn.disabled=true;btn.textContent="Sending…";
     try{
       var res=await sendConnectionRequest(realId,msg);
@@ -4762,11 +4874,10 @@ function showToast(msg){
 
 // ── Fallback demo data ───────────────────────
 function fallback(){
-  var r2=RO[S.role]||RO.res_r;
   MATCHES=[
-    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Tech/CTO role and Python skills directly complement your "+r2.n+". Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank — reached district finals."},{title:"Hackathon MLH — 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need a "+r2.n+" who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
-    {name:"Sofia Reyes",school:"Beverly Hills High School",country:"United States",grade:"12th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Public Speaking":"Expert","Social Media Marketing":"Advanced","Brand Strategy":"Advanced","Market Research":"Intermediate"},competitions:["Blue Ocean Competition","Diamond Challenge"],matchScore:91,why:"Sofia's Expert public speaking and marketing skills are exactly what a "+r2.n+" needs to pitch and win. LA-based so you can meet and prep together.",projectIdea:"Social enterprise connecting food-insecure students at LA schools with local restaurants",commitment:"Serious",availability:"8 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Spanish"],status:"has idea",stage:"planning",bio:"Senior at Beverly Hills High School who ran her school's social enterprise club and grew it from 12 to 200 members. Has a fully formed idea for a Conrad Challenge submission and needs a research and tech co-founder.",experience:[{title:"Conrad Challenge Regional Semifinalist 2024",desc:"Led pitch and marketing for a water conservation startup."},{title:"School Social Enterprise Club President",desc:"Grew membership from 12 to 200 students across two years."},{title:"TEDx Youth LA Speaker",desc:"Spoke on equity in student entrepreneurship programs."}],awards:["Conrad Challenge Regional Semifinalist 2024"],portfolio:null,lookingFor:"I need a "+r2.n+" who can handle the research and technical side. I pitch, promote, and close. Let's compete in Conrad and Blue Ocean this year."},
-    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills the gap a "+r2.n+" needs. She turns research into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a Research Lead or Tech partner. I handle all pitching in three languages."}
+    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Python and data analysis skills directly complement what you're looking for. Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank — reached district finals."},{title:"Hackathon MLH — 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need someone who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
+    {name:"Sofia Reyes",school:"Beverly Hills High School",country:"United States",grade:"12th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Public Speaking":"Expert","Social Media Marketing":"Advanced","Brand Strategy":"Advanced","Market Research":"Intermediate"},competitions:["Blue Ocean Competition","Diamond Challenge"],matchScore:91,why:"Sofia's Expert public speaking and marketing skills are exactly what this project needs to pitch and win. LA-based so you can meet and prep together.",projectIdea:"Social enterprise connecting food-insecure students at LA schools with local restaurants",commitment:"Serious",availability:"8 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Spanish"],status:"has idea",stage:"planning",bio:"Senior at Beverly Hills High School who ran her school's social enterprise club and grew it from 12 to 200 members. Has a fully formed idea for a Conrad Challenge submission and needs a research and tech co-founder.",experience:[{title:"Conrad Challenge Regional Semifinalist 2024",desc:"Led pitch and marketing for a water conservation startup."},{title:"School Social Enterprise Club President",desc:"Grew membership from 12 to 200 students across two years."},{title:"TEDx Youth LA Speaker",desc:"Spoke on equity in student entrepreneurship programs."}],awards:["Conrad Challenge Regional Semifinalist 2024"],portfolio:null,lookingFor:"I need someone who can handle the research and technical side. I pitch, promote, and close. Let's compete in Conrad and Blue Ocean this year."},
+    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills a real gap. She turns research into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a research or technical partner. I handle all pitching in three languages."}
   ];
   PROJECTS=[
     {title:"AI tutoring app for rural schools",description:"Need a "+r2.n+" to lead research and content for our Conrad Challenge submission.",neededRole:S.role||"res_r",skills:["Curriculum Design","Research"],competition:"Conrad Challenge",spots:2,authorName:"Jordan Lee",authorSchool:"Stuyvesant HS",authorCountry:"United States",track:"tech",posted:"2 days ago",matchReason:"Your role and skill levels are exactly the gap this team needs.",stage:"building"},
@@ -4784,7 +4895,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",experience:[],awards:[],portfolioItems:[],skillsNeeded:""};
+  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],skillsNeeded:""};
   MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
   signOutUser().catch(function(){});
