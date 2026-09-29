@@ -428,13 +428,10 @@ async function countPeerCorroboration(email,schoolName){
   var domain=getEmailDomain(email);
   if(!domain||!schoolName)return 0;
   try{
-    var res=await sba.from("students").select("email,school")
-      .eq("school_verification","self_reported")
-      .ilike("school",schoolName.trim());
-    if(!res.data)return 0;
-    return res.data.filter(function(r){
-      return getEmailDomain(r.email)===domain;
-    }).length;
+    // The database counts matching students for us and returns only a
+    // number - the app never downloads anyone else's email address.
+    var res=await sba.rpc("peer_corroboration_count",{p_school:schoolName.trim(),p_domain:domain});
+    return (res&&typeof res.data==="number")?res.data:0;
   }catch(ex){
     return 0;
   }
@@ -763,7 +760,7 @@ async function toggleSaveProfile(id){
 }
 async function fetchSavedStudents(){
   if(!S.savedIds.length)return [];
-  var studentsRes=await sba.from("students").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
+  var studentsRes=await sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
   if(studentsRes.error)throw studentsRes.error;
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
   if(!students.length)return [];
@@ -824,7 +821,7 @@ async function searchRealStudents(opts,excludeId){
       var compTextRes=await sba.from("competitions").select("student_id,competition_name").ilike("competition_name",qp);
       if(compTextRes.error)throw compTextRes.error;
       (compTextRes.data||[]).forEach(function(r){ids[r.student_id]=true;});
-      var ideaRes=await sba.from("students").select("id").ilike("idea",qp);
+      var ideaRes=await sba.from("students_public").select("id").ilike("idea",qp);
       if(ideaRes.error)throw ideaRes.error;
       (ideaRes.data||[]).forEach(function(r){ids[r.id]=true;});
     }
@@ -884,7 +881,7 @@ async function searchRealStudents(opts,excludeId){
     if(!idList.length)return [];
   }
 
-  var studentsQuery=sba.from("students").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(40);
+  var studentsQuery=sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(40);
   if(idList!==null)studentsQuery=studentsQuery.in("id",idList);
   if(city)studentsQuery=studentsQuery.ilike("city",city);
   if(school)studentsQuery=studentsQuery.ilike("school",school);
@@ -1647,6 +1644,7 @@ function goTo(p){
 function logo(big){return "<div class=\"logo"+(big?" big":"")+"\">Partn<span>r</span></div>";}
 // 5-step progress bar
 function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=4;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
+function safeUrl(u){u=(u||"").toString();return /^https?:\/\//i.test(u)?esc(u):"#";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 // Marks a required field/section label. A single small red asterisk,
 // consistent everywhere a field or section is actually enforced by
@@ -2206,7 +2204,7 @@ function rSkills(){
       "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+
       (item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+
       (item.desc?"<div style=\"font-size:12px;color:#666;margin-top:3px;line-height:1.4;\">"+esc(item.desc)+"</div>":"")+
-      (item.link?"<a href=\""+esc(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
+      (item.link?"<a href=\""+safeUrl(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
       "</div>"+
       "<button class=\"pow-del\" data-pi=\""+realIndex+"\" aria-label=\"Remove this entry\"><i class=\"ti ti-x\"></i></button>"+
     "</div>";
@@ -2560,7 +2558,7 @@ function openCompDetail(c,previewMode){
       "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;\"><div style=\"font-size:11px;color:#6b6b6b;margin-bottom:2px;\">Eligibility</div><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.eli+"</div></div>"+
     "</div>"+
     "<div class=\"why\" style=\"margin-bottom:14px;\"><strong>Why find a partner:</strong> "+c.why+"</div>"+
-    (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet — search the name directly to confirm details.</div>")+
+    (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet — search the name directly to confirm details.</div>")+
     "<div style=\"display:flex;gap:8px;\">"+
       (added?"<button style=\"flex:1;padding:10px;background:#3B6D11;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Added</button>":
             "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">"+(previewMode?"Sign up to target this →":"+ Add to my targets")+"</button>")+
@@ -2605,7 +2603,7 @@ function renderCat(){
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
       "</div>"+
       "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
-      (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
+      (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
     "</div>"+
     "<button style=\"flex-shrink:0;padding:6px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:white;margin-top:2px;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\">"+
       (added?"Added ✓":"+ Add")+
@@ -3057,7 +3055,7 @@ async function doFetch(){
   var feedbackLine=REMATCH_FEEDBACK?("\nPrevious round feedback: "+REMATCH_FEEDBACK):"";
   REMATCH_FEEDBACK=""; // one-time use — consumed here so it never leaks into a later, unrelated call
   var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+(S.zip?", "+S.zip:"")+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nProof of work: "+powStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,city,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 fictional projects that could genuinely use this student's skills. Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
+  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nProof of work: "+powStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,city,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 fictional projects that could genuinely use this student's skills. Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
   try{
     // Real matching now goes through a Supabase edge function that holds
     // the actual Anthropic key server-side — the previous direct
@@ -3277,7 +3275,7 @@ function mCards(){
         "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
         getStageChip(m.stage)+
       "</div>"+
-      "<div class=\"why\"><strong>Why you match:</strong> "+m.why+"</div>"+
+      "<div class=\"why\"><strong>Why you match:</strong> "+esc(m.why)+"</div>"+
       "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+m.availability+" · "+m.commitment+"</div>"+
       "<div style=\"display:flex;gap:8px;\">"+
         (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
@@ -3312,7 +3310,7 @@ function openProfile(i){
   var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" · "+lv+"</span>";}).join("");
   var ctags=(m.competitions||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+c+"</span>";}).join("");
   var ltags=(m.languages||[]).map(function(l){return "<span class=\"tag\">"+l+"</span>";}).join("");
-  var exp=(m.experience||[]).map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+e.title+"</div><div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.5;\">"+e.desc+"</div></div>";}).join("");
+  var exp=(m.experience||[]).map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div><div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.5;\">"+esc(e.desc)+"</div></div>";}).join("");
   var awds=(m.awards||[]).map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:"+t.c+";\"></i>"+a+"</div>";}).join("");
   var conn=CONNS.some(function(c){return c.name===m.name;});
   R(logo()+
@@ -3323,7 +3321,7 @@ function openProfile(i){
           "<div class=\"av\" style=\"width:54px;height:54px;font-size:18px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
           "<div style=\"flex:1;\">"+
             "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
-            "<div style=\"font-size:13px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+" · "+m.grade+"</div>"+
+            "<div style=\"font-size:13px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+" · "+esc(m.grade)+"</div>"+
             "<div style=\"display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;\">"+
               "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
               "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
@@ -3333,7 +3331,7 @@ function openProfile(i){
         "</div>"+
         "<div class=\"tags\" style=\"margin-bottom:6px;\">"+stags+"</div>"+
         "<div class=\"tags\" style=\"margin-bottom:8px;\">"+ctags+"</div>"+
-        "<div style=\"font-size:13px;color:#666;line-height:1.6;\">"+m.bio+"</div>"+
+        "<div style=\"font-size:13px;color:#666;line-height:1.6;\">"+esc(m.bio)+"</div>"+
       "</div>"+
       "<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:8px;\">Availability & details</div>"+
         "<div class=\"ag\">"+
@@ -3348,7 +3346,7 @@ function openProfile(i){
       (exp?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:4px;\">Experience</div>"+exp+"</div>":"")+
       (awds?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:4px;\">Awards</div>"+awds+"</div>":"")+
       "<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:6px;\">What they're looking for</div>"+
-        "<div style=\"font-size:13px;color:#666;line-height:1.6;background:#f8f8f6;padding:12px 14px;border-radius:8px;\">"+m.lookingFor+"</div>"+
+        "<div style=\"font-size:13px;color:#666;line-height:1.6;background:#f8f8f6;padding:12px 14px;border-radius:8px;\">"+esc(m.lookingFor)+"</div>"+
       "</div>"+
       "<div style=\"display:flex;gap:8px;\">"+
         (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;padding:10px;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
@@ -3407,7 +3405,7 @@ async function loadRealProjects(){
   var projects=(res.data||[]).filter(function(p){return p.student_id!==myId;});
   if(!projects.length)return [];
   var authorIds=projects.map(function(p){return p.student_id;});
-  var authorsRes=await sba.from("students").select("id,name,school,city,country,role,track").in("id",authorIds);
+  var authorsRes=await sba.from("students_public").select("id,name,school,city,country,role,track").in("id",authorIds);
   var authorsById={};
   (authorsRes.data||[]).forEach(function(a){authorsById[a.id]=a;});
   return projects.map(function(p){return {project:p,author:authorsById[p.student_id]};});
@@ -3611,7 +3609,7 @@ async function rManagePosting(projectId){
     var applicantIds=apps.map(function(a){return a.applicant_id;});
     var applicantsById={};
     if(applicantIds.length){
-      var studentsRes=await sba.from("students").select("id,name,school,city,country").in("id",applicantIds);
+      var studentsRes=await sba.from("students_public").select("id,name,school,city,country").in("id",applicantIds);
       (studentsRes.data||[]).forEach(function(s){applicantsById[s.id]=s;});
     }
     var h="<button id=\"mp-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
@@ -3913,7 +3911,7 @@ function dCards(){
           "<span style=\"font-size:11px;color:#6b6b6b;\">"+c.eli+"</span>"+
           "<span style=\"font-size:11px;font-weight:600;color:"+uc+";margin-left:auto;\">"+days+"d left</span>"+
         "</div>"+
-        (c.url?"<a href=\""+esc(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site</a>":"")+
+        (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site</a>":"")+
       "</div>"+
     "</div>";
   });
@@ -3955,7 +3953,7 @@ async function loadRealConnections(){
   if(!rows.length)return {incoming:[],outgoing:[],accepted:[],me:me};
 
   var otherIds=rows.map(function(r){return r.student_a_id===me?r.student_b_id:r.student_a_id;});
-  var pplRes=await sba.from("students").select("id,name,school,city,country,track,role").in("id",otherIds);
+  var pplRes=await sba.from("students_public").select("id,name,school,city,country,track,role").in("id",otherIds);
   var ppl={};
   (pplRes.data||[]).forEach(function(p){ppl[p.id]=p;});
 
@@ -4125,14 +4123,14 @@ function meTab(){
   var awardsForView=S.proofOfWork.filter(function(item){return item.type==="Award";});
   function entryViewHTML(item){
     return "<div class=\"ei\">"+(item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+"<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+(item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+(item.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(item.desc)+"</div>":"")+
-    (item.link?"<a href=\""+esc(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
+    (item.link?"<a href=\""+safeUrl(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
     "</div>";
   }
   var powViewHTML=(expForView.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Experience</div>"+expForView.map(entryViewHTML).join(""):"")+
     (awardsForView.length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Awards</div>"+awardsForView.map(entryViewHTML).join(""):"");
   var neededHTML=S.skillsNeeded?"<div class=\"slabel\" style=\"margin-top:1rem;\">Looking for</div><div style=\"font-size:13px;color:#666;line-height:1.5;\">"+esc(S.skillsNeeded)+"</div>":"";
   var linksViewHTML=(S.links||[]).length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Links</div>"+
-    S.links.map(function(l){return "<a href=\""+esc(l.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#534AB7;text-decoration:none;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>"+esc(l.url)+"</a>";}).join(""):"";
+    S.links.map(function(l){return "<a href=\""+safeUrl(l.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#534AB7;text-decoration:none;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>"+esc(l.url)+"</a>";}).join(""):"";
   return "<div class=\"card\">"+
     "<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
@@ -4220,11 +4218,11 @@ async function loadWorkspaceItems(connectionId){
       var icon=it.type==="link"?"ti-link":"ti-file";
       var actionHtml;
       if(it.type==="link"){
-        actionHtml="<a href=\""+esc(it.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Open →</a>";
+        actionHtml="<a href=\""+safeUrl(it.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Open →</a>";
       } else {
         var signed=await sba.storage.from("workspace-files").createSignedUrl(it.storage_path,3600);
         var dlUrl=(signed&&signed.data&&signed.data.signedUrl)||"#";
-        actionHtml="<a href=\""+esc(dlUrl)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Download →</a>";
+        actionHtml="<a href=\""+safeUrl(dlUrl)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;text-decoration:none;\">Download →</a>";
       }
       rows.push("<div class=\"pit\">"+
         "<i class=\"ti "+icon+"\" style=\"font-size:18px;color:#6b6b6b;\"></i>"+
@@ -4764,12 +4762,12 @@ function renderSR(results,skill,isDemo){
     var cm=CM[r.avatarColor]||CM.purple;var t=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
     var isSaved=r._realId&&(S.savedIds||[]).indexOf(r._realId)>=0;
     var sk=Object.keys(sbgs).find(function(k){return r.status&&r.status.toLowerCase().indexOf(k)>=0;})||"exploring";
-    var others=(r.otherSkills||[]).map(function(s){return "<span class=\"tag\">"+s+"</span>";}).join("");
+    var others=(r.otherSkills||[]).map(function(s){return "<span class=\"tag\">"+esc(s)+"</span>";}).join("");
     var portfolioLine=(r.proofOfWork&&r.proofOfWork.length)?
       "<div style=\"margin-bottom:8px;\">"+
         r.proofOfWork.slice(0,2).map(function(p){
           return "<div style=\"font-size:12px;color:#444;margin-bottom:2px;\"><i class=\"ti ti-briefcase\" style=\"font-size:11px;color:#7F77DD;vertical-align:-1px;margin-right:3px;\"></i>"+esc(p.title)+
-            (p.link?" <a href=\""+esc(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;text-decoration:none;\">↗</a>":"")+
+            (p.link?" <a href=\""+safeUrl(p.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;text-decoration:none;\">↗</a>":"")+
           "</div>";
         }).join("")+
       "</div>":"";
@@ -4778,12 +4776,12 @@ function renderSR(results,skill,isDemo){
       "<div style=\"flex:1;min-width:0;\">"+
         "<div style=\"display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:3px;\">"+
           "<span style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(r.name))+"</span>"+
-          "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+r.status+"</span>"+
+          "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+esc(r.status)+"</span>"+
         "</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;\">"+locationLine(r.school,r.city,r.country,sharesSchoolRequiredComp(r.competitions))+" · "+esc(r.grade)+"</div>"+
-        "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.5;\">"+r.bio+"</div>"+
+        "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.5;\">"+esc(r.bio)+"</div>"+
         "<div class=\"tags\" style=\"margin-bottom:8px;\">"+
-          "<span class=\"tag\" style=\"background:"+(LB[r.keyLevel]||"#EEEDFE")+";color:"+(LT[r.keyLevel]||"#3C3489")+";font-weight:600;\">"+r.keySkill+" · "+r.keyLevel+"</span>"+
+          "<span class=\"tag\" style=\"background:"+(LB[r.keyLevel]||"#EEEDFE")+";color:"+(LT[r.keyLevel]||"#3C3489")+";font-weight:600;\">"+esc(r.keySkill)+" · "+esc(r.keyLevel)+"</span>"+
           others+
           "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+ro.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+ro.n+"</span>"+
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
@@ -4791,7 +4789,7 @@ function renderSR(results,skill,isDemo){
         portfolioLine+
         "<div style=\"display:flex;gap:8px;align-items:center;\">"+
           "<button class=\"bc sr-connect\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId||"")+"\" style=\"background:"+t.c+";padding:6px 14px;font-size:12px;\">Connect →</button>"+
-          ((r.links&&r.links[0])?"<a href=\""+esc(r.links[0].url)+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>"+esc(r.links[0].url)+"</a>":"")+
+          ((r.links&&r.links[0])?"<a href=\""+safeUrl(r.links[0].url)+"\" style=\"font-size:12px;color:"+t.c+";text-decoration:none;display:flex;align-items:center;gap:3px;padding:6px 0;\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-external-link\" style=\"font-size:12px;\"></i>"+esc(r.links[0].url)+"</a>":"")+
           (r._realId?"<button class=\"bg2 sr-save\" data-realid=\""+esc(r._realId)+"\" title=\""+(isSaved?"Remove from saved":"Save privately")+"\" aria-label=\""+(isSaved?"Remove ":"Save ")+esc(r.name)+"\"><i class=\"ti "+(isSaved?"ti-star-filled":"ti-star")+"\" style=\"font-size:14px;color:"+(isSaved?"#BA7517":"inherit")+";\"></i></button>":"")+
           (r._realId?"<button class=\"bg2 sr-report\" data-name=\""+esc(r.name)+"\" data-realid=\""+esc(r._realId)+"\" title=\"Report or block\" aria-label=\"Report or block "+esc(r.name)+"\" style=\"margin-left:auto;\"><i class=\"ti ti-flag\" style=\"font-size:14px;\"></i></button>":"")+
         "</div>"+
