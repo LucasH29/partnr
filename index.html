@@ -843,13 +843,25 @@ async function searchRealStudents(opts,excludeId){
       // Broader than an exact competition name — matches any student
       // targeting ANY real competition that falls under this category,
       // e.g. "All Tech competitions" captures Congressional App
-      // Challenge, USACO, CyberPatriot, etc. all at once.
+      // Challenge, USACO, CyberPatriot, etc. all at once. Also matches
+      // by TRACK, not just saved competitions - a student whose track
+      // is Research & Science should show up under "All Science
+      // competitions" even if they haven't logged a specific one yet,
+      // the same track-or-competition rule used everywhere else in
+      // this app (Open Projects sorting, the weekly match email).
       var namesInCategory=COMPS.filter(function(c){return c.cat===category;}).map(function(c){return c.n;});
       var catIds={};
       if(namesInCategory.length){
         var catCompRes=await sba.from("competitions").select("student_id").in("competition_name",namesInCategory);
         if(catCompRes.error)throw catCompRes.error;
         (catCompRes.data||[]).forEach(function(r){catIds[r.student_id]=true;});
+      }
+      var CATEGORY_TO_TRACK={science:"research",business:"business",impact:"impact",tech:"tech",arts:"arts",writing:"arts",law:"law"};
+      var mappedTrack=CATEGORY_TO_TRACK[category];
+      if(mappedTrack){
+        var trackRes=await sba.from("students_public").select("id").eq("track",mappedTrack);
+        if(trackRes.error)throw trackRes.error;
+        (trackRes.data||[]).forEach(function(r){catIds[r.id]=true;});
       }
       if(query||competition){
         var narrowedCat={};
@@ -3752,8 +3764,8 @@ function sTab(){
     "</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
       "<div style=\"width:100%;font-size:12px;color:#6b6b6b;margin-bottom:6px;\">Browse by skill, or find others aiming for the same competition:</div>"+
-      "<button id=\"browse-toggle\" style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;cursor:pointer;flex:1;min-width:150px;\"><span>Browse by skill</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
-      "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;flex:1;min-width:150px;\">"+compOptions+"</select>"+
+      "<button id=\"browse-toggle\" style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px;height:38px;box-sizing:border-box;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;cursor:pointer;flex:1;min-width:150px;\"><span>Browse by skill</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
+      "<select id=\"filter-comp\" style=\"padding:0 10px;height:38px;box-sizing:border-box;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;flex:1;min-width:150px;\">"+compOptions+"</select>"+
       "<div style=\"width:100%;height:0;\"></div>"+
       "<div class=\"chip\" id=\"filter-global\" role=\"button\" tabindex=\"0\">🌍 Anyone</div>"+
       "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
