@@ -1592,7 +1592,7 @@ var SKILL_CATS=[
    items:["Fusion 360","SolidWorks","Onshape","AutoCAD","SketchUp","3D Printing","Laser Cutting","Robotics - FIRST / VEX","Robot Programming (Java / C++)","ROS","FIRST - Drive Coach / Strategy","FIRST - Scouting & Data Analysis","Circuit Design / PCB","Soldering / Electronics","Electrical Wiring","Mechanical Design","Aerospace / Rocketry","Cybersecurity / Networks","Embedded Systems"]},
   {id:"design",label:"Design & Creative Tools",question:"What design tools and creative skills do you use?",icon:"ti-palette",type:"level",hint:"List tools you actually open and use regularly",
    items:["Figma / UI Design","Adobe Photoshop","Adobe Illustrator","Adobe Premiere / Video Editing","After Effects / Motion Graphics","DaVinci Resolve","Blender / 3D Modeling","Procreate / Digital Art","Photography","Canva","Brand Identity / Logos","Illustration / Drawing","Animation","Game Art / Pixel Art","Architecture Design"]},
-  {id:"business",label:"Business & Finance",question:"What business skills do you know?",icon:"ti-chart-line",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
+  {id:"business",label:"Business & Finance",question:"What business skills do you know?",icon:"ti-trending-up",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
    items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Fundraising","Hospitality Management","Economics","Product Management","Project Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
   {id:"writing",label:"Writing & Communication",question:"What writing and communication skills do you have?",icon:"ti-pencil",type:"level",hint:"Select skills you actively and regularly use",
    items:["Research & Academic Writing","Essay Writing","Journalism / Reporting","Creative Writing","Technical Writing","Grant Writing","Screenwriting / Scripts","Poetry","Public Speaking","Debate","Social Media Content"]},
@@ -3757,12 +3757,22 @@ function sTab(){
       "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
       "<div class=\"chip\" id=\"filter-saved\" role=\"button\" tabindex=\"0\">★ Saved ("+(S.savedIds||[]).length+")</div>"+
     "</div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Browse by category</div>"+
-    "<div id=\"skill-browse\" style=\"margin-bottom:1rem;\"></div>"+
+    "<button id=\"browse-toggle\" style=\"width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;padding:0;margin-top:0;margin-bottom:8px;cursor:pointer;font-family:inherit;\"><span class=\"slabel\" style=\"margin:0;\">Browse by category</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
+    "<div id=\"skill-browse\" style=\"margin-bottom:1rem;display:none;\"></div>"+
     "<div id=\"skill-drill\" style=\"margin-bottom:1rem;display:none;\"></div>"+
     "<div id=\"sr\" style=\"margin-top:0.5rem;\"></div>";
 }
 function bindSE(){
+  var browseToggleBtn=document.getElementById("browse-toggle");
+  if(browseToggleBtn){
+    browseToggleBtn.addEventListener("click",function(){
+      var body=document.getElementById("skill-browse");
+      var chev=document.getElementById("browse-chev");
+      var opening=body.style.display==="none";
+      body.style.display=opening?"block":"none";
+      chev.style.transform=opening?"rotate(180deg)":"";
+    });
+  }
   // Build category browser
   var browsEl=document.getElementById("skill-browse");
   if(!browsEl)return;
@@ -3861,23 +3871,19 @@ function bindSE(){
     var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
     var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
     if(!q&&!comp&&!category&&!subcat&&!city&&!school){
-      // Everything's cleared — restore the browse-by-category view
-      // instead of leaving a blank pane. This is the fix for the bug
-      // where browse-by-category vanished after any search and never
-      // came back, even once every filter was cleared again.
-      document.getElementById("skill-browse").style.display="block";
+      // Browse-by-category is now a manual toggle the student
+      // controls directly - clearing filters doesn't force it open or
+      // closed either, it stays exactly as they left it.
       document.getElementById("skill-drill").style.display="none";
       document.getElementById("sr").innerHTML="";
       LAST_SKILL_SEARCH=null;
       return;
     }
     // Browse-by-category is a tool for picking a skill to search by - it
-    // has nothing to do with the competition, city, or school filters, so
-    // it stays visible regardless of what else is selected. Only close
-    // the drilled-into-one-category view, since that view's whole point
-    // was picking a skill, and a search just ran.
+    // has nothing to do with the competition, city, or school filters, and
+    // it's now a manual toggle the student controls, so a search running
+    // never forces it open or closed on its own.
     document.getElementById("skill-drill").style.display="none";
-    document.getElementById("skill-browse").style.display="block";
     LAST_SKILL_SEARCH={qRaw:q,compRawValue:compRaw,cityOn:!!(cityChip&&cityChip.classList.contains("on")),schoolOn:!!(schoolChip&&schoolChip.classList.contains("on"))};
     srchSkill({query:q,competition:comp,category:category,subcat:subcat,city:city,school:school});
   }
