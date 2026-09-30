@@ -3751,6 +3751,7 @@ function sTab(){
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
     "</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
+      "<div style=\"width:100%;font-size:12px;color:#6b6b6b;margin-bottom:2px;\">Or find others aiming for the same competition</div>"+
       "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;max-width:220px;\">"+compOptions+"</select>"+
       "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
       "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
@@ -3870,8 +3871,13 @@ function bindSE(){
       LAST_SKILL_SEARCH=null;
       return;
     }
-    document.getElementById("skill-browse").style.display="none";
+    // Browse-by-category is a tool for picking a skill to search by - it
+    // has nothing to do with the competition, city, or school filters, so
+    // it stays visible regardless of what else is selected. Only close
+    // the drilled-into-one-category view, since that view's whole point
+    // was picking a skill, and a search just ran.
     document.getElementById("skill-drill").style.display="none";
+    document.getElementById("skill-browse").style.display="block";
     LAST_SKILL_SEARCH={qRaw:q,compRawValue:compRaw,cityOn:!!(cityChip&&cityChip.classList.contains("on")),schoolOn:!!(schoolChip&&schoolChip.classList.contains("on"))};
     srchSkill({query:q,competition:comp,category:category,subcat:subcat,city:city,school:school});
   }
@@ -4198,12 +4204,18 @@ async function renderConnections(){
 function meTab(){
   var inits=S.name?S.name.split(" ").map(function(w){return w[0];}).join("").substring(0,2).toUpperCase():"?";
   var t=TR[S.track]||{};
-  var tags=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];}).slice(0,6).map(function(k){
+  var allSkillKeys=Object.keys(S.skillLevels).filter(function(k){return S.skillLevels[k];});
+  var mathKeysForView=allSkillKeys.filter(function(k){return k.indexOf("math:")===0;});
+  var otherSkillKeysForView=allSkillKeys.filter(function(k){return k.indexOf("math:")!==0;});
+  function skillTagHTML(k,small){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
-    if(lv==="studied"||lv==="noted")return "<span class=\"tag\">"+skill+"</span>";
-    return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+skill+" · "+lv+"</span>";
-  }).join("");
-  tags+=(S.comps||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+(c||"")+"</span>";}).join("");
+    var sizeStyle=small?"font-size:11px;padding:3px 9px;":"";
+    if(lv==="studied"||lv==="noted")return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
+    return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";"+sizeStyle+"\">"+skill+" · "+lv+"</span>";
+  }
+  var mathTagsHTML=mathKeysForView.map(function(k){return skillTagHTML(k,true);}).join("");
+  var skillTagsHTML=otherSkillKeysForView.slice(0,10).map(function(k){return skillTagHTML(k,false);}).join("");
+  var compTagsHTML=(S.comps||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+(c||"")+"</span>";}).join("");
   var expForView=S.proofOfWork.filter(function(item){return item.type!=="Award";});
   var awardsForView=S.proofOfWork.filter(function(item){return item.type==="Award";});
   function entryViewHTML(item){
@@ -4232,10 +4244,13 @@ function meTab(){
       "</div>"+
       "<div style=\"text-align:right;\">"+
         "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
+        (S.status?"<div style=\"font-size:11px;color:#6b6b6b;margin-top:4px;\">"+esc(S.status)+"</div>":"")+
       "</div>"+
     "</div>"+
-    "<div class=\"tags\">"+tags+"</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;font-style:italic;margin-top:4px;\">"+(S.idea||"Open to ideas")+"</div>"+
+    (skillTagsHTML?"<div class=\"slabel\" style=\"margin-top:0.75rem;\">Skills</div><div class=\"tags\">"+skillTagsHTML+"</div>":"")+
+    (compTagsHTML?"<div class=\"slabel\" style=\"margin-top:0.75rem;\">Competitions</div><div class=\"tags\">"+compTagsHTML+"</div>":"")+
+    (mathTagsHTML?"<div class=\"slabel\" style=\"margin-top:0.75rem;font-size:10px;\">Math courses</div><div class=\"tags\" style=\"opacity:0.85;\">"+mathTagsHTML+"</div>":"")+
+    "<div style=\"font-size:13px;color:#6b6b6b;font-style:italic;margin-top:8px;\">"+(S.idea||"Open to ideas")+"</div>"+
     linksViewHTML+powViewHTML+neededHTML+
   "</div>"+
   // Edit Profile button
