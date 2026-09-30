@@ -2299,7 +2299,7 @@ function rSkills(){
   document.querySelectorAll("#avail-hours .chip").forEach(function(c){c.addEventListener("click",function(){pendingHours=getChips("avail-hours")[0]||"";});});
   document.querySelectorAll("#avail-when .chip").forEach(function(c){c.addEventListener("click",function(){pendingWhen=getChips("avail-when")[0]||"";});});
 
-  renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional).",[mathCat],false);
+  renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Useful beyond math competitions — research, engineering, and business projects often need this too.",[mathCat],false);
   renderGroup("active-group","Based on your interests",null,activeCats,false);
   renderGroup("extra-group","Select additional skills","The more you add, the better your matches.",extraCats,true);
   renderSkillRecap();
@@ -3751,13 +3751,15 @@ function sTab(){
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
     "</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
-      "<div style=\"width:100%;font-size:12px;color:#6b6b6b;margin-bottom:2px;\">Or find others aiming for the same competition</div>"+
-      "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;max-width:220px;\">"+compOptions+"</select>"+
+      "<div style=\"width:100%;font-size:12px;color:#6b6b6b;margin-bottom:6px;\">Browse by skill, or find others aiming for the same competition:</div>"+
+      "<button id=\"browse-toggle\" style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;cursor:pointer;flex:1;min-width:150px;\"><span>Browse by skill</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
+      "<select id=\"filter-comp\" style=\"padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;flex:1;min-width:150px;\">"+compOptions+"</select>"+
+      "<div style=\"width:100%;height:0;\"></div>"+
+      "<div class=\"chip\" id=\"filter-global\" role=\"button\" tabindex=\"0\">🌍 Anyone</div>"+
       "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
       "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
       "<div class=\"chip\" id=\"filter-saved\" role=\"button\" tabindex=\"0\">★ Saved ("+(S.savedIds||[]).length+")</div>"+
     "</div>"+
-    "<button id=\"browse-toggle\" style=\"width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;padding:0;margin-top:0;margin-bottom:8px;cursor:pointer;font-family:inherit;\"><span class=\"slabel\" style=\"margin:0;\">Browse by category</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
     "<div id=\"skill-browse\" style=\"margin-bottom:1rem;display:none;\"></div>"+
     "<div id=\"skill-drill\" style=\"margin-bottom:1rem;display:none;\"></div>"+
     "<div id=\"sr\" style=\"margin-top:0.5rem;\"></div>";
@@ -3836,9 +3838,20 @@ function bindSE(){
   // Filter chips: toggle on/off, same visual pattern as chips elsewhere.
   var cityChip=document.getElementById("filter-city");
   var schoolChip=document.getElementById("filter-school");
-  [cityChip,schoolChip].forEach(function(chip){
+  var globalChip=document.getElementById("filter-global");
+  // Location is a single choice, not independent toggles - Anyone,
+  // In my city, or At my school. Anyone is the sensible default when
+  // nothing else is picked, shown as on until something else is chosen.
+  if(globalChip&&!(cityChip&&cityChip.classList.contains("on"))&&!(schoolChip&&schoolChip.classList.contains("on"))){
+    globalChip.classList.add("on");
+  }
+  [globalChip,cityChip,schoolChip].forEach(function(chip){
     if(!chip)return;
-    chip.addEventListener("click",function(){chip.classList.toggle("on");runSkillSearch();});
+    chip.addEventListener("click",function(){
+      [globalChip,cityChip,schoolChip].forEach(function(c){if(c)c.classList.remove("on");});
+      chip.classList.add("on");
+      runSkillSearch();
+    });
     addKbdActivation(chip);
   });
   var savedChip=document.getElementById("filter-saved");
@@ -4249,7 +4262,7 @@ function meTab(){
           "<span style=\"font-size:11px;font-weight:600;color:#854F0B;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;\"></i> Self-Reported School</span> <button id=\"verifyEmailBtn\" style=\"background:none;border:none;color:#534AB7;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Verify with school email</button> <button id=\"helpVerifyBtn\" style=\"background:none;border:none;color:#6b6b6b;font-size:11px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;\">Can't verify this way? Ask us for help</button>")+"</div>"+
       "</div>"+
       "<div style=\"text-align:right;\">"+
-        "<div style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";\">"+  (t.n||"")+"</div>"+
+        "<div style=\"display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(t.bg||"")+";color:"+(t.tc||"")+";white-space:nowrap;text-align:center;max-width:160px;\">"+(t.n||"")+"</div>"+
         (S.status?"<div style=\"font-size:11px;color:#6b6b6b;margin-top:4px;\">"+esc(S.status)+"</div>":"")+
       "</div>"+
     "</div>"+
