@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Partnr — Find Your Perfect Student Partner</title>
+<title>Partnr: Find Your Perfect Student Partner</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://unpkg.com/@formspree/ajax@1" defer></script>
 <style>
@@ -160,6 +160,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 // ── State ──────────────────────────────────
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],schoolVerification:"self_reported",skillsNeeded:"",dob:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,notSureActiveTab="browse",activeCats=[],modalTarget=null;
+var MATCHES_ARE_DEMO=false; // true while the example profiles from fallback() are on screen
 // Remembers the last real Skill Search (query/filters), so backing out
 // of a Report/Block flow can return to the actual results the student
 // was looking at instead of a reset, blank browse-by-category screen.
@@ -522,7 +523,7 @@ async function loadProfileIntoState(uid){
   var p=pRes.data;
   S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
-  S.secondary=p.secondary||[];S.status=p.status||"";S.idea=p.idea||"";S.availability=p.availability||"";
+  S.secondary=p.secondary||[];S.status=(p.status||"").replace("I have a project — need teammates","I have a project and need teammates");S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
@@ -764,6 +765,7 @@ async function fetchSavedStudents(){
   var studentsRes=await sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
   if(studentsRes.error)throw studentsRes.error;
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
+  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need teammates";});
   if(!students.length)return [];
   var finalIds=students.map(function(s){return s.id;});
   var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",finalIds);
@@ -802,7 +804,7 @@ async function searchRealStudents(opts,excludeId){
   var competition=(opts.competition||"").trim();
   var category=(opts.category||"").trim();
   var subcat=(opts.subcat||"").trim();
-  if(!query&&!city&&!school&&!competition&&!category&&!subcat)return [];
+  if(!opts.all&&!query&&!city&&!school&&!competition&&!category&&!subcat)return [];
 
   var idList=null; // null = no id-narrowing needed (pure city/school filter)
   var skillMatch={};
@@ -906,6 +908,7 @@ async function searchRealStudents(opts,excludeId){
   // too keeps the UI consistent immediately after a block, before any
   // refetch happens.
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
+  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need teammates";});
   console.log("[Partnr search] filters:",{query:query,city:city,school:school,competition:competition},"| matched:",students.length);
   if(!students.length)return [];
 
@@ -948,8 +951,8 @@ function rCheckEmail(){
     "<div style=\"text-align:center;padding:2rem 1rem;\">"+
       "<i class=\"ti ti-mail-opened check-email-icon\"></i>"+
       "<h2 style=\"margin-bottom:0.5rem;\">Check your email</h2>"+
-      "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue — you'll come right back here.</div>"+
-      "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely — if it still doesn't show up after a few minutes, try signing up again with a personal email instead.</div>"+
+      "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue, and you'll come right back here.</div>"+
+      "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely. If it still doesn't show up after a few minutes, try signing up again with a personal email instead.</div>"+
       "<button class=\"bkbtn\" id=\"backToSignup\" style=\"margin-top:1rem;\">← Use a different email</button>"+
     "</div>"
   );
@@ -964,6 +967,7 @@ async function boot(){
       await loadBlockedIds();
       var profile=await loadProfileIntoState(session.user.id);
       if(profile&&profile.onboarded){
+        await loadSavedMatches();
         goTo("matches");
         return;
       }
@@ -1839,7 +1843,7 @@ function rSignIn(){
     "<button class=\"bp\" id=\"googleSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-google\"></i> Sign in with Google</button>"+
     "<button class=\"bp\" id=\"msSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-windows\"></i> Sign in with Microsoft</button>"+
     "<button class=\"bp\" id=\"ghSignIn\" style=\"background:#fff;color:#1a1a1a;border:1px solid #ddd;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;\"><i class=\"ti ti-brand-github\"></i> Sign in with GitHub</button>"+
-    "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-top:1rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Some schools block third-party sign-in until their IT admin approves it. If Google or Microsoft doesn't work, use your email instead — it always works and doesn't require any approval.</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:8px 12px;margin-top:1rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Some schools block third-party sign-in until their IT admin approves it. If Google or Microsoft doesn't work, use your email instead. It always works and doesn't require any approval.</div>"+
     "<button class=\"bkbtn\" id=\"toWelcome\" style=\"margin-top:1rem;\">New to Partnr? Create an account</button>"
   );
   document.getElementById("toWelcome").addEventListener("click",function(){goTo("signup");});
@@ -1852,14 +1856,14 @@ function rSignIn(){
     sendMagicLink(email,null).then(function(err){
       if(err){
         btn.disabled=false;btn.textContent="Send sign-in link →";
-        showErr("siEmail","Couldn't send sign-in link — "+(err.message||"please try again"));
+        showErr("siEmail","Couldn't send sign-in link: "+(err.message||"please try again"));
         scrollToFirstErr();
         return;
       }
       rCheckEmail();
     }).catch(function(ex){
       btn.disabled=false;btn.textContent="Send sign-in link →";
-      showErr("siEmail","Something went wrong — please try again");
+      showErr("siEmail","Something went wrong. Please try again");
       scrollToFirstErr();
     });
   });
@@ -1870,7 +1874,7 @@ function rSignIn(){
     if(err){
       gBtn.disabled=false;
       gBtn.innerHTML="<i class=\"ti ti-brand-google\"></i> Sign in with Google";
-      showToast("Couldn't start Google sign-in — please try again");
+      showToast("Couldn't start Google sign-in. Please try again");
     }
   });
   var mBtn=document.getElementById("msSignIn");
@@ -1880,7 +1884,7 @@ function rSignIn(){
     if(err){
       mBtn.disabled=false;
       mBtn.innerHTML="<i class=\"ti ti-brand-windows\"></i> Sign in with Microsoft";
-      showToast("Couldn't start Microsoft sign-in — please try again");
+      showToast("Couldn't start Microsoft sign-in. Please try again");
     }
   });
   var ghBtn=document.getElementById("ghSignIn");
@@ -1890,7 +1894,7 @@ function rSignIn(){
     if(err){
       ghBtn.disabled=false;
       ghBtn.innerHTML="<i class=\"ti ti-brand-github\"></i> Sign in with GitHub";
-      showToast("Couldn't start GitHub sign-in — please try again");
+      showToast("Couldn't start GitHub sign-in. Please try again");
     }
   });
 }
@@ -1902,7 +1906,7 @@ function rSignup(){
   R(logo()+sb(1)+
     "<h2>Create your profile</h2>"+
     "<div class=\"sub\">Tell us a little about yourself.</div>"+
-    (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google — email verified</div>":"")+
+    (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google. Email verified</div>":"")+
     "<div class=\"fi\"><label for=\"iname\">Full name"+req()+"</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
     "<div class=\"fi\"><label for=\"iemail\">Email"+req()+"</label><div style=\"font-size:12px;color:#6b6b6b;margin-bottom:6px;\">We recommend a personal email. Some schools block sign-in emails.</div><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
     "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">School name"+req()+"</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
@@ -2075,8 +2079,8 @@ function rTrack(){
   var catKeys=Object.keys(CM2).filter(function(k){return k!=="custom";});
   var compSectionHTML=
     "<div class=\"slabel\" style=\"margin-top:1.5rem;\">Have a competition in mind?</div>"+
-    "<div class=\"hint\">Enter the name below — add as many as you're targeting.</div>"+
-    "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search — ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
+    "<div class=\"hint\">Add as many as you're targeting.</div>"+
+    "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
     "<div id=\"pills\" style=\"display:flex;flex-wrap:wrap;gap:5px;min-height:10px;margin-bottom:1rem;\"></div>"+
     "<div id=\"exbtn\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;\">"+
       "<button class=\"exbtn ex2\" id=\"exb-browse\" data-tab=\"browse\"><i class=\"ti ti-layout-grid\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Browse by category</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
@@ -2118,7 +2122,7 @@ function rTrack(){
     "<button class=\"bp\" id=\"s3\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
-  mkChips("status",["I have a project — need teammates","Open to joining a project","Just exploring"],[S.status],true);
+  mkChips("status",["I have a project and need teammates","Open to joining a project","Just exploring"],[S.status],true);
   mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
   renderInterestChips();
   document.getElementById("s3").addEventListener("click",step3);
@@ -2236,7 +2240,7 @@ function rSkills(){
       "<div style=\"flex:1;\">"+
       (item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+
       "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+
-      (item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+
+      (item.role?"<span style=\"font-size:12px;color:#666;\">, "+esc(item.role)+"</span>":"")+
       (item.desc?"<div style=\"font-size:12px;color:#666;margin-top:3px;line-height:1.4;\">"+esc(item.desc)+"</div>":"")+
       (item.link?"<a href=\""+safeUrl(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
       "</div>"+
@@ -2282,7 +2286,7 @@ function rSkills(){
     "<div id=\"extra-group\"></div>"+
     "<div id=\"math-group\"></div>"+
     "<div id=\"skillrecap\" style=\"background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:1rem;\"></div>"+
-    "<div class=\"slabel\">Don't see it?</div>"+
+    "<div class=\"slabel\">Missing a skill? Add your own.</div>"+
     "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
       "<input id=\"customskill2\" placeholder=\"Still not there? Type it - e.g. VHDL, Falconry, Amateur Radio...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"addskillbtn2\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
@@ -2293,7 +2297,7 @@ function rSkills(){
     "<div class=\"cgrow\" id=\"avail-when\"></div>"+
     "<div style=\"background:#f8f8f6;border-radius:12px;padding:14px;margin-bottom:1rem;\">"+
       "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;\">Experience <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">A project, a club, an internship. Skip if you're just getting started — that's totally fine.</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">A project, a club, an internship. Just getting started? Skip this, that's totally fine.</div>"+
       "<div id=\"pow-list\">"+expHTML2+"</div>"+
       expAddHTML+
       "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 4px;\">Awards <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
@@ -2311,7 +2315,7 @@ function rSkills(){
   document.querySelectorAll("#avail-hours .chip").forEach(function(c){c.addEventListener("click",function(){pendingHours=getChips("avail-hours")[0]||"";});});
   document.querySelectorAll("#avail-when .chip").forEach(function(c){c.addEventListener("click",function(){pendingWhen=getChips("avail-when")[0]||"";});});
 
-  renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Useful beyond math competitions — research, engineering, and business projects often need this too.",[mathCat],false);
+  renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Research, engineering, and business projects often need math too, not just math competitions.",[mathCat],false);
   renderGroup("active-group","Based on your interests",null,activeCats,false);
   renderGroup("extra-group","Select additional skills","The more you add, the better your matches.",extraCats,true);
   renderSkillRecap();
@@ -2531,7 +2535,7 @@ function renderSkillRecap(){
     if(lv==="noted"){
       return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 10px;\">"+esc(name)+"</span>";
     }
-    return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#854F0B;background:white;border:1px solid #FAC775;border-radius:20px;padding:4px 10px;\">"+esc(name)+" — needs a level</span>";
+    return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#854F0B;background:white;border:1px solid #FAC775;border-radius:20px;padding:4px 10px;\">"+esc(name)+": needs a level</span>";
   });
   el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px;\">Selected ("+keys.length+")</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:6px;\">"+pills.join("")+"</div>";
@@ -2616,7 +2620,7 @@ function openCompDetail(c,previewMode){
       "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;\"><div style=\"font-size:11px;color:#6b6b6b;margin-bottom:2px;\">Eligibility</div><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+c.eli+"</div></div>"+
     "</div>"+
     "<div class=\"why\" style=\"margin-bottom:14px;\"><strong>Why find a partner:</strong> "+c.why+"</div>"+
-    (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet — search the name directly to confirm details.</div>")+
+    (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:13px;color:"+cm.c+";text-decoration:none;display:flex;align-items:center;gap:5px;margin-bottom:14px;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>Visit official site for real dates and rules</a>":"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:14px;\">We haven't verified an official link for this one yet. Search the name directly to confirm details.</div>")+
     "<div style=\"display:flex;gap:8px;\">"+
       (added?"<button style=\"flex:1;padding:10px;background:#3B6D11;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Added</button>":
             "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">"+(previewMode?"Sign up to target this →":"+ Add to my targets")+"</button>")+
@@ -2661,7 +2665,7 @@ function renderCat(){
         "<span style=\"font-size:10px;padding:2px 7px;border-radius:20px;background:#f4f4f0;color:#666;\">"+c.eli+"</span>"+
       "</div>"+
       "<div style=\"font-size:11px;font-style:italic;color:"+cm.c+";margin-top:4px;\"><i class=\"ti ti-users\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;\"></i>"+c.why+"</div>"+
-      (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site — check real dates and rules</a>":"")+
+      (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site: check real dates and rules</a>":"")+
     "</div>"+
     "<button style=\"flex-shrink:0;padding:6px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:white;margin-top:2px;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\">"+
       (added?"Added ✓":"+ Add")+
@@ -2786,6 +2790,10 @@ async function runInlineSuggestions(){
       var result=await fetchCompetitionSuggestions(text,chipKeys.map(function(k){return TR[k].n;}));
       if(result.primaryCategory&&TR[result.primaryCategory]){
         S.track=result.primaryCategory;
+        // Second category (e.g. Research for a cancer-prevention club that
+        // wants to write a paper) becomes the secondary interest, which
+        // also moves it into "Based on your interests" on the Skills page.
+        S.secondary=(result.categories||[]).slice(1).map(function(k){return TR[k].n;});
         renderInterestChips();
       }
       renderInlineSuggestionResults(result.suggestions,text);
@@ -2802,7 +2810,7 @@ async function runInlineSuggestions(){
   }catch(ex){
     console.error("[Partnr] competition suggestion failed:",ex);
     var notSignedIn=ex&&ex.code==="not_signed_in";
-    resultsEl.innerHTML="<div class=\"sec-err\" style=\"margin-top:0;\">"+(notSignedIn?"You've been signed out — please sign in again.":"Something went wrong — please try again.")+"</div>";
+    resultsEl.innerHTML="<div class=\"sec-err\" style=\"margin-top:0;\">"+(notSignedIn?"You've been signed out. Please sign in again.":"Something went wrong. Please try again.")+"</div>";
   }
   btn.disabled=false;btn.textContent="Suggest competitions →";
 }
@@ -2839,8 +2847,8 @@ async function fetchCompetitionSuggestions(interestText,alsoInterestedIn){
     "Pick the 3 to 5 BEST-FITTING competitions from this exact list for this student's stated interest. "+
     "You MUST only use competition names EXACTLY as they appear above — never invent a new competition, and never state a deadline or prize amount, since none are given here. "+
     "For each pick, write one specific sentence on why it fits what they said. "+
-    "Also read their description and pick the single best-fitting category from this list: research, business, impact, tech, law, arts.\n\n"+
-    "Return ONLY valid JSON: {\"primaryCategory\":\"one of research|business|impact|tech|law|arts\",\"suggestions\":[{\"name\":\"exact name from the list\",\"why\":\"one sentence\"}]}";
+    "Also read their description and pick the 1 or 2 best-fitting categories from this list, best fit first: research, business, impact, tech, law, arts. Pick 2 whenever the description clearly spans two (for example a health nonprofit that also wants to write a research paper is impact AND research). Your competition picks should cover every category you choose.\n\n"+
+    "Return ONLY valid JSON: {\"categories\":[\"1 or 2 of research|business|impact|tech|law|arts\"],\"suggestions\":[{\"name\":\"exact name from the list\",\"why\":\"one sentence\"}]}";
   var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
     method:"POST",
     headers:{
@@ -2848,13 +2856,12 @@ async function fetchCompetitionSuggestions(interestText,alsoInterestedIn){
       "apikey":SUPABASE_KEY,
       "Authorization":"Bearer "+session.access_token
     },
-    body:JSON.stringify({prompt:prompt,mode:"suggest_competitions",max_tokens:800})
+    body:JSON.stringify({prompt:prompt,mode:"suggest_competitions",max_tokens:1500})
   });
   if(!res.ok)throw new Error("status "+res.status);
   var d=await res.json();
   if(d.error)throw new Error("api error");
-  var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
-  var parsed=JSON.parse(txt);
+  var parsed=parseModelJson(d);
   var raw=parsed.suggestions||[];
   // Defensive: only keep suggestions whose name exactly matches a real
   // competition. Anything else is dropped silently — a model slip
@@ -2867,8 +2874,9 @@ async function fetchCompetitionSuggestions(interestText,alsoInterestedIn){
     if(real)kept.push({comp:real,why:s.why||real.why});
   });
   var validCats=["research","business","impact","tech","law","arts"];
-  var primaryCategory=validCats.indexOf(parsed.primaryCategory)>=0?parsed.primaryCategory:null;
-  return {suggestions:kept,primaryCategory:primaryCategory};
+  var cats=(Array.isArray(parsed.categories)?parsed.categories:[parsed.primaryCategory])
+    .filter(function(k,i,arr){return validCats.indexOf(k)>=0&&arr.indexOf(k)===i;}).slice(0,2);
+  return {suggestions:kept,primaryCategory:cats[0]||null,categories:cats};
 }
 
 // Renders suggestion results right inside the same inline panel -
@@ -2876,7 +2884,7 @@ async function fetchCompetitionSuggestions(interestText,alsoInterestedIn){
 function renderInlineSuggestionResults(suggestions,basedOnText){
   var resultsEl=document.getElementById("interest-results");if(!resultsEl)return;
   if(!suggestions.length){
-    resultsEl.innerHTML="<div style=\"font-size:12px;color:#6b6b6b;padding:8px 0;\">No clear fit found — try describing it differently, or browse by category above.</div>";
+    resultsEl.innerHTML="<div style=\"font-size:12px;color:#6b6b6b;padding:8px 0;\">No clear fit found. Try describing it differently, or browse by category above.</div>";
     return;
   }
   var shortText=basedOnText.length>60?basedOnText.slice(0,60)+"…":basedOnText;
@@ -2987,7 +2995,7 @@ async function step2(){
     if(err){
       if(btn){btn.disabled=false;btn.textContent="Continue →";}
       console.error("Supabase magic link error:",err);
-      showErr("iemail","Couldn't send login link — "+(err.message||"check the email and try again"));
+      showErr("iemail","Couldn't send login link: "+(err.message||"check the email and try again"));
       scrollToFirstErr();
       return;
     }
@@ -2995,7 +3003,7 @@ async function step2(){
   }).catch(function(ex){
     if(btn){btn.disabled=false;btn.textContent="Continue →";}
     console.error("Supabase magic link threw:",ex);
-    showErr("iemail","Something went wrong sending the login link — please try again");
+    showErr("iemail","Something went wrong sending the login link. Please try again");
     scrollToFirstErr();
   });
 }
@@ -3021,7 +3029,7 @@ function step4(){
   // other skill is genuinely optional, just encouraged.
   var needLevel=Object.keys(S.skillLevels).filter(function(k){return !S.skillLevels[k];});
   if(needLevel.length){
-    showSecErr("math-group",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level or tag — reopen it and tap one");
+    showSecErr("math-group",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level or tag. Reopen it and tap one");
     scrollToFirstErr();return;
   }
   var hours=getChips("avail-hours")[0]||"";
@@ -3089,7 +3097,7 @@ function openRematchModal(){
   R(logo()+
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
       "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Find new partners</div>"+
-      "<div class=\"sub\">Help us do better this round — what wasn't the right fit, and what are you looking for?</div>"+
+      "<div class=\"sub\">Help us do better this round. What wasn't the right fit, and what are you looking for?</div>"+
       "<div class=\"slabel\" style=\"margin-top:0;\">What wasn't working? <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
       "<div class=\"cgrow\" id=\"rematch-reasons\" style=\"margin-bottom:1rem;\"></div>"+
       "<div class=\"fi\"><label for=\"rematch-needed\">What kind of partner are you looking for?</label><input id=\"rematch-needed\" placeholder=\"e.g. a biology partner, someone who can build an app...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
@@ -3111,8 +3119,49 @@ function openRematchModal(){
   });
 }
 
+// ── Saved matches ────────────────────────────
+// Every real AI match round is kept in the saved_matches table so a
+// returning student sees their matches instead of an empty page. New
+// rounds are added on top; anyone already in the list isn't added twice.
+function matchKey(m){return ((m&&m.name)||"").trim().toLowerCase()+"|"+((m&&m.school)||"").trim().toLowerCase();}
+async function loadSavedMatches(){
+  try{
+    var res=await sba.from("saved_matches").select("id,match,created_at").order("created_at",{ascending:false}).order("id",{ascending:false}).limit(60);
+    if(res.error)throw res.error;
+    var seen={};var list=[];
+    (res.data||[]).forEach(function(r){var k=matchKey(r.match);if(r.match&&!seen[k]){seen[k]=true;list.push(r.match);}});
+    MATCHES=list;
+  }catch(ex){console.error("[Partnr] loading saved matches failed:",ex);}
+}
+async function saveNewMatches(fresh){
+  var have={};MATCHES.forEach(function(m){have[matchKey(m)]=true;});
+  var added=(fresh||[]).filter(function(m){var k=matchKey(m);if(have[k])return false;have[k]=true;return true;});
+  if(added.length){
+    try{
+      // Inserted oldest-first so the list keeps the AI's order when read back newest-first.
+      var rows=added.slice().reverse().map(function(m){return {match:m};});
+      var ins=await sba.from("saved_matches").insert(rows);
+      if(ins.error)throw ins.error;
+    }catch(ex){console.error("[Partnr] saving matches failed (still shown this visit):",ex);}
+  }
+  MATCHES=added.concat(MATCHES);
+  return added.length;
+}
+
+// Pulls the JSON object out of a model reply. The model sometimes adds a
+// sentence before or after the JSON, which made a plain JSON.parse throw
+// and showed students "Something went wrong".
+function parseModelJson(d){
+  var txt=(d&&Array.isArray(d.content)?d.content:[]).map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
+  var a=txt.indexOf("{"),b=txt.lastIndexOf("}");
+  if(a<0||b<=a)throw new Error("no JSON in model reply");
+  return JSON.parse(txt.slice(a,b+1));
+}
+
 async function doFetch(){
-  var t=TR[S.track]||{n:S.track};
+  try{
+  var t=TR[S.track]||{n:S.track||"open"};
+  var r=RO[S.role]||{n:S.role||"open"};
   var compInfo=selComps.map(function(c){
     var crossNote=c.cross===true?"(cross-school ok)":c.cross==="prep"?"(prep partner only)":"(same school required)";
     return c.n+" "+crossNote;
@@ -3151,7 +3200,7 @@ async function doFetch(){
       try{limitInfo=await res.json();}catch(ex){}
       var limitN=limitInfo.limit||3;
       if(MATCHES.length){
-        showToast("You've used today's "+limitN+" match rounds — new ones available tomorrow.");
+        showToast("You've used today's "+limitN+" match rounds. New ones are available tomorrow.");
         goTo("matches");
       } else {
         // No existing matches to fall back to (first-ever call somehow
@@ -3163,11 +3212,15 @@ async function doFetch(){
     if(!res.ok)throw new Error("status "+res.status);
     var d=await res.json();
     if(d.error)throw new Error("api error");
-    var txt=d.content.map(function(b){return b.text||"";}).join("").replace(/```json|```/g,"").trim();
-    var parsed=JSON.parse(txt);
-    MATCHES=parsed.matches||[];PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
+    var parsed=parseModelJson(d);
+    var hadMatches=MATCHES.length>0&&!MATCHES_ARE_DEMO;
+    if(MATCHES_ARE_DEMO){MATCHES=[];MATCHES_ARE_DEMO=false;}
+    var addedCount=await saveNewMatches(parsed.matches||[]);
+    PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
     goTo("matches");
+    if(hadMatches)showToast(addedCount?(addedCount+" new match"+(addedCount>1?"es":"")+" added to your list."):"No new matches this round. Your saved matches are still here.");
   } catch(e){console.error("[Partnr] AI matching failed, showing demo data:",e);fallback();}
+  }catch(outer){console.error("[Partnr] match setup failed, showing demo data:",outer);fallback();}
 }
 
 // ── Matches page ─────────────────────────────
@@ -3176,7 +3229,7 @@ function rMatches(){
   var wlBanner="<div class=\"wl-banner\">"+
     "<i class=\"ti ti-users\" style=\"font-size:20px;color:#534AB7;flex-shrink:0;\"></i>"+
     "<div style=\"flex:1;\">"+
-      "<div style=\"font-size:13px;font-weight:600;color:#534AB7;\">These are demo matches — real students coming soon</div>"+
+      "<div style=\"font-size:13px;font-weight:600;color:#534AB7;\">These are demo matches. Real students are coming soon.</div>"+
       "<div style=\"font-size:12px;color:#7068C2;margin-top:2px;\">Sign up to be notified when your city or region goes live.</div>"+
     "</div>"+
     "<button id=\"wlbtn\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;\">Notify me</button>"+
@@ -3254,7 +3307,7 @@ function openWaitlist(){
         "<div class=\"fi\"><label for=\"wl-email\">Email</label><input type=\"email\" id=\"wl-email\" placeholder=\"your@email.com\" required/><div id=\"wl-email-err\" style=\"color:#C53030;font-size:12px;margin-top:3px;display:none;\">Please enter a valid email</div></div>"+
         "<div class=\"fi\"><label for=\"wl-city\">City / Region</label><input type=\"text\" id=\"wl-city\" placeholder=\"e.g. Lagos, Nairobi, Mumbai, London\"/></div>"+
         "<button class=\"bp\" id=\"wl-submit\">Join the waitlist →</button>"+
-        "<div id=\"wl-err\" style=\"color:#C53030;font-size:12px;margin-top:8px;display:none;\">Something went wrong — please try again</div>"+
+        "<div id=\"wl-err\" style=\"color:#C53030;font-size:12px;margin-top:8px;display:none;\">Something went wrong. Please try again</div>"+
       "</div>"+
       "<button class=\"bkbtn\" id=\"wl-back\">← Back to matches</button>"+
     "</div>"
@@ -3319,7 +3372,7 @@ function mCards(){
   if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem 1rem;\">"+
     "<i class=\"ti ti-users-group\" style=\"font-size:38px;color:#AFA9EC;\"></i>"+
     "<div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;\">No matches loaded</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">Matches aren't saved between visits yet. Run matching again to see partner suggestions, or head to Skill search to find real students directly.</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">No matches yet. Tap below to find partners, or head to Find students to see real students directly.</div>"+
     "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find my partners \u2192</button>"+
   "</div>";
   var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;\">"+
@@ -3436,8 +3489,8 @@ function openModal(idx){
     "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
-        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro — tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you — you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro. Tell them why you want to collaborate.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you, and you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
         "<textarea id=\"mmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"sbtn\" style=\"flex:1;padding:10px;background:"+t.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
@@ -3558,7 +3611,7 @@ async function rRecruit(){
     });
   }catch(ex){
     console.error("[Partnr] loading projects failed:",ex);
-    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load projects — please try again.</p>";
+    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load projects. Please try again.</p>";
   }
 }
 
@@ -3610,7 +3663,7 @@ function rPostProject(){
     });
     if(res.error){
       console.error("[Partnr] post project failed:",res.error);
-      showToast("Couldn't post — please try again");
+      showToast("Couldn't post. Please try again");
       btn.disabled=false;btn.textContent="Post project →";
       return;
     }
@@ -3644,7 +3697,7 @@ function openProjectApplyModal(projectId,title){
     if(res.error){
       btn.disabled=false;btn.textContent="Send application →";
       if(res.error.code==="23505")showToast("You've already applied to this project");
-      else showToast("Couldn't send — please try again");
+      else showToast("Couldn't send. Please try again");
       return;
     }
     R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Application sent!</div><button id=\"pa-done\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to projects</button></div></div>");
@@ -3711,7 +3764,7 @@ async function rManagePosting(projectId){
           (a.message?"<div class=\"why\" style=\"margin-bottom:10px;\">"+esc(a.message)+"</div>":"")+
           (a.status==="pending"?
             "<div style=\"display:flex;gap:8px;\"><button class=\"bc app-accept\" data-id=\""+esc(a.id)+"\" data-applicant=\""+esc(a.applicant_id)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button><button class=\"bo app-decline\" data-id=\""+esc(a.id)+"\">Decline</button></div>":
-            "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(a.status==="accepted"?"#EAF3DE":"#F1EFE8")+";color:"+(a.status==="accepted"?"#3B6D11":"#5F5E5A")+";\">"+(a.status==="accepted"?"Accepted — check your Inbox for chat & workspace":"Declined")+"</span>")+
+            "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(a.status==="accepted"?"#EAF3DE":"#F1EFE8")+";color:"+(a.status==="accepted"?"#3B6D11":"#5F5E5A")+";\">"+(a.status==="accepted"?"Accepted! Check your Inbox for chat & workspace":"Declined")+"</span>")+
         "</div>";
       });
     }
@@ -3722,7 +3775,7 @@ async function rManagePosting(projectId){
         var btn=this;btn.disabled=true;btn.textContent="Accepting…";
         await sba.from("project_applications").update({status:"accepted"}).eq("id",this.dataset.id);
         await ensureAcceptedConnection(this.dataset.applicant,projectTitle);
-        showToast("Accepted — chat and workspace are now open in your Inbox");
+        showToast("Accepted! Chat and workspace are now open in your Inbox");
         rManagePosting(projectId);
       });
     });
@@ -3734,7 +3787,7 @@ async function rManagePosting(projectId){
     });
   }catch(ex){
     console.error("[Partnr] loading applications failed:",ex);
-    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load applications — please try again.</p>";
+    el.innerHTML="<p style=\"text-align:center;color:#6b6b6b;padding:2rem;\">Couldn't load applications. Please try again.</p>";
   }
 }
 
@@ -3877,7 +3930,7 @@ function bindSE(){
         renderSR(saved,"your saved profiles",false);
       }catch(ex){
         console.error("[Partnr] loading saved profiles failed:",ex);
-        el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Couldn't load saved profiles — please try again.</div>";
+        el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Couldn't load saved profiles. Please try again.</div>";
       }
     });
     addKbdActivation(savedChip);
@@ -3895,6 +3948,13 @@ function bindSE(){
     var subcat=compRaw.indexOf("subcat:")===0?compRaw.slice(7):"";
     var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
     var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
+    var anyoneOn=!!(globalChip&&globalChip.classList.contains("on"));
+    if(!q&&!comp&&!category&&!subcat&&!city&&!school&&anyoneOn){
+      document.getElementById("skill-drill").style.display="none";
+      LAST_SKILL_SEARCH={qRaw:"",compRawValue:compRaw,cityOn:false,schoolOn:false};
+      srchSkill({all:true});
+      return;
+    }
     if(!q&&!comp&&!category&&!subcat&&!city&&!school){
       // Browse-by-category is now a manual toggle the student
       // controls directly - clearing filters doesn't force it open or
@@ -3992,7 +4052,7 @@ function dCards(){
   running.sort(function(a,b){return parseISODate(a.cycle_end_date)-parseISODate(b.cycle_end_date);});
 
   if(!upcoming.length&&!running.length){
-    return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No confirmed upcoming deadlines right now — check back as we verify new cycles.</div>";
+    return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No confirmed upcoming deadlines right now. Check back as we verify new cycles.</div>";
   }
 
   var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
@@ -4177,7 +4237,7 @@ async function renderConnections(){
 
   h+="<div class=\"slabel\">Sent requests"+(data.outgoing.length?" ("+data.outgoing.length+")":"")+"</div>";
   if(!data.outgoing.length){
-    h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't sent any requests yet. Find someone in Skill search and tap Connect.</p>";
+    h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't sent any requests yet. Find someone in Find students and tap Connect.</p>";
   } else {
     data.outgoing.forEach(function(item){
       var wait=daysWaitingInfo(item.row.created_at);
@@ -4250,7 +4310,7 @@ function meTab(){
   var expForView=S.proofOfWork.filter(function(item){return item.type!=="Award";});
   var awardsForView=S.proofOfWork.filter(function(item){return item.type==="Award";});
   function entryViewHTML(item){
-    return "<div class=\"ei\">"+(item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+"<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+(item.role?"<span style=\"font-size:12px;color:#666;\"> — "+esc(item.role)+"</span>":"")+(item.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(item.desc)+"</div>":"")+
+    return "<div class=\"ei\">"+(item.type!=="Award"?"<span style=\"font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEEDFE;color:#3C3489;margin-right:6px;\">"+esc(item.type)+"</span>":"")+"<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(item.title)+"</span>"+(item.role?"<span style=\"font-size:12px;color:#666;\">, "+esc(item.role)+"</span>":"")+(item.desc?"<div style=\"font-size:12px;color:#666;margin-top:2px;\">"+esc(item.desc)+"</div>":"")+
     (item.link?"<a href=\""+safeUrl(item.link)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#534AB7;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>"+esc(item.link)+"</a>":"")+
     "</div>";
   }
@@ -4309,7 +4369,7 @@ async function rWorkspace(connectionId,otherName){
   R(logo()+
     "<button id=\"ws-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
     "<h2 style=\"margin-bottom:0.25rem;\">Workspace with "+esc(otherName)+"</h2>"+
-    "<div class=\"sub\">Share links and documents for your project. No photos yet — that's coming once we've built real screening for it.</div>"+
+    "<div class=\"sub\">Share links and documents for your project. No photos yet. That's coming once we've built real screening for it.</div>"+
     "<div id=\"ws-list\" style=\"margin:1rem 0;\"><div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Add a link</div>"+
     "<div style=\"display:flex;gap:8px;margin-bottom:0.5rem;\">"+
@@ -4320,7 +4380,7 @@ async function rWorkspace(connectionId,otherName){
       "<button id=\"ws-link-add\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>"+
     "<div class=\"slabel\">Upload a document</div>"+
-    "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">PDF, Word, PowerPoint, Excel, text, or CSV — up to 10MB.</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">PDF, Word, PowerPoint, Excel, text, or CSV, up to 10MB.</div>"+
     "<input id=\"ws-file-input\" type=\"file\" accept=\".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv\" style=\"margin-bottom:1rem;\"/>"+
     "<div id=\"ws-upload-status\" style=\"font-size:12px;color:#6b6b6b;\"></div>"
   );
@@ -4337,7 +4397,7 @@ async function loadWorkspaceItems(connectionId){
     if(res.error)throw res.error;
     var items=res.data||[];
     if(!items.length){
-      el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Nothing shared yet — add a link or upload a document below.</p>";
+      el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Nothing shared yet. Add a link or upload a document below.</p>";
       return;
     }
     var session=await getSession();
@@ -4370,7 +4430,7 @@ async function loadWorkspaceItems(connectionId){
     });
   }catch(ex){
     console.error("[Partnr] workspace load failed:",ex);
-    el.innerHTML="<p style=\"font-size:13px;color:#C53030;\">Couldn't load workspace items — please try again.</p>";
+    el.innerHTML="<p style=\"font-size:13px;color:#C53030;\">Couldn't load workspace items. Please try again.</p>";
   }
 }
 
@@ -4384,7 +4444,7 @@ async function addWorkspaceLink(connectionId){
   var res=await sba.from("workspace_items").insert({
     connection_id:connectionId,student_id:session.user.id,type:"link",title:title,url:url
   });
-  if(res.error){showToast("Couldn't add link — please try again");return;}
+  if(res.error){showToast("Couldn't add link. Please try again");return;}
   document.getElementById("ws-link-title").value="";
   document.getElementById("ws-link-url").value="";
   loadWorkspaceItems(connectionId);
@@ -4396,13 +4456,13 @@ async function uploadWorkspaceFile(connectionId,inputEl){
   var ext=file.name.split(".").pop().toLowerCase();
   var statusEl=document.getElementById("ws-upload-status");
   if(WORKSPACE_ALLOWED_EXT.indexOf(ext)<0){
-    statusEl.textContent="That file type isn't supported — documents only (PDF, Word, PowerPoint, Excel, text, CSV).";
+    statusEl.textContent="That file type isn't supported. Documents only (PDF, Word, PowerPoint, Excel, text, CSV).";
     statusEl.style.color="#C53030";
     inputEl.value="";
     return;
   }
   if(file.size>WORKSPACE_MAX_BYTES){
-    statusEl.textContent="That file is too large — 10MB max.";
+    statusEl.textContent="That file is too large (10MB max).";
     statusEl.style.color="#C53030";
     inputEl.value="";
     return;
@@ -4425,7 +4485,7 @@ async function uploadWorkspaceFile(connectionId,inputEl){
     loadWorkspaceItems(connectionId);
   }catch(ex){
     console.error("[Partnr] file upload failed:",ex);
-    statusEl.textContent="Upload failed — please try again.";
+    statusEl.textContent="Upload failed. Please try again.";
     statusEl.style.color="#C53030";
   }
 }
@@ -4470,12 +4530,12 @@ async function rChat(connectionId,otherName){
   R(logo()+
     "<button id=\"chat-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:0.5rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
     "<h2 style=\"margin-bottom:2px;\">Chat with "+esc(otherName)+"</h2>"+
-    "<div style=\"font-size:11px;color:#6b6b6b;margin-bottom:1rem;\"><i class=\"ti ti-shield-check\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;color:#3B6D11;\"></i>Text only — for files and links, use your Workspace.</div>"+
+    "<div style=\"font-size:11px;color:#6b6b6b;margin-bottom:1rem;\"><i class=\"ti ti-shield-check\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;color:#3B6D11;\"></i>Text only. For files and links, use your Workspace.</div>"+
     "<div id=\"chat-messages\" style=\"background:#f8f8f6;border-radius:12px;padding:12px;height:340px;overflow-y:auto;margin-bottom:0.75rem;display:flex;flex-direction:column;gap:8px;\"><div style=\"text-align:center;padding:1rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div></div>"+
     "<div id=\"chat-warning\" style=\"display:none;font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:8px;\">Sharing contact info off Partnr means this conversation can't be reviewed if something goes wrong. Send anyway?</div>"+
     "<div id=\"chat-selfharm-card\" style=\"display:none;font-size:13px;color:#1a1a1a;background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:8px;line-height:1.5;\">"+
       "It sounds like you might be going through something hard. You don't have to deal with it alone.<br>"+
-      "<a href=\"tel:988\" style=\"color:#534AB7;font-weight:600;text-decoration:none;\">Call or text 988</a> — free, confidential, any time. "+
+      "<a href=\"tel:988\" style=\"color:#534AB7;font-weight:600;text-decoration:none;\">Call or text 988</a>: free, confidential, any time. "+
       "<button id=\"chat-selfharm-dismiss\" style=\"background:none;border:none;color:#6b6b6b;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;font-family:inherit;\">Dismiss</button>"+
     "</div>"+
     "<div style=\"display:flex;gap:8px;\">"+
@@ -4521,7 +4581,7 @@ async function sendChatMessage(connectionId,text){
   var session=await getSession();
   if(!session)return;
   var res=await sba.from("messages").insert({connection_id:connectionId,sender_id:session.user.id,body:text});
-  if(res.error){showToast("Couldn't send — please try again");console.error("[Partnr] send message failed:",res.error);}
+  if(res.error){showToast("Couldn't send. Please try again");console.error("[Partnr] send message failed:",res.error);}
 }
 
 async function loadChatMessages(connectionId){
@@ -4535,14 +4595,14 @@ async function loadChatMessages(connectionId){
     markMessagesRead(connectionId,myId);
   }catch(ex){
     console.error("[Partnr] loading messages failed:",ex);
-    el.innerHTML="<p style=\"font-size:13px;color:#C53030;text-align:center;\">Couldn't load messages — please try again.</p>";
+    el.innerHTML="<p style=\"font-size:13px;color:#C53030;text-align:center;\">Couldn't load messages. Please try again.</p>";
   }
 }
 
 function renderChatMessages(msgs,myId){
   var el=document.getElementById("chat-messages");if(!el)return;
   if(!msgs.length){
-    el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;text-align:center;margin:auto;\">Say hi — this is the start of your conversation.</p>";
+    el.innerHTML="<p style=\"font-size:13px;color:#6b6b6b;text-align:center;margin:auto;\">Say hi! This is the start of your conversation.</p>";
     return;
   }
   el.innerHTML=msgs.map(function(m,i){
@@ -4726,7 +4786,7 @@ function bindMeTab(){
         });
       }catch(ex){
         console.error("Verification code generation failed",ex);
-        showVerifyEmailErr("Something went wrong generating your code — please try again.");
+        showVerifyEmailErr("Something went wrong generating your code. Please try again.");
         sendBtn.disabled=false;sendBtn.textContent="Send code";
       }
     });
@@ -4758,7 +4818,7 @@ function bindMeTab(){
           student_id:session.user.id,school_name:S.school||null,claimed_email:S.email||null,note:note||null
         });
         if(res.error)throw res.error;
-        box.innerHTML="<span style=\"font-size:12px;color:#1D9E75;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Sent — someone will follow up.</span>";
+        box.innerHTML="<span style=\"font-size:12px;color:#1D9E75;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Sent. Someone will follow up.</span>";
       }catch(ex){
         console.error("Verification help request failed",ex);
         btn.disabled=false;btn.textContent="Send";
@@ -4807,7 +4867,11 @@ async function srchSkill(opts){
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
   var SUBCAT_LABELS={coding:"Coding",robotics:"Robotics"};
-  var isFilterOnly=!query&&(competition||category||subcat||city||school); // no typed text, pure structured filter
+  var browseAll=!!opts.all;
+  // Example profiles are only ever shown for a plain text search with
+  // "Anyone" selected. With a school, city, or competition filter on they
+  // would claim to be "at Viewpoint School" when they're really in Senegal.
+  var isFilterOnly=browseAll||competition||category||subcat||city||school;
 
   var descParts=[];
   if(query)descParts.push("\""+query+"\"");
@@ -4816,14 +4880,14 @@ async function srchSkill(opts){
   if(subcat)descParts.push("all "+(SUBCAT_LABELS[subcat]||subcat)+" competitions");
   if(city)descParts.push("in "+city);
   if(school)descParts.push("at "+school);
-  var desc=descParts.join(" · ")||"partners";
+  var desc=descParts.join(" · ")||(browseAll?"everyone":"partners");
 
   var el=document.getElementById("sr");if(!el)return;
   el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Searching for "+esc(desc)+"...</div></div>";
   try{
     var session=await getSession();
     var myId=session&&session.user?session.user.id:null;
-    var real=await searchRealStudents({query:query,competition:competition,category:category,subcat:subcat,city:city,school:school},myId);
+    var real=await searchRealStudents({all:browseAll,query:query,competition:competition,category:category,subcat:subcat,city:city,school:school},myId);
     if(real.length){renderSR(real,desc,false);return;}
   }catch(ex){
     console.error("[Partnr search] failed:",ex);
@@ -4842,7 +4906,7 @@ async function srchSkill(opts){
     el.innerHTML="<div style=\"text-align:center;padding:2rem 1rem;\">"+
       "<i class=\"ti ti-users-group\" style=\"font-size:32px;color:#AFA9EC;\"></i>"+
       "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin:10px 0 6px;\">No real students match yet</div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">Nobody onboarded so far matches "+esc(desc)+". Check back as more students join, or try widening your filters.</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">"+(browseAll?"No other students have joined yet. Check back soon.":"Nobody who has joined so far matches "+esc(desc)+". Check back as more students join, or try widening your filters.")+"</div>"+
     "</div>";
     return;
   }
@@ -4893,7 +4957,7 @@ function renderSR(results,skill,isDemo){
     el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">"+esc(emptyMsg)+"</div>";return;
   }
   var h="<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\"><strong style=\"color:#1a1a1a;\">"+results.length+"</strong> student"+(results.length>1?"s":"")+" found matching <strong style=\"color:#1a1a1a;\">"+esc(skill)+"</strong></div>"+
-    (isDemo?"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>No real students matched yet — showing example profiles so you can see how search works.</div>":"");
+    (isDemo?"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>No real students matched yet, so we're showing example profiles so you can see how search works.</div>":"");
   results.forEach(function(r){
     var cm=CM[r.avatarColor]||CM.purple;var t=TR[r.track]||TR.research;var ro=RO[r.role]||{n:r.role||"Partner",i:"ti-user"};
     var isSaved=r._realId&&(S.savedIds||[]).indexOf(r._realId)>=0;
@@ -4967,8 +5031,8 @@ function openSearchConnectModal(realId,name){
     "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
-        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro — tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you — you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro. Tell them why you want to collaborate.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you, and you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
         "<textarea id=\"srmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"srsbtn\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
@@ -4986,7 +5050,7 @@ function openSearchConnectModal(realId,name){
       var res=await sendConnectionRequest(realId,msg);
       if(res.error){
         btn.disabled=false;btn.textContent="Send request →";
-        showToast("Couldn't send request — please try again");
+        showToast("Couldn't send request. Please try again");
         return;
       }
       R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
@@ -4994,7 +5058,7 @@ function openSearchConnectModal(realId,name){
     }catch(ex){
       console.error("Search connect failed",ex);
       btn.disabled=false;btn.textContent="Send request →";
-      showToast("Something went wrong — please try again");
+      showToast("Something went wrong. Please try again");
     }
   });
 }
@@ -5008,8 +5072,14 @@ function showToast(msg){
 
 // ── Fallback demo data ───────────────────────
 function fallback(){
+  if(MATCHES.length&&!MATCHES_ARE_DEMO){
+    showToast("Couldn't find new matches right now. Your saved matches are still here.");
+    goTo("matches");
+    return;
+  }
+  MATCHES_ARE_DEMO=true;
   MATCHES=[
-    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Python and data analysis skills directly complement what you're looking for. Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank — reached district finals."},{title:"Hackathon MLH — 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need someone who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
+    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Python and data analysis skills directly complement what you're looking for. Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank. Reached district finals."},{title:"Hackathon MLH, 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need someone who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
     {name:"Sofia Reyes",school:"Beverly Hills High School",country:"United States",grade:"12th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Public Speaking":"Expert","Social Media Marketing":"Advanced","Brand Strategy":"Advanced","Market Research":"Intermediate"},competitions:["Blue Ocean Competition","Diamond Challenge"],matchScore:91,why:"Sofia's Expert public speaking and marketing skills are exactly what this project needs to pitch and win. LA-based so you can meet and prep together.",projectIdea:"Social enterprise connecting food-insecure students at LA schools with local restaurants",commitment:"Serious",availability:"8 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Spanish"],status:"has idea",stage:"planning",bio:"Senior at Beverly Hills High School who ran her school's social enterprise club and grew it from 12 to 200 members. Has a fully formed idea for a Conrad Challenge submission and needs a research and tech co-founder.",experience:[{title:"Conrad Challenge Regional Semifinalist 2024",desc:"Led pitch and marketing for a water conservation startup."},{title:"School Social Enterprise Club President",desc:"Grew membership from 12 to 200 students across two years."},{title:"TEDx Youth LA Speaker",desc:"Spoke on equity in student entrepreneurship programs."}],awards:["Conrad Challenge Regional Semifinalist 2024"],portfolio:null,lookingFor:"I need someone who can handle the research and technical side. I pitch, promote, and close. Let's compete in Conrad and Blue Ocean this year."},
     {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills a real gap. She turns research into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a research or technical partner. I handle all pitching in three languages."}
   ];
@@ -5030,7 +5100,7 @@ function fallback(){
 
 function resetAll(){
   S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],skillsNeeded:""};
-  MATCHES=[];PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
+  MATCHES=[];MATCHES_ARE_DEMO=false;PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
   signOutUser().catch(function(){});
   goTo("welcome");
