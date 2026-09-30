@@ -676,7 +676,7 @@ function openBlockConfirm(otherId,name,onDone){
   R(logo()+
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
       "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Block "+esc(name)+"?</div>"+
-      "<div class=\"sub\">They won't be able to see your profile or send you anything, and they won't appear in your search or matches. They are not told that you blocked them.</div>"+
+      "<div class=\"sub\">They won't be able to see your profile or send you anything, and they won't appear in your search or matches. We don't notify students when you block them.</div>"+
       "<div style=\"font-size:13px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;line-height:1.5;\">You can undo this anytime from My Profile \u2192 Blocked students.</div>"+
       "<button class=\"bp\" id=\"blk-yes\" style=\"background:#C53030;\">Block "+esc(name)+"</button>"+
       "<button class=\"bkbtn\" id=\"blk-no\">Cancel</button>"+
@@ -1612,6 +1612,19 @@ var LEVEL_DEFS={"Beginner":"Just started learning this","Intermediate":"Used it 
 // "how good are you") so it gets its own two-tag system rather than
 // being forced into the same proficiency scale as a tool or subject.
 var MATH_TAGS=["Completed","Currently taking"];
+// These don't have a real skill ladder the way a tool or a craft does -
+// "Advanced at Business Strategy" doesn't mean much for a teenager the
+// way "Advanced at Python" does. Selecting one just adds it as a plain
+// tag; the description field is where to say more if it matters.
+var NO_LEVEL_ITEMS=new Set([
+  "Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery",
+  "Pitching / Demo Day","Case Analysis","Sales","Fundraising","Hospitality Management","Economics",
+  "Product Management","Project Management","Social Media Marketing","Email / Content Marketing","Accounting Basics",
+  "Philosophy / Ethics","Political Science","Law & Policy","Psychology","Sociology",
+  "History / Historical Research","International Relations","Environmental Policy","Education / Pedagogy",
+  "Community Organizing","Nonprofit Management","Volunteer Coordination","International Development",
+  "Civic Engagement","Education / Tutoring","Event Planning"
+]);
 var accordionOpen={};
 var powTypePicked="Project";
 // Each interest pulls full, uncurated skill categories - not a
@@ -1876,11 +1889,11 @@ function rSignup(){
   var viaGoogle=!!PENDING_GOOGLE_SESSION;
   R(logo()+sb(1)+
     "<h2>Create your profile</h2>"+
-    "<div class=\"sub\">Any email works. We recommend a personal one so you never lose access if your school blocks automated messages — you can still tell us your school below.</div>"+
+    "<div class=\"sub\">Tell us a little about yourself.</div>"+
     (viaGoogle?"<div style=\"background:#EAF3DE;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#3B6D11;font-weight:600;\"><i class=\"ti ti-circle-check\"></i> Signed in with Google — email verified</div>":"")+
     "<div class=\"fi\"><label for=\"iname\">Full name"+req()+"</label><input id=\"iname\" placeholder=\"Alex Chen\" value=\""+esc(S.name)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"iemail\">Email"+req()+"</label><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
-    "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">High school name"+req()+"</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
+    "<div class=\"fi\"><label for=\"iemail\">Email"+req()+"</label><div style=\"font-size:12px;color:#6b6b6b;margin-bottom:6px;\">We recommend a personal email. Some schools block sign-in emails.</div><input id=\"iemail\" type=\"email\" placeholder=\"you@email.com\" value=\""+esc(S.email)+"\""+(viaGoogle?" readonly style=\"background:#f8f8f6;color:#6b6b6b;\"":"")+"/></div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"ischool\">School name"+req()+"</label><input id=\"ischool\" autocomplete=\"off\" placeholder=\"Burbank High School\" value=\""+esc(S.school)+"\"/>"+
       "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"icountry\">Country"+req()+"</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
@@ -1893,7 +1906,7 @@ function rSignup(){
     "<div class=\"fi\"><label for=\"igrade\">Grade / Year"+req()+"</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
     "<div class=\"fi\"><label for=\"idob\">Date of birth"+req()+"</label><input id=\"idob\" type=\"date\" value=\""+esc(S.dob)+"\"/></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken"+req()+"</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Your country's languages appear first. Select all that apply.</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Which languages would you be comfortable working in? Your country's languages appear first.</div>"+
     "<div id=\"lang-suggested\" style=\""+(COUNTRY_LANGS[co]?"":"display:none;")+"\">"+
       "<div style=\"font-size:11px;font-weight:600;color:#534AB7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;\">Suggested for your country</div>"+
       "<div class=\"cgrow\" id=\"lang-primary\" style=\"margin-bottom:8px;\"></div>"+
@@ -2048,16 +2061,14 @@ function rSignup(){
 // runInlineSuggestions() below.
 function rTrack(){
   var catKeys=Object.keys(CM2).filter(function(k){return k!=="custom";});
-  R(logo()+sb(2)+
-    "<h2>Your interests & goals</h2>"+
-    "<div class=\"sub\">Tell us what you're working on and who you're looking for.</div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Target competitions</div>"+
-    "<div class=\"hint\">Already have a competition in mind? Enter the name below — add as many as you're targeting.</div>"+
+  var compSectionHTML=
+    "<div class=\"slabel\" style=\"margin-top:1.5rem;\">Have a competition in mind?</div>"+
+    "<div class=\"hint\">Enter the name below — add as many as you're targeting.</div>"+
     "<div class=\"swrap\"><i class=\"ti ti-search sico\"></i><input id=\"ci\" placeholder=\"Search — ISEF, Hackathon, Conrad... or type your own\"/><div id=\"cdd\" class=\"cdd\" style=\"display:none;\"></div></div>"+
     "<div id=\"pills\" style=\"display:flex;flex-wrap:wrap;gap:5px;min-height:10px;margin-bottom:1rem;\"></div>"+
     "<div id=\"exbtn\" style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;\">"+
       "<button class=\"exbtn ex2\" id=\"exb-browse\" data-tab=\"browse\"><i class=\"ti ti-layout-grid\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Browse by category</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
-      "<button class=\"exbtn ex2\" id=\"exb-ai\" data-tab=\"ai\"><i class=\"ti ti-compass\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Not sure? Help me pick</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
+      "<button class=\"exbtn ex2\" id=\"exb-ai\" data-tab=\"ai\"><i class=\"ti ti-compass\" style=\"font-size:17px;color:#7F77DD;\"></i><span>Help me pick</span><i class=\"ti ti-chevron-down exch2\" style=\"font-size:15px;\"></i></button>"+
     "</div>"+
     "<div class=\"expp\" id=\"expp\">"+
       "<div id=\"notsure-browse\" style=\"display:block;\">"+
@@ -2074,10 +2085,14 @@ function rTrack(){
         "<button class=\"bp\" id=\"interest-go\" style=\"margin-top:0;\">Suggest competitions →</button>"+
         "<div id=\"interest-results\" style=\"margin-top:10px;\"></div>"+
       "</div>"+
-    "</div>"+
-    "<div class=\"slabel\">Status"+req()+"</div>"+
+    "</div>";
+  R(logo()+sb(2)+
+    "<h2>Let's find you a partner to build something great.</h2>"+
+    "<div class=\"sub\">Whether you've got an idea, a skill, or you're still figuring it out, start here.</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Status"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
-    "<div class=\"fi\" style=\"margin-top:1rem;\"><label for=\"iidea\">Describe your idea or what you're looking for in a partner <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition above)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to build a startup tackling food waste and need a technical co-founder, or: I know Python and I'm looking for a biology research project to join...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div class=\"fi\" style=\"margin-top:1rem;\"><label for=\"iidea\">What do you want to build or work on, and what kind of partner would help? <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition below)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to start a nonprofit tackling food waste and need a partner who's into grassroots organizing, or: I know Python and want to join a biology research project...\">"+esc(S.idea)+"</textarea></div>"+
+    compSectionHTML+
     "<div class=\"slabel\">Commitment"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
     "<div class=\"slabel\">Who do you want to connect with?"+req()+"</div>"+
@@ -2250,19 +2265,19 @@ function rSkills(){
   R(logo()+sb(3)+
     "<h2>Your skills</h2>"+
     "<div class=\"sub\">Tap a category to see the options, and pick as many as fit.</div>"+
-    "<div id=\"math-group\"></div>"+
-    "<div style=\"font-size:12px;color:#854F0B;margin-bottom:1.2rem;\">We recommend at least 3-5 skills beyond math, for the best matches.</div>"+
+    "<div style=\"font-size:12px;color:#854F0B;margin-bottom:1.2rem;\">Add a couple of skills so students can actually find you.</div>"+
     "<div id=\"active-group\"></div>"+
     "<div id=\"extra-group\"></div>"+
+    "<div id=\"math-group\"></div>"+
     "<div id=\"skillrecap\" style=\"background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:1rem;\"></div>"+
     "<div class=\"slabel\">Don't see it?</div>"+
     "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
       "<input id=\"customskill2\" placeholder=\"Still not there? Type it - e.g. VHDL, Falconry, Amateur Radio...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"addskillbtn2\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>"+
-    "<div class=\"slabel\">Hours per week"+req()+"</div>"+
+    "<div class=\"slabel\">How many hours a week can you commit?"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"avail-hours\"></div>"+
-    "<div class=\"slabel\">When"+req()+"</div>"+
+    "<div class=\"slabel\">When are you usually available?"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"avail-when\"></div>"+
     "<div style=\"background:#f8f8f6;border-radius:12px;padding:14px;margin-bottom:1rem;\">"+
       "<div style=\"font-size:11px;font-weight:600;color:#6b6b6b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;\">Experience <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\"> (optional)</span></div>"+
@@ -2277,12 +2292,14 @@ function rSkills(){
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
 
-  var savedHours=(S.availability||"").split(" · ")[0]||"";
-  var savedWhen=(S.availability||"").split(" · ")[1]||"";
-  mkChips("avail-hours",["1-3 hrs/week","4-6 hrs/week","7-10 hrs/week","10+ hrs/week"],[savedHours],true);
+  var savedHours=pendingHours||(S.availability||"").split(" · ")[0]||"";
+  var savedWhen=pendingWhen||(S.availability||"").split(" · ")[1]||"";
+  mkChips("avail-hours",["1-3 hrs/week","4-6 hrs/week","7-10 hrs/week","11+ hrs/week"],[savedHours],true);
   mkChips("avail-when",["Weekdays","Weekends","Both"],[savedWhen],true);
+  document.querySelectorAll("#avail-hours .chip").forEach(function(c){c.addEventListener("click",function(){pendingHours=getChips("avail-hours")[0]||"";});});
+  document.querySelectorAll("#avail-when .chip").forEach(function(c){c.addEventListener("click",function(){pendingWhen=getChips("avail-when")[0]||"";});});
 
-  renderGroup("math-group","Math courses"+req(),"Select every course you've completed or are currently taking.",[mathCat],false);
+  renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional).",[mathCat],false);
   renderGroup("active-group","Based on your interests",null,activeCats,false);
   renderGroup("extra-group","Select additional skills","The more you add, the better your matches.",extraCats,true);
   renderSkillRecap();
@@ -2382,6 +2399,7 @@ function rSkills(){
 // type here so a math course is never accidentally rendered with the
 // wrong tag set, wherever it's rendered from.
 var openSkillKey=null;
+var pendingHours="",pendingWhen="";
 function chipHTML(catId,item){
   var cat=SKILL_CATS.find(function(c){return c.id===catId;});
   var isMath=cat&&cat.type==="course";
@@ -2390,6 +2408,10 @@ function chipHTML(catId,item){
   var on=S.skillLevels[key]!==undefined;
   var lv=S.skillLevels[key];
   var isOpen=openSkillKey===key;
+  if(NO_LEVEL_ITEMS.has(item)){
+    var notedOn=lv==="noted";
+    return "<button class=\"chip skill-chip no-level-chip"+(notedOn?" on":"")+"\" data-key=\""+key+"\" data-item=\""+esc(item)+"\">"+esc(item)+"</button>";
+  }
   if(isOpen){
     return "<div style=\"background:white;border:1px solid #AFA9EC;border-radius:8px;padding:8px 10px;\">"+
       "<div style=\"font-size:13px;font-weight:500;color:#3C3489;margin-bottom:6px;\">"+esc(item)+"</div>"+
@@ -2400,12 +2422,29 @@ function chipHTML(catId,item){
     "</div>";
   }
   var label=on&&lv?item+" · "+lv:item;
-  return "<button class=\"chip skill-chip"+(on?" on":"")+"\" data-key=\""+key+"\" data-item=\""+esc(item)+"\""+(on&&!lv?" style=\"border-color:#AFA9EC;\"":"")+">"+esc(label)+"</button>";
+  if(on&&!lv){
+    return "<span class=\"chip skill-chip\" data-key=\""+key+"\" data-item=\""+esc(item)+"\" style=\"border-color:#E24B4A;background:#FCEBEB;color:#A32D2D;display:inline-flex;align-items:center;gap:6px;\">"+esc(label)+"<span class=\"skill-chip-remove\" data-key=\""+key+"\" role=\"button\" aria-label=\"Remove "+esc(item)+"\" style=\"font-weight:700;opacity:0.75;cursor:pointer;\">×</span></span>";
+  }
+  return "<button class=\"chip skill-chip"+(on?" on":"")+"\" data-key=\""+key+"\" data-item=\""+esc(item)+"\">"+esc(label)+"</button>";
 }
 function wireChipContainer(container){
+  container.querySelectorAll(".skill-chip-remove").forEach(function(x){
+    x.addEventListener("click",function(e){
+      e.stopPropagation();
+      delete S.skillLevels[this.dataset.key];
+      if(openSkillKey===this.dataset.key)openSkillKey=null;
+      rSkills();
+    });
+  });
   container.querySelectorAll(".skill-chip").forEach(function(btn){
     btn.addEventListener("click",function(){
       var key=this.dataset.key;
+      if(this.classList.contains("no-level-chip")){
+        if(S.skillLevels[key]==="noted")delete S.skillLevels[key];
+        else S.skillLevels[key]="noted";
+        rSkills();
+        return;
+      }
       if(openSkillKey===key){
         if(!S.skillLevels[key])delete S.skillLevels[key];
         openSkillKey=null;
@@ -2440,7 +2479,7 @@ function renderGroup(containerId,groupLabel,groupSub,cats,subAccent){
     var isOpen=!!accordionOpen[cat.id];
     h+="<div style=\"border:1px solid #e8e8e4;border-radius:10px;margin-bottom:8px;overflow:hidden;\">"+
       "<button class=\"acc-toggle\" data-catid=\""+cat.id+"\" style=\"width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:white;border:none;cursor:pointer;font-family:inherit;text-align:left;\">"+
-        "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+cat.label+" <span style=\"font-weight:400;color:#6b6b6b;\">("+cat.items.length+")"+(selCount?" · "+selCount+" selected":"")+"</span></span>"+
+        "<span style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+cat.label+" <span style=\"font-weight:400;color:#6b6b6b;\">"+(selCount?" · "+selCount+" selected":"")+"</span></span>"+
         "<i class=\"ti "+(isOpen?"ti-chevron-up":"ti-chevron-down")+"\" style=\"font-size:15px;color:#6b6b6b;\"></i>"+
       "</button>"+
       "<div class=\"acc-body\" style=\"display:"+(isOpen?"flex":"none")+";flex-wrap:wrap;align-items:flex-start;gap:6px;padding:10px 14px 12px;\">"+
@@ -2468,7 +2507,7 @@ function renderSkillRecap(){
   var el=document.getElementById("skillrecap");if(!el)return;
   var keys=Object.keys(S.skillLevels);
   if(!keys.length){
-    el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Nothing added yet.</div>";
+    el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Your selected skills will appear here.</div>";
     return;
   }
   var pills=keys.map(function(k){
@@ -2682,8 +2721,8 @@ function renderPills(){
   var el=document.getElementById("pills");if(!el)return;
   el.innerHTML="";
   if(!selComps.length){
-    var msg=document.createElement("span");msg.style.cssText="font-size:13px;color:#6b6b6b;font-style:italic;";
-    msg.textContent="None yet — search above or browse by category";
+    var msg=document.createElement("span");msg.style.cssText="font-size:14px;font-weight:500;color:#1a1a1a;display:block;margin-bottom:8px;";
+    msg.textContent="Not sure where to start? Browse by category, or let us help.";
     el.appendChild(msg);return;
   }
   selComps.forEach(function(c){
@@ -2829,7 +2868,12 @@ function renderInlineSuggestionResults(suggestions,basedOnText){
     return;
   }
   var shortText=basedOnText.length>60?basedOnText.slice(0,60)+"…":basedOnText;
-  var h="<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">Based on \""+esc(shortText)+"\":</div>";
+  var h="<div style=\"display:flex;align-items:center;justify-content:space-between;background:#7F77DD;color:white;border-radius:8px 8px 0 0;padding:8px 12px;\">"+
+    "<span style=\"font-size:13px;font-weight:600;\">Suggested competitions</span>"+
+    "<button id=\"suggest-toggle\" style=\"background:none;border:none;color:white;font-size:12px;cursor:pointer;font-family:inherit;padding:4px 8px;\">Hide ↑</button>"+
+  "</div>"+
+  "<div id=\"suggest-body\" style=\"border:1px solid #e8e8e4;border-top:none;border-radius:0 0 8px 8px;padding:10px 12px;\">"+
+  "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">Based on \""+esc(shortText)+"\":</div>";
   suggestions.forEach(function(s,i){
     var c=s.comp;
     var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
@@ -2840,7 +2884,17 @@ function renderInlineSuggestionResults(suggestions,basedOnText){
       "<button class=\"suggest-add\" data-i=\""+i+"\" style=\"padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:white;font-family:inherit;background:"+(added?"#3B6D11":cm.c)+";\" "+(added?"disabled":"")+">"+(added?"Added ✓":"+ Add to targets")+"</button>"+
     "</div>";
   });
+  h+="</div>";
   resultsEl.innerHTML=h;
+  var suggestToggleBtn=document.getElementById("suggest-toggle");
+  if(suggestToggleBtn){
+    suggestToggleBtn.addEventListener("click",function(){
+      var body=document.getElementById("suggest-body");
+      var hidden=body.style.display==="none";
+      body.style.display=hidden?"block":"none";
+      suggestToggleBtn.textContent=hidden?"Hide ↑":"Show ↓";
+    });
+  }
   resultsEl.querySelectorAll(".comp-detail-open").forEach(function(el){
     el.addEventListener("click",function(){
       var s=suggestions.find(function(x){return x.comp.n===el.dataset.name;});
@@ -2953,11 +3007,6 @@ function step3(){
 function step4(){
   // Math is the one thing every student can honestly answer - every
   // other skill is genuinely optional, just encouraged.
-  var mathKeys=Object.keys(S.skillLevels).filter(function(k){return k.indexOf("math:")===0;});
-  if(!mathKeys.length){
-    showSecErr("math-group","Select at least one math course");
-    scrollToFirstErr();return;
-  }
   var needLevel=Object.keys(S.skillLevels).filter(function(k){return !S.skillLevels[k];});
   if(needLevel.length){
     showSecErr("math-group",needLevel.length+" skill"+(needLevel.length>1?"s still need":"still needs")+" a level or tag — reopen it and tap one");
@@ -3123,8 +3172,8 @@ function rMatches(){
   R(logo()+wlBanner+
     "<div class=\"nav\">"+
       "<button class=\"nb on\" id=\"nb-matches\">Matches</button>"+
-      "<button class=\"nb\" id=\"nb-recruit\">Recruiting me</button>"+
-      "<button class=\"nb\" id=\"nb-search\">Skill search</button>"+
+      "<button class=\"nb\" id=\"nb-recruit\">Open projects</button>"+
+      "<button class=\"nb\" id=\"nb-search\">Find students</button>"+
       "<button class=\"nb\" id=\"nb-deadlines\">Deadlines</button>"+
       "<button class=\"nb\" id=\"nb-conns\"><i class=\"ti ti-inbox\" style=\"font-size:13px;vertical-align:-2px;margin-right:3px;\"></i>Inbox<span id=\"conn-badge\"></span></button>"+
       "<button class=\"nb\" id=\"nb-me\">My profile</button>"+
@@ -3422,7 +3471,7 @@ async function rRecruit(){
   var el=document.getElementById("tc");if(!el)return;
   el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div>";
   var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;\">"+
-    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Projects recruiting</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Open projects looking for a partner</div>"+
     "<button id=\"post-project-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">+ Post a project</button>"+
   "</div>";
   var myPostingsRes,items;
@@ -3446,15 +3495,30 @@ async function rRecruit(){
       }
     }
     items=await loadRealProjects();
-    h+="<div class=\"slabel\">Open postings</div>";
+
+    // Relevance sort: your own track and any skill overlap float to the
+    // top, so "Open projects" isn't just one flat list everyone sees
+    // identically regardless of what's actually on their profile.
+    var mySkillNames=Object.keys(S.skillLevels||{}).map(function(k){return (k.indexOf(":")>=0?k.split(":")[1]:k).toLowerCase();});
+    function projectRelevance(item){
+      var score=0;
+      if(item.author&&item.author.track&&item.author.track===S.track)score+=2;
+      (item.project.skills||[]).forEach(function(sk){
+        if(mySkillNames.indexOf((sk||"").toLowerCase())>=0)score+=1;
+      });
+      return score;
+    }
+    items=items.map(function(item,idx){return {item:item,score:projectRelevance(item),idx:idx};})
+      .sort(function(a,b){return b.score-a.score||a.idx-b.idx;})
+      .map(function(x){return x.item;});
+
     if(!items.length){
-      h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">No open postings right now. Be the first — post a project above.</p>";
+      h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">No open postings right now. <a href='#' class='open-proj-find-link' style='color:#534AB7;font-weight:600;text-decoration:none;'>Find students</a> to team up with, or be the first to post a project above.</p>";
     } else {
       items.forEach(function(item){
         var p=item.project,author=item.author;
         var t=TR[author&&author.track]||TR.research;
-        var r=RO[p.needed_role]||{n:p.needed_role||"Any role",i:"ti-user"};
-        var stags=(p.skills||[]).map(function(s){return "<span class=\"tag\">"+esc(s)+"</span>";}).join("");
+                var stags=(p.skills||[]).map(function(s){return "<span class=\"tag\">"+esc(s)+"</span>";}).join("");
         h+="<div class=\"card\">"+
           "<div style=\"display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;\">"+
             "<div style=\"flex:1;\"><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(p.title)+"</div>"+
@@ -3464,7 +3528,6 @@ async function rRecruit(){
           "<div style=\"font-size:13px;color:#666;margin-bottom:8px;line-height:1.5;\">"+esc(p.description)+"</div>"+
           "<div class=\"tags\" style=\"margin-bottom:8px;\">"+stags+
             (p.competition_name?"<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(p.competition_name)+"</span>":"")+
-            "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\">Needs "+esc(r.n)+"</span>"+
             getStageChip(p.stage)+
           "</div>"+
           "<button class=\"bc real-apply-btn\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>"+
@@ -3473,6 +3536,8 @@ async function rRecruit(){
     }
     el.innerHTML=h;
     document.getElementById("post-project-btn").addEventListener("click",rPostProject);
+    var findStudentsLink=document.querySelector(".open-proj-find-link");
+    if(findStudentsLink)findStudentsLink.addEventListener("click",function(e){e.preventDefault();document.getElementById("nb-search").click();});
     document.querySelectorAll(".my-posting-manage").forEach(function(b){
       b.addEventListener("click",function(){rManagePosting(this.dataset.id);});
     });
@@ -3487,18 +3552,18 @@ async function rRecruit(){
 
 function rPostProject(){
   var el=document.getElementById("tc");if(!el)return;
-  var roleOpts="<option value=\"\">Any role</option>"+Object.keys(RO).map(function(k){return "<option value=\""+k+"\">"+RO[k].n+"</option>";}).join("");
   var compOpts="<option value=\"\">Not tied to a specific competition</option>"+COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}).join("");
   el.innerHTML="<div class=\"slabel\" style=\"margin-top:0;\">Post a project</div>"+
-    "<div class=\"fi\"><label for=\"pp-title\">Title</label><input id=\"pp-title\" placeholder=\"e.g. Need a designer for our Diamond Challenge pitch\"/></div>"+
+    "<div class=\"fi\"><label for=\"pp-title\">Project title</label><input id=\"pp-title\" placeholder=\"e.g. Need a designer for our Diamond Challenge pitch\"/></div>"+
     "<div class=\"fi\"><label for=\"pp-desc\">Description</label><textarea id=\"pp-desc\" placeholder=\"What are you building, and what do you need help with?\"></textarea></div>"+
-    "<div class=\"fi\"><label for=\"pp-role\">Role needed</label><select id=\"pp-role\">"+roleOpts+"</select></div>"+
-    "<div class=\"fi\"><label for=\"pp-skills\">Skills needed <span style=\"font-weight:400;color:#6b6b6b;\">(comma-separated)</span></label><input id=\"pp-skills\" placeholder=\"e.g. Figma, UI Design, Prototyping\"/></div>"+
-    "<div class=\"fi\"><label for=\"pp-comp\">Competition</label><select id=\"pp-comp\">"+compOpts+"</select></div>"+
-    "<div class=\"fi\"><label for=\"pp-spots\">Spots open</label><input id=\"pp-spots\" type=\"number\" min=\"1\" max=\"10\" value=\"1\"/></div>"+
+    "<div class=\"fi\"><label for=\"pp-skills\">Skills you're looking for <span style=\"font-weight:400;color:#6b6b6b;\">(optional, comma-separated)</span></label><input id=\"pp-skills\" placeholder=\"e.g. Figma, UI Design, Prototyping\"/></div>"+
+    "<div class=\"fi\"><label for=\"pp-comp\">Competition <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><select id=\"pp-comp\">"+compOpts+"</select></div>"+
+    "<div class=\"fi\"><label for=\"pp-spots\">How many partners?</label><input id=\"pp-spots\" type=\"number\" min=\"1\" max=\"10\" value=\"1\"/></div>"+
+    "<div class=\"slabel\">Who should see this?"+req()+"</div>"+
+    "<div id=\"pp-scope\" class=\"cgrow\"></div>"+
     "<div class=\"slabel\">Stage</div>"+
     "<div id=\"pp-stage\" class=\"stbar\">"+
-      ["Spark|spark","Planning|planning","Building|building","Submitting|submitting"].map(function(x){
+      ["Idea|spark","Planning|planning","Building|building","Submitting|submitting"].map(function(x){
         var p=x.split("|");
         return "<div class=\"stb\" data-val=\""+p[1]+"\">"+p[0]+"</div>";
       }).join("")+
@@ -3513,12 +3578,14 @@ function rPostProject(){
       this.classList.add("on");chosenStage=this.dataset.val;
     });
   });
+  mkChips("pp-scope",["My school","My city / region","Anyone"],[],true);
   document.getElementById("pp-cancel").addEventListener("click",function(){showTab("recruit");});
   document.getElementById("pp-submit").addEventListener("click",async function(){
     var title=document.getElementById("pp-title").value.trim();
     var desc=document.getElementById("pp-desc").value.trim();
     if(!title||!desc){showToast("Add a title and description");return;}
-    var role=document.getElementById("pp-role").value||null;
+    var scope=getChips("pp-scope")[0];
+    if(!scope){showToast("Choose who should see this");return;}
     var skills=document.getElementById("pp-skills").value.split(",").map(function(s){return s.trim();}).filter(Boolean);
     var comp=document.getElementById("pp-comp").value||null;
     var spots=parseInt(document.getElementById("pp-spots").value,10)||1;
@@ -3526,8 +3593,8 @@ function rPostProject(){
     if(!session)return;
     var btn=this;btn.disabled=true;btn.textContent="Posting…";
     var res=await sba.from("projects").insert({
-      student_id:session.user.id,title:title,description:desc,partner_need:role,
-      needed_role:role,skills:skills,competition_name:comp,spots:spots,stage:chosenStage,status:"open"
+      student_id:session.user.id,title:title,description:desc,
+      skills:skills,competition_name:comp,spots:spots,stage:chosenStage,status:"open",location_scope:scope
     });
     if(res.error){
       console.error("[Partnr] post project failed:",res.error);
@@ -3661,7 +3728,7 @@ async function rManagePosting(projectId){
 
 
 function sTab(){
-  var compOptions=["<option value=\"\">Any competition</option>"];
+  var compOptions=["<option value=\"\">All competitions</option>"];
   var catKeysForFilter=["science","math","business","impact","tech","writing","arts","law"];
   compOptions.push("<optgroup label=\"By category (broader)\">"+
     catKeysForFilter.map(function(k){
@@ -3676,9 +3743,9 @@ function sTab(){
   "</optgroup>");
   compOptions=compOptions.join("");
   return "<div class=\"slabel\" style=\"margin-top:0;\">Find students by skill</div>"+
-    "<div class=\"sub\">Browse by category, or filter by exactly who you need — a competition (or a whole category of them), your city, your school.</div>"+
+    "<div class=\"sub\">Find students by skill, competition, or location.</div>"+
     "<div class=\"swrap\" style=\"margin-bottom:0.75rem;display:flex;gap:8px;\">"+
-      "<div style=\"position:relative;flex:1;\"><input id=\"ss\" autocomplete=\"off\" placeholder=\"Search — Python, ISEF, Figma, debate, nonprofit... (optional)\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<div style=\"position:relative;flex:1;\"><label for=\"ss\" style=\"display:block;font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:4px;\">Search by skill or name</label><input id=\"ss\" autocomplete=\"off\" placeholder=\"Python, Figma, debate...\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
         "<div id=\"skill-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
       "</div>"+
       "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
@@ -3867,7 +3934,11 @@ function dCards(){
   // dates the backend has independently verified are current.
   var upcoming=COMPS.filter(function(c){
     var d=DEADLINE_DATA[c.n];
-    return d&&d.status==="confirmed"&&d.deadline_date;
+    // Guard against stale data: a "confirmed" deadline that has already
+    // passed (not yet re-checked by the weekly verification job) should
+    // never show as "-2d left, Act now" - exclude it rather than
+    // display a date that's already gone.
+    return d&&d.status==="confirmed"&&d.deadline_date&&daysUntilISODate(d.deadline_date)>=0;
   }).map(function(c){
     return {comp:c,deadline_date:DEADLINE_DATA[c.n].deadline_date,sortDays:daysUntilISODate(DEADLINE_DATA[c.n].deadline_date)};
   });
@@ -4023,11 +4094,18 @@ async function renderConnections(){
     return;
   }
 
+  if(!data.incoming.length&&!data.accepted.length&&!data.outgoing.length){
+    el.innerHTML="<div style=\"text-align:center;padding:2rem;\"><p style=\"font-size:14px;font-weight:500;color:#1a1a1a;margin-bottom:6px;\">Nothing here yet.</p><p style=\"font-size:13px;color:#6b6b6b;margin-bottom:14px;\">Requests you send or receive, and conversations you start, will show up here.</p><button id=\"inbox-find-link\" style=\"background:none;border:1px solid #ddd;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;color:#534AB7;cursor:pointer;font-family:inherit;\">Find students</button></div>";
+    var inboxFindBtn=document.getElementById("inbox-find-link");
+    if(inboxFindBtn)inboxFindBtn.addEventListener("click",function(){document.getElementById("nb-search").click();});
+    return;
+  }
+
   var h="";
 
-  h+="<div class=\"slabel\" style=\"margin-top:0;\">Requests for you"+(data.incoming.length?" ("+data.incoming.length+")":"")+"</div>";
+  h+="<div class=\"slabel\" style=\"margin-top:0;\">Received requests"+(data.incoming.length?" ("+data.incoming.length+")":"")+"</div>";
   if(!data.incoming.length){
-    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">No one has asked to connect with you yet. When a student sends you a request, it shows up here with their message.</p>";
+    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">No connection requests yet. When a student sends you one, it shows up here with their message.</p>";
   } else {
     data.incoming.forEach(function(item){
       var wait=daysWaitingInfo(item.row.created_at);
@@ -4043,9 +4121,9 @@ async function renderConnections(){
     h+="<div style=\"height:0.5rem;\"></div>";
   }
 
-  h+="<div class=\"slabel\">Connected"+(data.accepted.length?" ("+data.accepted.length+")":"")+"</div>";
+  h+="<div class=\"slabel\">Conversations"+(data.accepted.length?" ("+data.accepted.length+")":"")+"</div>";
   if(!data.accepted.length){
-    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">Once you and another student both accept, you'll both show up here.</p>";
+    h+="<p style=\"font-size:13px;color:#6b6b6b;margin-bottom:1.5rem;line-height:1.6;\">Once one of you accepts a request, you'll both show up here.</p>";
   } else {
     data.accepted.forEach(function(item){
       h+=connPersonRow(item,
@@ -4060,7 +4138,7 @@ async function renderConnections(){
     h+="<div style=\"height:0.5rem;\"></div>";
   }
 
-  h+="<div class=\"slabel\">Requests you sent"+(data.outgoing.length?" ("+data.outgoing.length+")":"")+"</div>";
+  h+="<div class=\"slabel\">Sent requests"+(data.outgoing.length?" ("+data.outgoing.length+")":"")+"</div>";
   if(!data.outgoing.length){
     h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">You haven't sent any requests yet. Find someone in Skill search and tap Connect.</p>";
   } else {
@@ -4762,7 +4840,12 @@ function renderSR(results,skill,isDemo){
   var el=document.getElementById("sr");if(!el)return;
   var sbgs={"has project":"#EEEDFE","open to joining":"#EAF3DE","has idea":"#FAEEDA","exploring":"#F1EFE8"};
   var stcs={"has project":"#3C3489","open to joining":"#3B6D11","has idea":"#854F0B","exploring":"#5F5E5A"};
-  if(!results||!results.length){el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No results — try a different search.</div>";return;}
+  if(!results||!results.length){
+    var emptyMsg=(skill==="your saved profiles")
+      ?"You haven't saved anyone yet. Browse Skill Search and tap the star on a profile to save it here."
+      :"No one matches this search yet. You'll get an email the moment a real match comes in.";
+    el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">"+esc(emptyMsg)+"</div>";return;
+  }
   var h="<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\"><strong style=\"color:#1a1a1a;\">"+results.length+"</strong> student"+(results.length>1?"s":"")+" found matching <strong style=\"color:#1a1a1a;\">"+esc(skill)+"</strong></div>"+
     (isDemo?"<div style=\"font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>No real students matched yet — showing example profiles so you can see how search works.</div>":"");
   results.forEach(function(r){
