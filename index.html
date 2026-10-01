@@ -523,7 +523,7 @@ async function loadProfileIntoState(uid){
   var p=pRes.data;
   S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
-  S.secondary=p.secondary||[];S.status=(p.status||"").replace("I have a project — need teammates","I have a project and need teammates");S.idea=p.idea||"";S.availability=p.availability||"";
+  S.secondary=p.secondary||[];S.status=(p.status||"").replace(/^I have a project.*$/,"I have a project and need partners");S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
@@ -765,7 +765,7 @@ async function fetchSavedStudents(){
   var studentsRes=await sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
   if(studentsRes.error)throw studentsRes.error;
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
-  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need teammates";});
+  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
   if(!students.length)return [];
   var finalIds=students.map(function(s){return s.id;});
   var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",finalIds);
@@ -908,7 +908,7 @@ async function searchRealStudents(opts,excludeId){
   // too keeps the UI consistent immediately after a block, before any
   // refetch happens.
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
-  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need teammates";});
+  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
   console.log("[Partnr search] filters:",{query:query,city:city,school:school,competition:competition},"| matched:",students.length);
   if(!students.length)return [];
 
@@ -1760,10 +1760,10 @@ function gradeOpts(){
 // ── Welcome ─────────────────────────────────
 function rWelcome(){
   R(logo(true)+
-    "<h2 style=\"font-size:28px;line-height:1.15;margin-bottom:0.75rem;\">Find your next project partner.</h2>"+
-    "<div style=\"font-size:15px;color:#1a1a1a;line-height:1.6;margin-bottom:0.75rem;\">Ever wanted to enter a competition, publish research, launch a business, or start a nonprofit, but didn’t know where to start or who to do it with?</div>"+
-    "<div style=\"font-size:15px;color:#1a1a1a;line-height:1.6;margin-bottom:0.75rem;\">Partnr connects you with high school students who share your ambition, at your school, in your city, or around the world.</div>"+
-    "<div style=\"font-size:14px;color:#1a1a1a;line-height:1.6;margin-bottom:1.25rem;\">Bring your ideas and skills. Find a project that excites you. Build something together.</div>"+
+    "<h2 style=\"font-size:28px;line-height:1.15;margin-bottom:0.9rem;color:#1a1a1a;font-weight:600;\">Find your next project partner.</h2>"+
+    "<div style=\"font-size:16px;color:#1a1a1a;line-height:1.75;max-width:38em;margin-bottom:1rem;\">Partnr helps motivated high school students team up to pursue research, launch businesses, and start clubs or nonprofits, with chances to enter competitions and put their ideas to the test.</div>"+
+    "<div style=\"font-size:16px;color:#1a1a1a;line-height:1.75;max-width:38em;margin-bottom:1rem;\">Meet someone who shares your ambition and brings skills that complement yours. Share what you know, learn from each other, and build something together.</div>"+
+    "<div style=\"font-size:16px;color:#1a1a1a;line-height:1.75;max-width:38em;margin-bottom:1.5rem;\">Connect at your school, in your city, or around the world.</div>"+
     "<div class=\"wgrid\" style=\"margin-bottom:0.75rem;\">"+
       "<div class=\"welcome-cat\" data-cats=\"science\" data-label=\"Research & Science\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-microscope\" style=\"font-size:28px;color:#3E96DB;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Research & Science</div></div>"+
       "<div class=\"welcome-cat\" data-cats=\"business\" data-label=\"Business & Finance\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-trending-up\" style=\"font-size:28px;color:#4A7F1E;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Business & Finance</div></div>"+
@@ -1773,7 +1773,7 @@ function rWelcome(){
       "<div class=\"welcome-cat\" data-cats=\"arts,writing\" data-label=\"Arts & Writing\" style=\"padding:20px 8px;border-radius:14px;border:1px solid #e8e8e4;text-align:center;background:white;cursor:pointer;\"><i class=\"ti ti-pencil\" style=\"font-size:28px;color:#C9691A;\"></i><div style=\"font-size:14px;font-weight:600;color:#1a1a1a;margin-top:8px;line-height:1.25;\">Arts & Writing</div></div>"+
     "</div>"+
     "<div style=\"text-align:center;font-size:12px;color:#1a1a1a;margin-bottom:1.5rem;\">Tap a category to explore "+COMPS.length+"+ real competitions. No account needed.</div>"+
-    "<button class=\"bp\" id=\"gs\">Find my project partner →</button>"+
+    "<button class=\"bp\" id=\"gs\">Join Partnr</button>"+
     "<button class=\"bkbtn\" id=\"toSignin\" style=\"color:#1a1a1a;\">Already on Partnr? Sign in</button>"+
     "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#1a1a1a;\">Free to join · Currently in beta</div>"
   );
@@ -2103,11 +2103,11 @@ function rTrack(){
       "</div>"+
     "</div>";
   R(logo()+sb(2)+
-    "<h2>Let's find you a partner to build something great.</h2>"+
-    "<div class=\"sub\">Whether you've got an idea, a skill, or you're still figuring it out, start here.</div>"+
-    "<div class=\"slabel\" style=\"margin-top:0;\">Status"+req()+"</div>"+
+    "<h2>Find the right partner to bring your ideas to life.</h2>"+
+    "<div class=\"sub\">Whether you’re starting a project, joining one, or exploring possibilities, connect with students who share your interests and ambition.</div>"+
+    "<div class=\"fi\" style=\"margin-top:0;\"><label for=\"iidea\">Describe a project you have in mind or the kind you’d be interested in joining. <span style=\"font-weight:600;color:#534AB7;font-size:12px;\">Required. A sentence or two is all it takes.</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to start a nonprofit tackling food waste and need a partner who's into grassroots organizing, or: I know Python and want to join a biology research project...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div class=\"slabel\">Status"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
-    "<div class=\"fi\" style=\"margin-top:1rem;\"><label for=\"iidea\">What do you want to build or work on, and what kind of partner would help? <span style=\"font-weight:400;color:#854F0B;font-size:12px;\">(required unless you add a competition below)</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to start a nonprofit tackling food waste and need a partner who's into grassroots organizing, or: I know Python and want to join a biology research project...\">"+esc(S.idea)+"</textarea></div>"+
     compSectionHTML+
     "<div class=\"slabel\">Commitment"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"commit\"></div>"+
@@ -2122,7 +2122,7 @@ function rTrack(){
     "<button class=\"bp\" id=\"s3\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
-  mkChips("status",["I have a project and need teammates","Open to joining a project","Just exploring"],[S.status],true);
+  mkChips("status",["I have a project and need partners","Open to joining a project","Just exploring"],[S.status],true);
   mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
   renderInterestChips();
   document.getElementById("s3").addEventListener("click",step3);
@@ -2279,16 +2279,17 @@ function rSkills(){
       "<button id=\"award-add\" style=\"padding:10px 14px;background:#EAF3DE;color:#3B6D11;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>";
   R(logo()+sb(3)+
-    "<h2>Your skills</h2>"+
-    "<div class=\"sub\">Tap a category to see the options, and pick as many as fit.</div>"+
-    "<div style=\"font-size:12px;color:#854F0B;margin-bottom:1.2rem;\">Add a couple of skills so students can actually find you.</div>"+
+    "<h2>There’s more than one way to make a team stronger.</h2>"+
+    "<div class=\"sub\" style=\"margin-bottom:0.5rem;\">Skills come from classes, hobbies, and everyday experience. Choose the ones you’ve used. They show other students what you’d bring to a team.</div>"+
+    "<div style=\"font-size:14px;color:#666;line-height:1.6;margin-bottom:0.75rem;\">Tap a category to explore the options and select all that apply.</div>"+
+    "<div style=\"margin-bottom:0.75rem;\"></div>"+
     "<div id=\"active-group\"></div>"+
     "<div id=\"extra-group\"></div>"+
     "<div id=\"math-group\"></div>"+
     "<div id=\"skillrecap\" style=\"background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:1rem;\"></div>"+
     "<div class=\"slabel\">Missing a skill? Add your own.</div>"+
     "<div style=\"display:flex;gap:8px;margin-bottom:1rem;\">"+
-      "<input id=\"customskill2\" placeholder=\"Still not there? Type it - e.g. VHDL, Falconry, Amateur Radio...\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<input id=\"customskill2\" placeholder=\"e.g. Birding, Podcasting, Sign language\" style=\"flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"addskillbtn2\" style=\"padding:10px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>"+
     "<div class=\"slabel\">How many hours a week can you commit?"+req()+"</div>"+
@@ -2317,7 +2318,7 @@ function rSkills(){
 
   renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Research, engineering, and business projects often need math too, not just math competitions.",[mathCat],false);
   renderGroup("active-group","Based on your interests",null,activeCats,false);
-  renderGroup("extra-group","Select additional skills","The more you add, the better your matches.",extraCats,true);
+  renderGroup("extra-group","Select additional skills","Add all the skills you have. It helps you match with more partners and projects.",extraCats,true);
   renderSkillRecap();
 
   document.getElementById("addskillbtn2").addEventListener("click",addCustomSkill);
@@ -2488,7 +2489,7 @@ function renderGroup(containerId,groupLabel,groupSub,cats,subAccent){
   if(!cats.length){container.innerHTML="";return;}
   var subStyle=subAccent?"font-size:12px;color:#534AB7;font-weight:600;margin-bottom:8px;":"font-size:12px;color:#6b6b6b;margin-bottom:8px;";
   var h="<div style=\"margin-bottom:1.2rem;\">"+
-    "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:2px;\">"+groupLabel+"</div>"+
+    "<div class=\"slabel\" style=\"margin:0 0 4px;\">"+groupLabel+"</div>"+
     (groupSub?"<div style=\""+subStyle+"\">"+groupSub+"</div>":"<div style=\"margin-bottom:6px;\"></div>");
   cats.forEach(function(cat){
     var selCount=cat.items.filter(function(i){return S.skillLevels[cat.id+":"+i]!==undefined;}).length;
@@ -2737,9 +2738,12 @@ function renderPills(){
   var el=document.getElementById("pills");if(!el)return;
   el.innerHTML="";
   if(!selComps.length){
-    var msg=document.createElement("span");msg.style.cssText="font-size:14px;font-weight:500;color:#1a1a1a;display:block;margin-bottom:8px;";
-    msg.textContent="Not sure where to start? Browse by category, or let us help.";
-    el.appendChild(msg);return;
+    // Same light-gray ALL CAPS section label used everywhere else on this page.
+    var msg=document.createElement("div");msg.className="slabel";msg.style.cssText="width:100%;margin-bottom:2px;";
+    msg.textContent="Not sure where to start?";
+    var help=document.createElement("div");help.style.cssText="width:100%;font-size:13px;color:#6b6b6b;margin-bottom:8px;";
+    help.textContent="Browse by category or let us help.";
+    el.appendChild(msg);el.appendChild(help);return;
   }
   selComps.forEach(function(c){
     var cm=CM2[c.cat]||{bg:"#EEEDFE",tc:"#3C3489"};
@@ -3013,7 +3017,7 @@ function step3(){
   var statusSel=getChips("status")[0]||"";
   if(!statusSel){showSecErr("status","Select your current status");valid=false;}
   var idea=document.getElementById("iidea").value.trim();
-  if(!idea&&!selComps.length){showSecErr("iidea","Describe your project or add at least one competition");valid=false;}
+  if(!idea){showSecErr("iidea","Add a sentence or two about what you want to work on. It helps us find your best match.");valid=false;}
   var commit=getChips("commit")[0]||"";
   if(!commit){showSecErr("commit","Select your commitment level");valid=false;}
   if(!S.locationPref){showSecErr("loc-pref","Select who you want to connect with");valid=false;}
