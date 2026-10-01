@@ -75,6 +75,8 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .fs-tile span{display:block;font-weight:400;color:#888;font-size:11px;margin-top:2px;}
 .cp-row{padding:10px 4px;border-bottom:1px solid #f0f0ec;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;}
 .cp-row:hover{background:#f6f5ff;}
+.inv-opt{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid #e8e8e4;border-radius:10px;background:#fafaf8;font-size:14px;font-weight:600;color:#1a1a1a;text-decoration:none;cursor:pointer;font-family:inherit;}
+.inv-opt:hover{border-color:#7F77DD;background:#f6f5ff;}
 
 .spin{width:30px;height:30px;border:2px solid #e0e0dc;border-top-color:#7F77DD;border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 1rem;}
 @keyframes sp{to{transform:rotate(360deg);}}
@@ -289,6 +291,20 @@ async function autofillCityFromZip(country,zip,cityInputEl){
     // of just "the zip thing isn't working" with no way to tell why.
     console.warn("[Partnr] zip autofill failed (non-fatal):",ex);
   }
+}
+
+// State/province from a postal code (e.g. 91316 -> "CA"), used to show
+// same-state students first. Never blocks signup if the lookup fails.
+async function lookupStateFromZip(country,zip){
+  var iso=COUNTRY_ISO[country];
+  if(!iso||!zip)return "";
+  try{
+    var res=await fetch("https://api.zippopotam.us/"+iso.toLowerCase()+"/"+encodeURIComponent(String(zip).trim()));
+    if(!res.ok)return "";
+    var data=await res.json();
+    var pl=data&&data.places&&data.places[0];
+    return (pl&&(pl["state abbreviation"]||pl.state))||"";
+  }catch(ex){console.warn("[Partnr] state lookup failed (non-fatal):",ex);return "";}
 }
 
 // Lazy-loads the school autocomplete data once, reused for every signup.
@@ -517,9 +533,10 @@ async function saveProfile(){
     }
   }
 
+  if(!S.state&&S.zip&&S.country)S.state=await lookupStateFromZip(S.country,S.zip);
   var upsertRes=await sba.from("students").upsert({
     id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
-    zip:S.zip,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
+    zip:S.zip,state:S.state||null,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,links:S.links||[],proof_of_work:S.proofOfWork||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null
@@ -561,7 +578,7 @@ async function loadProfileIntoState(uid){
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=p.location_pref||"";
   S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
-  S.dob=p.dob||"";
+  S.dob=p.dob||"";S.state=p.state||"";
   S.skillsNeeded=p.skills_needed||"";
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
@@ -835,10 +852,11 @@ async function searchRealStudents(opts,excludeId){
   var query=(opts.query||"").trim();
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
+  var country=(opts.country||"").trim();
   var competition=(opts.competition||"").trim();
   var category=(opts.category||"").trim();
   var subcat=(opts.subcat||"").trim();
-  if(!opts.all&&!query&&!city&&!school&&!competition&&!category&&!subcat)return [];
+  if(!opts.all&&!query&&!city&&!school&&!country&&!competition&&!category&&!subcat)return [];
 
   var idList=null; // null = no id-narrowing needed (pure city/school filter)
   var skillMatch={};
@@ -930,10 +948,11 @@ async function searchRealStudents(opts,excludeId){
     if(!idList.length)return [];
   }
 
-  var studentsQuery=sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(40);
+  var studentsQuery=sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(60);
   if(idList!==null)studentsQuery=studentsQuery.in("id",idList);
   if(city)studentsQuery=studentsQuery.ilike("city",city);
   if(school)studentsQuery=studentsQuery.ilike("school",school);
+  if(country)studentsQuery=studentsQuery.ilike("country",country);
   if(excludeId)studentsQuery=studentsQuery.neq("id",excludeId);
 
   var studentsRes=await studentsQuery;
@@ -943,6 +962,8 @@ async function searchRealStudents(opts,excludeId){
   // refetch happens.
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
   students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
+  // Nearest first: same school, city, state, country, then everyone else.
+  students.sort(function(a,b){return locationRank(a)-locationRank(b);});
   console.log("[Partnr search] filters:",{query:query,city:city,school:school,competition:competition},"| matched:",students.length);
   if(!students.length)return [];
 
@@ -3108,12 +3129,12 @@ function rLoading(){
 function openRematchModal(){
   R(logo()+
     "<div style=\"background:white;border:1px solid #e8e8e4;border-radius:16px;padding:1.5rem;\">"+
-      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Find new partners</div>"+
-      "<div class=\"sub\">Help us do better this round. What wasn't the right fit, and what are you looking for?</div>"+
+      "<div style=\"font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Change what you're looking for</div>"+
+      "<div class=\"sub\">Tell us what to do differently, and we'll find new matches.</div>"+
       "<div class=\"slabel\" style=\"margin-top:0;\">What wasn't working? <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;font-size:12px;letter-spacing:0;\">(optional)</span></div>"+
       "<div class=\"cgrow\" id=\"rematch-reasons\" style=\"margin-bottom:1rem;\"></div>"+
       "<div class=\"fi\"><label for=\"rematch-needed\">What kind of partner are you looking for?</label><input id=\"rematch-needed\" placeholder=\"e.g. a biology partner, someone who can build an app...\" value=\""+esc(S.skillsNeeded)+"\"/></div>"+
-      "<button class=\"bp\" id=\"rematch-go\">Find new partners →</button>"+
+      "<button class=\"bp\" id=\"rematch-go\">Get new matches →</button>"+
       "<button class=\"bkbtn\" id=\"rematch-cancel\">Cancel</button>"+
     "</div>"
   );
@@ -3135,7 +3156,7 @@ function openRematchModal(){
 // Every real AI match round is kept in the saved_matches table so a
 // returning student sees their matches instead of an empty page. New
 // rounds are added on top; anyone already in the list isn't added twice.
-function matchKey(m){return ((m&&m.name)||"").trim().toLowerCase()+"|"+((m&&m.school)||"").trim().toLowerCase();}
+function matchKey(m){if(m&&m.realId)return "real:"+m.realId;return ((m&&m.name)||"").trim().toLowerCase()+"|"+((m&&m.school)||"").trim().toLowerCase();}
 async function loadSavedMatches(){
   try{
     var res=await sba.from("saved_matches").select("id,match,status,pass_reason,created_at").order("created_at",{ascending:false}).order("id",{ascending:false}).limit(150);
@@ -3143,7 +3164,7 @@ async function loadSavedMatches(){
     var seen={};var list=[];
     (res.data||[]).forEach(function(r){
       var k=matchKey(r.match);
-      if(r.match&&!seen[k]){
+      if(r.match&&r.match.realId&&!seen[k]){ // older AI example profiles (no realId) are no longer shown
         seen[k]=true;
         // _rowId/_status/_reason live only in memory, never written back into the match itself
         r.match._rowId=r.id;r.match._status=r.status||"active";r.match._reason=r.pass_reason||null;
@@ -3181,73 +3202,210 @@ function parseModelJson(d){
   return JSON.parse(txt.slice(a,b+1));
 }
 
+// ── Real matching ────────────────────────────
+// Matches come only from real, registered students. Nothing is made up:
+//  1. Load the real students this student is allowed to see (the
+//     students_public view already applies everyone's privacy choice).
+//  2. Narrow to the student's own "Who do you want to connect with?"
+//     choice. If nobody is there yet, widen one step at a time
+//     (school → city → state → country → anyone) and say so.
+//  3. The AI ranks the candidates and writes "why you match". If the AI
+//     is unavailable, a simple skill/interest score ranks them instead.
+var MATCH_NOTE=""; // e.g. "No one at Viewpoint yet, so here are students in Encino."
+var NO_REAL_MATCHES=false;
+
+function normLoc(x){return (x||"").toString().trim().toLowerCase();}
+async function loadMatchCandidates(myId){
+  var res=await sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links,skills_needed").eq("onboarded",true).neq("id",myId).limit(300);
+  if(res.error)throw res.error;
+  var shownReal={};MATCHES.forEach(function(m){if(m.realId)shownReal[m.realId]=true;});
+  var people=(res.data||[]).filter(function(s){return !BLOCKED_IDS[s.id]&&!shownReal[s.id];});
+  if(!people.length)return [];
+  var ids=people.map(function(s){return s.id;});
+  var sk=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",ids);
+  var cp=await sba.from("competitions").select("student_id,competition_name").in("student_id",ids);
+  var skillsBy={},compsBy={};
+  (sk.data||[]).forEach(function(r){(skillsBy[r.student_id]=skillsBy[r.student_id]||[]).push(r);});
+  (cp.data||[]).forEach(function(r){(compsBy[r.student_id]=compsBy[r.student_id]||[]).push(r.competition_name);});
+  people.forEach(function(s){s._skills=skillsBy[s.id]||[];s._comps=compsBy[s.id]||[];});
+  return people;
+}
+// Same school, then city, then same state, then same country, then anyone.
+function locationRank(s){
+  if(S.school&&s.school&&normLoc(s.school)===normLoc(S.school))return 0;
+  if(normLoc(s.city)===normLoc(S.city)&&normLoc(s.country)===normLoc(S.country))return 1;
+  if(S.state&&normLoc(s.state)===normLoc(S.state)&&normLoc(s.country)===normLoc(S.country))return 2;
+  if(normLoc(s.country)===normLoc(S.country))return 3;
+  return 4;
+}
+function pickByPreference(people){
+  var pref=(S.locationPref||"").toLowerCase();
+  var startLevel=pref.indexOf("school")>=0?0:pref.indexOf("city")>=0?1:4;
+  var levels=[0,1,2,3,4].filter(function(l){return l>=startLevel;});
+  var names={0:"at "+(S.school||"your school"),1:"in "+(S.city||"your city"),2:"in "+(S.state||"your state"),3:"in "+(S.country||"your country"),4:"around the world"};
+  for(var i=0;i<levels.length;i++){
+    var lvl=levels[i];
+    var found=people.filter(function(s){return locationRank(s)<=lvl;});
+    if(found.length){
+      MATCH_NOTE=(i>0)?("No one "+names[startLevel]+" yet, so here are students "+names[lvl]+"."):"";
+      return found.sort(function(a,b){return locationRank(a)-locationRank(b);});
+    }
+  }
+  MATCH_NOTE="";
+  return [];
+}
+// Simple backup ranking when the AI can't be reached.
+function localMatchScore(s){
+  var score=0;
+  if(s.track&&s.track===S.track)score+=3;
+  (S.secondary||[]).forEach(function(n){if(TR[s.track]&&TR[s.track].n===n)score+=2;});
+  var myComps=S.comps||[];s._comps.forEach(function(c){if(myComps.indexOf(c)>=0)score+=3;});
+  var mySkills=Object.keys(S.skillLevels||{}).map(function(k){return (k.split(":")[1]||k).toLowerCase();});
+  var theirs=s._skills.map(function(r){return (r.skill_name||"").toLowerCase();});
+  var different=theirs.filter(function(n){return mySkills.indexOf(n)<0;}).length;
+  score+=Math.min(different,4); // complementary skills count most
+  score+=Math.max(0,3-locationRank(s));
+  return score;
+}
+function realToMatch(s,score,why){
+  var swl={};s._skills.slice(0,8).forEach(function(r){swl[r.skill_name]=r.level||"Intermediate";});
+  var place=[s.city,s.state&&normLoc(s.country)==="united states"?s.state:""].filter(Boolean).join(", ");
+  return {
+    realId:s.id,name:s.name,school:s.school||"",city:place||s.city||"",country:s.country||"",grade:s.grade||"",
+    avatar:initialsFor(s.name),avatarColor:colorForId(s.id),track:s.track||"",role:s.role||"",
+    skillsWithLevels:swl,competitions:s._comps.slice(0,5),matchScore:score,why:why||"",
+    availability:s.availability||"Not specified",commitment:"",timezone:"",stage:"",
+    bio:s.idea||"",status:s.status||"",lookingFor:s.skills_needed||"",languages:[],awards:[],
+    experience:(s.proof_of_work||[]).filter(function(p){return p&&p.type!=="Award";}).slice(0,3).map(function(p){return {title:p.title||"",desc:p.desc||p.role||""};}),
+    portfolio:null
+  };
+}
+function localWhy(s){
+  var bits=[];
+  var shared=s._comps.filter(function(c){return (S.comps||[]).indexOf(c)>=0;});
+  if(shared.length)bits.push("You're both aiming for "+shared[0]+".");
+  if(s.track&&s.track===S.track)bits.push("You share an interest in "+((TR[s.track]||{}).n||s.track)+".");
+  var top=s._skills.slice(0,2).map(function(r){return r.skill_name;});
+  if(top.length)bits.push("They bring "+top.join(" and ")+".");
+  return bits.join(" ")||"Their interests and skills line up with what you're working on.";
+}
+
 async function doFetch(){
   try{
-  var t=TR[S.track]||{n:S.track||"open"};
-  var r=RO[S.role]||{n:S.role||"open"};
-  var compInfo=selComps.map(function(c){
-    var crossNote=c.cross===true?"(cross-school ok)":c.cross==="prep"?"(prep partner only)":"(same school required)";
-    return c.n+" "+crossNote;
-  }).join(", ")||"open";
-  var powStr=S.proofOfWork.map(function(item){return item.type+": "+item.title+(item.role?" ("+item.role+")":"")+(item.desc?" - "+item.desc:"");}).join("; ")||"none";
-  var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
-  var neededStr=S.skillsNeeded||"open — infer from idea and role";
-  var feedbackLine=REMATCH_FEEDBACK?("\nPrevious round feedback: "+REMATCH_FEEDBACK):"";
-  var passedList=MATCHES_ARE_DEMO?[]:MATCHES.filter(function(m){return m._status==="passed";});
-  var shownNames=MATCHES_ARE_DEMO?[]:MATCHES.map(function(m){return m.name;}).filter(Boolean).slice(0,40);
-  if(passedList.length)feedbackLine+="\nThe student passed on these earlier matches (avoid similar mismatches): "+passedList.slice(0,15).map(function(m){return m.name+(m._reason?" ("+m._reason+")":"");}).join("; ");
-  if(shownNames.length)feedbackLine+="\nAlready shown, never suggest these people again: "+shownNames.join(", ");
-  REMATCH_FEEDBACK=""; // one-time use — consumed here so it never leaks into a later, unrelated call
-  var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
-  var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nProof of work: "+powStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,city,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 fictional projects that could genuinely use this student's skills. Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
-  try{
-    // Real matching now goes through a Supabase edge function that holds
-    // the actual Anthropic key server-side — the previous direct
-    // fetch("https://api.anthropic.com/...") call with no key attached
-    // only ever works inside Claude's own Artifacts preview, never on a
-    // real deployed site, so this call was almost certainly always
-    // failing and silently landing on fallback() below.
     var session=await getSession();
     if(!session)throw new Error("no session");
-    var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "apikey":SUPABASE_KEY,
-        "Authorization":"Bearer "+session.access_token
-      },
-      body:JSON.stringify({prompt:prompt})
-    });
-    if(res.status===429){
-      // Daily limit reached — this is not a failure, so it gets its own
-      // clear message rather than silently showing demo profiles, which
-      // would look identical to "the AI call broke" from the student's
-      // side and just be confusing.
-      var limitInfo={};
-      try{limitInfo=await res.json();}catch(ex){}
-      var limitN=limitInfo.limit||3;
-      if(MATCHES.length){
-        showToast("You've used today's "+limitN+" match rounds. New ones are available tomorrow.");
-        goTo("matches");
-      } else {
-        // No existing matches to fall back to (first-ever call somehow
-        // hit the limit) — show demo profiles rather than a dead end.
-        fallback();
-      }
+    NO_REAL_MATCHES=false;
+    var people=pickByPreference(await loadMatchCandidates(session.user.id));
+    if(!people.length){
+      NO_REAL_MATCHES=true;REMATCH_FEEDBACK="";
+      goTo("matches");
       return;
     }
-    if(!res.ok)throw new Error("status "+res.status);
-    var d=await res.json();
-    if(d.error)throw new Error("api error");
-    var parsed=parseModelJson(d);
-    var hadMatches=MATCHES.length>0&&!MATCHES_ARE_DEMO;
-    if(MATCHES_ARE_DEMO){MATCHES=[];MATCHES_ARE_DEMO=false;}
-    var addedCount=await saveNewMatches(parsed.matches||[]);
-    PROJECTS=parsed.projects||[];COMPS_DATA=parsed.competitions||[];
+    var pool=people.slice(0,40);
+    var feedback=REMATCH_FEEDBACK;REMATCH_FEEDBACK=""; // one-time use
+    var passed=MATCHES.filter(function(m){return m._status==="passed";}).slice(0,15)
+      .map(function(m){return m.name+(m._reason?" ("+m._reason+")":"");});
+    var list=pool.map(function(s){
+      return s.id+" | "+(s.name||"").split(" ")[0]+" | "+[s.city,s.state,s.country].filter(Boolean).join(", ")+
+        " | track: "+(s.track||"?")+" | role: "+(s.role||"?")+
+        " | skills: "+(s._skills.slice(0,8).map(function(r){return r.skill_name+(r.level?" ("+r.level+")":"");}).join(", ")||"none listed")+
+        " | competitions: "+(s._comps.slice(0,5).join(", ")||"none")+
+        " | wants: "+((s.idea||"").slice(0,160).replace(/\n/g," ")||"not shared")+
+        " | looking for: "+((s.skills_needed||"").slice(0,100)||"open");
+    }).join("\n");
+    var prompt="You are Partnr's matching engine for high school students. Pick the best REAL partners for this student from the candidate list.\n\n"+
+      "STUDENT: track "+((TR[S.track]||{}).n||S.track||"open")+"; secondary: "+((S.secondary||[]).join(", ")||"none")+"; status: "+(S.status||"open")+
+      "\nSkills: "+skStr()+"\nLooking for in a partner: "+(S.skillsNeeded||"open")+
+      "\nWants to work on: "+(S.idea||"open")+"\nTarget competitions: "+((S.comps||[]).join(", ")||"none")+
+      "\nAvailability: "+(S.availability||"?")+", commitment: "+(S.commit||"?")+
+      (feedback?"\nFeedback on the last round: "+feedback:"")+
+      (passed.length?"\nThey passed on: "+passed.join("; ")+". Avoid similar mismatches.":"")+
+      "\n\nCANDIDATES (id | first name | location | track | role | skills | competitions | wants | looking for):\n"+list+
+      "\n\nRULES: Prefer complementary skills and roles (a researcher with a builder, an idea person with someone technical), shared target competitions, and shared interests. "+
+      "Candidates are already ordered nearest first; when two are similar, prefer the nearer one. Only use ids from the list. Never invent people or facts.\n"+
+      "Pick up to 5. For each give matchScore (50-98, honest) and why: one or two specific sentences about how they complement this student, using only facts from the list.\n"+
+      "Return ONLY valid JSON: {\"matches\":[{\"id\":\"candidate id\",\"matchScore\":80,\"why\":\"...\"}]}";
+    var picks=null;
+    var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({prompt:prompt,max_tokens:1500})
+    });
+    if(res.status===429){
+      var limitInfo={};try{limitInfo=await res.json();}catch(ex){}
+      showToast("You've used today's "+(limitInfo.limit||3)+" match rounds. New ones are available tomorrow.");
+      goTo("matches");
+      return;
+    }
+    try{
+      if(!res.ok)throw new Error("status "+res.status);
+      var d=await res.json();
+      if(d.error)throw new Error("api error");
+      var byId={};pool.forEach(function(s){byId[s.id]=s;});
+      picks=(parseModelJson(d).matches||[]).filter(function(p){return p&&byId[p.id];}).slice(0,5).map(function(p){
+        var sc=Math.max(50,Math.min(98,parseInt(p.matchScore)||75));
+        return realToMatch(byId[p.id],sc,p.why||localWhy(byId[p.id]));
+      });
+    }catch(aiErr){
+      console.error("[Partnr] AI ranking failed, using simple ranking:",aiErr);
+      picks=null;
+    }
+    if(!picks||!picks.length){
+      picks=pool.slice().sort(function(a,b){return localMatchScore(b)-localMatchScore(a);}).slice(0,5)
+        .map(function(s){return realToMatch(s,Math.min(95,60+localMatchScore(s)*3),localWhy(s));});
+    }
+    var hadMatches=MATCHES.some(function(m){return m._status==="active";});
+    var addedCount=await saveNewMatches(picks);
     goTo("matches");
-    if(hadMatches)showToast(addedCount?(addedCount+" new match"+(addedCount>1?"es":"")+" added to your list."):"No new matches this round. Your saved matches are still here.");
-  } catch(e){console.error("[Partnr] AI matching failed, showing demo data:",e);fallback();}
-  }catch(outer){console.error("[Partnr] match setup failed, showing demo data:",outer);fallback();}
+    if(hadMatches)showToast(addedCount?(addedCount+" new match"+(addedCount>1?"es":"")+" added."):"No new matches this round. Your saved matches are still here.");
+  }catch(e){
+    console.error("[Partnr] matching failed:",e);
+    fallback();
+  }
+}
+
+// Invite a friend. On phones (and Safari on Mac) this opens the
+// built-in share sheet: Messages, Mail, Instagram, WhatsApp and more.
+// Where that isn't available, it shows a small menu instead.
+var INVITE_URL="https://projectpartnr.com";
+var INVITE_TEXT="I'm on Partnr, where high school students find partners for research, startups, nonprofits and competitions. Join me!";
+function copyInviteLink(){
+  if(navigator.share){
+    navigator.share({title:"Join me on Partnr",text:INVITE_TEXT,url:INVITE_URL}).catch(function(ex){
+      if(ex&&ex.name!=="AbortError")openInviteMenu(); // AbortError = they closed the sheet
+    });
+    return;
+  }
+  openInviteMenu();
+}
+function openInviteMenu(){
+  var old=document.getElementById("invite-menu");if(old)old.remove();
+  var body=encodeURIComponent(INVITE_TEXT+" "+INVITE_URL);
+  var ov=document.createElement("div");ov.id="invite-menu";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:220;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  var opt=function(id,icon,label,href){
+    return (href?"<a id=\""+id+"\" href=\""+href+"\" target=\"_blank\" rel=\"noopener\"":"<button id=\""+id+"\"")+
+      " class=\"inv-opt\"><span style=\"font-size:20px;\">"+icon+"</span>"+label+(href?"</a>":"</button>");
+  };
+  ov.innerHTML="<div style=\"background:white;border-radius:16px;padding:1.25rem;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2);\">"+
+    "<div style=\"font-size:16px;font-weight:700;margin-bottom:4px;\">Invite a friend</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:14px;\">The more students join, the better everyone's matches get.</div>"+
+    "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;\">"+
+      opt("inv-email","✉️","Email","mailto:?subject="+encodeURIComponent("Join me on Partnr")+"&body="+body)+
+      opt("inv-text","💬","Text","sms:?&body="+body)+
+      opt("inv-wa","🟢","WhatsApp","https://wa.me/?text="+body)+
+      opt("inv-copy","🔗","Copy link","")+
+    "</div>"+
+    "<div style=\"font-size:12px;color:#999;margin-bottom:12px;\">For Instagram or TikTok, copy the link and paste it in your story or bio.</div>"+
+    "<button id=\"inv-close\" class=\"bkbtn\" style=\"margin:0;\">Close</button></div>";
+  document.body.appendChild(ov);
+  ov.addEventListener("click",function(e){if(e.target===ov)ov.remove();});
+  document.getElementById("inv-close").addEventListener("click",function(){ov.remove();});
+  document.getElementById("inv-copy").addEventListener("click",function(){
+    var done=function(){showToast("Link copied: "+INVITE_URL);ov.remove();};
+    try{navigator.clipboard.writeText(INVITE_URL).then(done,function(){showToast("Share this link: "+INVITE_URL);});}
+    catch(ex){showToast("Share this link: "+INVITE_URL);}
+  });
 }
 
 // ── Matches page ─────────────────────────────
@@ -3378,7 +3536,7 @@ function showTab(tab){
   CURRENT_TAB=tab;
   // The demo-matches banner and the "who you're matched with" bar only
   // describe the Matches tab, so they're hidden everywhere else.
-  var wlWrap=document.getElementById("wl-wrap");if(wlWrap)wlWrap.style.display=tab==="matches"?"":"none";
+  var wlWrap=document.getElementById("wl-wrap");if(wlWrap)wlWrap.style.display=(tab==="matches"&&MATCHES_ARE_DEMO)?"":"none";
   var locBarEl=document.getElementById("loc-bar");if(locBarEl)locBarEl.style.display=tab==="matches"?"flex":"none";
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
@@ -3402,17 +3560,43 @@ function rebuildSelCompsFromProfile(){
   }
 }
 
+// Real matches send a real connection request; anything else uses the old local flow.
+function connectToMatch(i){
+  var m=MATCHES[i];if(!m)return;
+  if(m.realId)openSearchConnectModal(m.realId,m.name,function(){goTo("matches");});
+  else openModal(i);
+}
+function passedListHtml(){
+  var passed=MATCHES.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m._status==="passed";});
+  return "<div style=\"margin-top:8px;\">"+passed.map(function(x){
+        return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border:1px solid #e8e8e4;border-radius:10px;padding:10px 12px;margin-bottom:6px;\">"+
+          "<div style=\"font-size:13px;\"><b>"+esc(displayName(x.m.name))+"</b><span style=\"color:#999;\">"+(x.m._reason?" · "+esc(x.m._reason):"")+"</span></div>"+
+          "<button class=\"bring-back\" data-idx=\""+x.i+"\" style=\"background:#EEEDFE;color:#534AB7;border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;\">Bring back</button></div>";
+      }).join("")+"</div>";
+}
 function mCards(){
+  var hasActive=MATCHES.some(function(m){return !m._status||m._status==="active";});
+  if(NO_REAL_MATCHES&&!hasActive){
+    var scope=(S.locationPref||"").toLowerCase().indexOf("school")>=0?"at your school":(S.locationPref||"").toLowerCase().indexOf("city")>=0?"near you":"yet";
+    return "<div style=\"text-align:center;padding:2rem 1rem;\">"+
+      "<i class=\"ti ti-users-group\" style=\"font-size:38px;color:#AFA9EC;\"></i>"+
+      "<div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;\">No new students to match with "+scope+"</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:360px;margin-left:auto;margin-right:auto;\">Partnr is just getting started. Invite a friend who'd make a great partner, or check back soon as more students join.</div>"+
+      "<button class=\"bp\" id=\"invite-btn\" style=\"max-width:260px;margin:0 auto 8px;display:block;\">Invite a friend</button>"+
+      "<button class=\"bkbtn\" id=\"go-find-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Browse Find students</button>"+
+    "</div>"+(MATCHES.some(function(m){return m._status==="passed";})?"<div style=\"text-align:center;\"><button id=\"toggle-passed\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;\">"+(SHOW_PASSED?"Hide":"Show")+" passed</button></div>"+(SHOW_PASSED?passedListHtml():""):"");
+  }
   if(!MATCHES.length)return "<div style=\"text-align:center;padding:2rem 1rem;\">"+
     "<i class=\"ti ti-users-group\" style=\"font-size:38px;color:#AFA9EC;\"></i>"+
-    "<div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;\">No matches loaded</div>"+
-    "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">No matches yet. Tap below to find partners, or head to Find students to see real students directly.</div>"+
+    "<div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin:12px 0 6px;\">Find your partners</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">We'll look through the students on Partnr and pick the best fits for you.</div>"+
     "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find my partners \u2192</button>"+
   "</div>";
   var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;\">"+
-    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Your AI matches</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Your matches</div>"+
     "<button id=\"refine-rematch-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">Not the right fit? Refine & try again →</button>"+
   "</div>";
+  if(MATCH_NOTE)h+="<div style=\"font-size:13px;color:#534AB7;background:#EEEDFE;border-radius:8px;padding:8px 12px;margin-bottom:10px;\">"+esc(MATCH_NOTE)+"</div>";
   var activeCount=0;
   MATCHES.forEach(function(m,i){
     if(m._status&&m._status!=="active")return; // passed ones sit in the Passed list, saved ones on My board
@@ -3425,16 +3609,16 @@ function mCards(){
       "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
         "<div class=\"av\" style=\"width:44px;height:44px;font-size:15px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
         "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+" · "+m.timezone+"</div></div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;\">"+locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions))+(m.timezone?" · "+esc(m.timezone):"")+(m.grade?" · "+esc(m.grade):"")+"</div></div>"+
         "<div style=\"font-size:16px;font-weight:700;color:"+t.c+";\">"+m.matchScore+"%</div>"+
       "</div>"+
       "<div class=\"tags\">"+stags+
         "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
-        getStageChip(m.stage)+
+        (m.stage?getStageChip(m.stage):"")+
       "</div>"+
       "<div class=\"why\"><strong>Why you match:</strong> "+esc(m.why)+"</div>"+
-      "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+m.availability+" · "+m.commitment+"</div>"+
+      "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+esc([m.availability,m.commitment].filter(Boolean).join(" · "))+"</div>"+
       "<div style=\"display:flex;gap:8px;align-items:center;\">"+
         "<button class=\"mcircle mpass\" data-idx=\""+i+"\" title=\"Pass\" aria-label=\"Pass\">✕</button>"+
         "<button class=\"mcircle msave\" data-idx=\""+i+"\" title=\"Save to my board\" aria-label=\"Save to my board\">♥</button>"+
@@ -3456,31 +3640,30 @@ function mCards(){
   } else {
     h+="<div style=\"font-size:12px;color:#999;text-align:center;margin:-4px 0 12px;\">Tip: swipe a card left to pass or right to save.</div>";
   }
-  var passed=MATCHES.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m._status==="passed";});
-  if(passed.length){
-    h+="<button id=\"toggle-passed\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;padding:4px 0;\">"+(SHOW_PASSED?"Hide":"Show")+" passed ("+passed.length+")</button>";
-    if(SHOW_PASSED){
-      h+="<div style=\"margin-top:8px;\">"+passed.map(function(x){
-        return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border:1px solid #e8e8e4;border-radius:10px;padding:10px 12px;margin-bottom:6px;\">"+
-          "<div style=\"font-size:13px;\"><b>"+esc(displayName(x.m.name))+"</b><span style=\"color:#999;\">"+(x.m._reason?" · "+esc(x.m._reason):"")+"</span></div>"+
-          "<button class=\"bring-back\" data-idx=\""+x.i+"\" style=\"background:#EEEDFE;color:#534AB7;border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;\">Bring back</button></div>";
-      }).join("")+"</div>";
-    }
+  var passedCount=MATCHES.filter(function(m){return m._status==="passed";}).length;
+  if(passedCount){
+    h+="<button id=\"toggle-passed\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;padding:4px 0;\">"+(SHOW_PASSED?"Hide":"Show")+" passed ("+passedCount+")</button>";
+    if(SHOW_PASSED)h+=passedListHtml();
   }
   return h;
 }
 function bindME(){
   var rematch=document.getElementById("rematch-btn");
   if(rematch)rematch.addEventListener("click",function(){
+    // Straight to new matches - no form in between.
     rebuildSelCompsFromProfile();
-    openRematchModal();
+    REMATCH_FEEDBACK="";
+    goTo("loading");
+    doFetch();
   });
   var refineBtn=document.getElementById("refine-rematch-btn");
   if(refineBtn)refineBtn.addEventListener("click",function(){
     rebuildSelCompsFromProfile();
     openRematchModal();
   });
-  document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){openModal(parseInt(this.dataset.idx));});});
+  document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){connectToMatch(parseInt(this.dataset.idx));});});
+  var inv=document.getElementById("invite-btn");if(inv)inv.addEventListener("click",copyInviteLink);
+  var gf=document.getElementById("go-find-btn");if(gf)gf.addEventListener("click",function(){var b=document.getElementById("nb-search");if(b)b.click();});
   document.querySelectorAll(".pfb").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(this.dataset.idx));});});
   document.querySelectorAll(".mpass").forEach(function(b){b.addEventListener("click",function(){
     var box=document.getElementById("mreasons-"+b.dataset.idx);
@@ -3550,7 +3733,7 @@ function openProfile(i){
   );
   document.getElementById("pbk").addEventListener("click",function(){goTo("matches");});
   document.getElementById("pbk2").addEventListener("click",function(){goTo("matches");});
-  if(!conn)document.getElementById("pconn").addEventListener("click",function(){openModal(i);});
+  if(!conn)document.getElementById("pconn").addEventListener("click",function(){connectToMatch(i);});
 }
 
 function openModal(idx){
@@ -3607,10 +3790,13 @@ async function loadRealProjects(){
 async function rRecruit(){
   var el=document.getElementById("tc");if(!el)return;
   el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div>";
-  var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;\">"+
-    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Open projects looking for a partner</div>"+
-    "<button id=\"post-project-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">+ Post a project</button>"+
-  "</div>";
+  var h="<div style=\"display:flex;align-items:center;gap:14px;background:#EEEDFE;border:1px solid #d9d6fb;border-radius:14px;padding:16px 18px;margin-bottom:1.25rem;flex-wrap:wrap;\">"+
+    "<div style=\"font-size:26px;\">🚀</div>"+
+    "<div style=\"flex:1;min-width:200px;\"><div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">Have a project?</div>"+
+    "<div style=\"font-size:13px;color:#555;line-height:1.5;\">Post it and find partners with the skills you need.</div></div>"+
+    "<button id=\"post-project-btn\" style=\"background:#7F77DD;color:white;border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;\">Post a project →</button>"+
+  "</div>"+
+  "<div class=\"slabel\" style=\"margin-top:0;\">Open projects looking for a partner</div>";
   var myPostingsRes,items;
   try{
     var session=await getSession();
@@ -4696,12 +4882,18 @@ function bindMeTab(){
           "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Skills</div>"+
           "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Your skills & experience</div>"+
         "</button>"+
+        "<button id=\"ep-projects\" style=\"padding:14px;border:1px solid #ddd;border-radius:12px;cursor:pointer;background:white;text-align:left;font-family:inherit;\">"+
+          "<i class=\"ti ti-rocket\" style=\"font-size:18px;color:#B8456E;display:block;margin-bottom:6px;\"></i>"+
+          "<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">Your projects</div>"+
+          "<div style=\"font-size:11px;color:#6b6b6b;margin-top:2px;\">Post a project or manage yours</div>"+
+        "</button>"+
       "</div>"+
       "<button id=\"ep-cancel\" style=\"width:100%;padding:10px;background:none;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#6b6b6b;cursor:pointer;font-family:inherit;\">Cancel</button>";
     document.querySelectorAll(".ep-step").forEach(function(b){
       b.addEventListener("click",function(){goTo(this.dataset.step);});
     });
     document.getElementById("ep-cancel").addEventListener("click",function(){showTab("me");});
+    document.getElementById("ep-projects").addEventListener("click",function(){var b=document.getElementById("nb-recruit");if(b)b.click();});
   });
 }
 
@@ -4715,12 +4907,13 @@ async function srchSkill(opts){
   var subcat=(opts.subcat||"").trim();
   var city=(opts.city||"").trim();
   var school=(opts.school||"").trim();
+  var country=(opts.country||"").trim();
   var SUBCAT_LABELS={coding:"Coding",robotics:"Robotics"};
   var browseAll=!!opts.all;
   // Example profiles are only ever shown for a plain text search with
   // "Anyone" selected. With a school, city, or competition filter on they
   // would claim to be "at Viewpoint School" when they're really in Senegal.
-  var isFilterOnly=browseAll||competition||category||subcat||city||school;
+  var isFilterOnly=true; // never show made-up profiles
 
   var descParts=[];
   if(query)descParts.push("\""+query+"\"");
@@ -4729,6 +4922,7 @@ async function srchSkill(opts){
   if(subcat)descParts.push("all "+(SUBCAT_LABELS[subcat]||subcat)+" competitions");
   if(city)descParts.push("in "+city);
   if(school)descParts.push("at "+school);
+  if(country)descParts.push("in "+country);
   var desc=descParts.join(" · ")||(browseAll?"everyone":"partners");
 
   var el=document.getElementById("sr");if(!el)return;
@@ -4736,8 +4930,22 @@ async function srchSkill(opts){
   try{
     var session=await getSession();
     var myId=session&&session.user?session.user.id:null;
-    var real=await searchRealStudents({all:browseAll,query:query,competition:competition,category:category,subcat:subcat,city:city,school:school},myId);
+    var base={all:browseAll,query:query,competition:competition,category:category,subcat:subcat};
+    var real=await searchRealStudents(Object.assign({city:city,school:school,country:country},base),myId);
     if(real.length){renderSR(real,desc,false);return;}
+    // Nobody at that level yet: widen one step at a time and say so.
+    var steps=[];
+    if(school)steps.push({o:{city:S.city},label:"in "+(S.city||"your city"),from:"at "+school});
+    if(school||city)steps.push({o:{country:S.country},label:"in "+(S.country||"your country"),from:school?"at "+school:"in "+city});
+    if(school||city||country)steps.push({o:{all:!(query||competition||category||subcat)},label:"around the world",from:school?"at "+school:city?"in "+city:"in "+country});
+    for(var si=0;si<steps.length;si++){
+      var wider=await searchRealStudents(Object.assign({},base,steps[si].o),myId);
+      if(wider.length){
+        renderSR(wider,desc.replace(/ · (at|in) .*$/,"")+" · "+steps[si].label,false);
+        el.insertAdjacentHTML("afterbegin","<div style=\"font-size:13px;color:#534AB7;background:#EEEDFE;border-radius:8px;padding:8px 12px;margin-bottom:10px;\">No one "+esc(steps[si].from)+" yet, so here are students "+esc(steps[si].label)+".</div>");
+        return;
+      }
+    }
   }catch(ex){
     console.error("[Partnr search] failed:",ex);
     el.innerHTML="<div style=\"text-align:center;padding:2rem 1rem;\">"+
@@ -4761,7 +4969,7 @@ async function srchSkill(opts){
   }
   // Free-text search with no real matches — show demo profiles instead,
   // clearly labeled so nobody mistakes them for real matches.
-  renderSR(demoSR(query||desc),desc,true);
+  // (No made-up example profiles: the honest empty state above always shows.)
 }
 
 function demoSR(skill){
@@ -4875,7 +5083,8 @@ function renderSR(results,skill,isDemo){
 // Lightweight connect modal specifically for real Skill Search
 // results — separate from openModal() since search results aren't
 // indexed into the MATCHES array the way AI matches are.
-function openSearchConnectModal(realId,name){
+function openSearchConnectModal(realId,name,backFn){
+  var back=typeof backFn==="function"?backFn:returnToSkillSearch;
   R(logo()+
     "<div style=\"min-height:340px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;border-radius:16px;padding:1rem;\">"+
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
@@ -4890,7 +5099,7 @@ function openSearchConnectModal(realId,name){
       "</div>"+
     "</div>"
   );
-  document.getElementById("srcbtn").addEventListener("click",returnToSkillSearch);
+  document.getElementById("srcbtn").addEventListener("click",back);
   document.getElementById("srsbtn").addEventListener("click",async function(){
     var msg=document.getElementById("srmsg").value.trim();
     if(!msg){showErr("srmsg","Write a short intro message before sending");scrollToFirstErr();return;}
@@ -4903,7 +5112,7 @@ function openSearchConnectModal(realId,name){
         return;
       }
       R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
-      document.getElementById("srdbn").addEventListener("click",returnToSkillSearch);
+      document.getElementById("srdbn").addEventListener("click",back);
     }catch(ex){
       console.error("Search connect failed",ex);
       btn.disabled=false;btn.textContent="Send request →";
@@ -5348,7 +5557,7 @@ function fsQuickChips(){
   return chips;
 }
 function sTab(){
-  var whereOpts=[["anyone","🌍 Anyone"],["city","📍 "+(S.city||"My city")],["school","🏫 "+(S.school||"My school")]];
+  var whereOpts=[["school","🏫 "+(S.school||"My school")],["city","📍 "+(S.city||"My city")],["country","🗺️ "+(S.country||"My country")],["anyone","🌍 Anyone"]];
   return "<div style=\"position:relative;margin-bottom:4px;\">"+
       "<label for=\"ss\" class=\"sr-only\" style=\"position:absolute;left:-9999px;\">Search</label>"+
       "<i class=\"ti ti-search\" style=\"position:absolute;left:13px;top:13px;font-size:16px;color:#999;\"></i>"+
@@ -5411,15 +5620,15 @@ function fsRun(){
   var what=[FS.skill,fsCompLabel(FS.comp)].filter(Boolean);
   var whatEl=document.getElementById("fs-what");if(whatEl)whatEl.textContent=what.length?what.join(" + "):"everyone";
   var whEl=document.getElementById("fs-wh");
-  if(whEl)whEl.textContent=FS.where==="city"?("In "+(S.city||"my city")):FS.where==="school"?("At "+(S.school||"my school")):"Anyone";
+  if(whEl)whEl.textContent=FS.where==="city"?("In "+(S.city||"my city")):FS.where==="school"?("At "+(S.school||"my school")):FS.where==="country"?("In "+(S.country||"my country")):"Anyone";
   document.querySelectorAll("#fs-where div").forEach(function(d){d.classList.toggle("on",d.dataset.v===FS.where);});
   var comp=FS.comp,category="",subcat="";
   if(comp.indexOf("cat:")===0){category=comp.slice(4);comp="";}
   else if(comp.indexOf("subcat:")===0){subcat=comp.slice(7);comp="";}
-  var city=FS.where==="city"?S.city:"",school=FS.where==="school"?S.school:"";
+  var city=FS.where==="city"?S.city:"",school=FS.where==="school"?S.school:"",country=FS.where==="country"?S.country:"";
   LAST_SKILL_SEARCH={fs:true};
-  if(!FS.skill&&!comp&&!category&&!subcat&&!city&&!school){srchSkill({all:true});return;}
-  srchSkill({query:FS.skill,competition:comp,category:category,subcat:subcat,city:city,school:school});
+  if(!FS.skill&&!comp&&!category&&!subcat&&!city&&!school&&!country){srchSkill({all:true});return;}
+  srchSkill({query:FS.skill,competition:comp,category:category,subcat:subcat,city:city,school:school,country:country});
 }
 function bindSE(){
   document.querySelectorAll("#fs-where div").forEach(function(d){
@@ -5463,29 +5672,10 @@ function returnToSkillSearch(){showTab("search");}
 
 // ── Fallback demo data ───────────────────────
 function fallback(){
-  if(MATCHES.length&&!MATCHES_ARE_DEMO){
-    showToast("Couldn't find new matches right now. Your saved matches are still here.");
-    goTo("matches");
-    return;
-  }
-  MATCHES_ARE_DEMO=true;
-  MATCHES=[
-    {name:"Jordan Kim",school:"Burbank High School",country:"United States",grade:"11th grade",avatar:"JK",avatarColor:"blue",track:S.track||"research",role:"tech_r",skillsWithLevels:{Python:"Advanced","Data Analysis":"Advanced","Machine Learning":"Intermediate","React":"Intermediate"},competitions:["Congressional App Challenge","Hackathon MLH"],matchScore:96,why:"Jordan's Python and data analysis skills directly complement what you're looking for. Same region means you can meet in person and co-work on submissions.",projectIdea:"App that maps food deserts in the LA area using public health data",commitment:"Serious",availability:"10 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Korean"],status:"has project",stage:"building",bio:"Junior at Burbank High School who taught himself Python through YouTube and built two apps before 11th grade. Looking for a mission-driven partner to compete in the Congressional App Challenge this fall.",experience:[{title:"Congressional App Challenge Participant 2024",desc:"Built a transit accessibility app for Burbank. Reached district finals."},{title:"Hackathon MLH, 2nd place",desc:"48-hour hackathon, built a real-time air quality tracker for LA schools."},{title:"School Coding Club Lead",desc:"Runs weekly sessions for 25 students, teaches Python and web basics."}],awards:["MLH Hackathon 2nd Place 2024"],portfolio:"github.com/jordankim-dev",lookingFor:"I need someone who can lead the vision and direction. I handle all the code and deployment. Would love someone local who can meet up."},
-    {name:"Sofia Reyes",school:"Beverly Hills High School",country:"United States",grade:"12th grade",avatar:"SR",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Public Speaking":"Expert","Social Media Marketing":"Advanced","Brand Strategy":"Advanced","Market Research":"Intermediate"},competitions:["Blue Ocean Competition","Diamond Challenge"],matchScore:91,why:"Sofia's Expert public speaking and marketing skills are exactly what this project needs to pitch and win. LA-based so you can meet and prep together.",projectIdea:"Social enterprise connecting food-insecure students at LA schools with local restaurants",commitment:"Serious",availability:"8 hrs/week",timezone:"PT (UTC-8)",isNearby:true,languages:["English","Spanish"],status:"has idea",stage:"planning",bio:"Senior at Beverly Hills High School who ran her school's social enterprise club and grew it from 12 to 200 members. Has a fully formed idea for a Conrad Challenge submission and needs a research and tech co-founder.",experience:[{title:"Conrad Challenge Regional Semifinalist 2024",desc:"Led pitch and marketing for a water conservation startup."},{title:"School Social Enterprise Club President",desc:"Grew membership from 12 to 200 students across two years."},{title:"TEDx Youth LA Speaker",desc:"Spoke on equity in student entrepreneurship programs."}],awards:["Conrad Challenge Regional Semifinalist 2024"],portfolio:null,lookingFor:"I need someone who can handle the research and technical side. I pitch, promote, and close. Let's compete in Conrad and Blue Ocean this year."},
-    {name:"Lea Dubois",school:"Lycee Henri IV",country:"France",grade:"Terminale",avatar:"LD",avatarColor:"coral",track:"impact",role:"mktg",skillsWithLevels:{"Writing / Research":"Expert","Public Speaking":"Advanced",French:"Expert",Spanish:"Advanced"},competitions:["Diamond Challenge","WSI Impact League"],matchScore:86,why:"Lea's Expert writing and Advanced public speaking fills a real gap. She turns research into pitches that win international judges.",projectIdea:"Multilingual climate policy platform for EU students",commitment:"Serious",availability:"8 hrs/week",timezone:"CET (UTC+1)",isNearby:false,languages:["French","English","Spanish"],status:"has idea",stage:"spark",bio:"Top student at Lycee Henri IV with two published essays and Best Delegate at the European Youth Parliament.",experience:[{title:"European Youth Parliament Best Delegate",desc:"Represented France at EYP Brussels among 200 delegates."},{title:"French National Philosophy Essay Prize",desc:"Runner-up published in academic journal."},{title:"Le Monde Research Internship",desc:"Co-authored 2 published pieces on environment desk."}],awards:["EYP Best Delegate 2023"],portfolio:"leadubois.fr",lookingFor:"Looking for a research or technical partner. I handle all pitching in three languages."}
-  ];
-  PROJECTS=[
-    {title:"AI tutoring app for rural schools",description:"Need a "+r2.n+" to lead research and content for our Conrad Challenge submission.",neededRole:S.role||"res_r",skills:["Curriculum Design","Research"],competition:"Conrad Challenge",spots:2,authorName:"Jordan Lee",authorSchool:"Stuyvesant HS",authorCountry:"United States",track:"tech",posted:"2 days ago",matchReason:"Your role and skill levels are exactly the gap this team needs.",stage:"building"},
-    {title:"Microplastics in local waterways",description:"Need a "+r2.n+" to lead data analysis and write the ISEF submission.",neededRole:S.role||"res_r",skills:["Statistics","Research Writing"],competition:"Regeneron ISEF",spots:1,authorName:"Sofia Reyes",authorSchool:"Albuquerque HS",authorCountry:"United States",track:"research",posted:"5 days ago",matchReason:"Your analytical skills match what we need for our dataset.",stage:"building"},
-    {title:"Social enterprise for rural education",description:"Co-founder team needs a "+r2.n+" to complete our Diamond Challenge pitch.",neededRole:S.role||"res_r",skills:["Research","Business Strategy"],competition:"Diamond Challenge",spots:1,authorName:"Amara Diallo",authorSchool:"Accra Academy",authorCountry:"Ghana",track:"impact",posted:"1 week ago",matchReason:"We have pitch and ops covered. We need your research credibility.",stage:"planning"}
-  ];
-  COMPS_DATA=[
-    {name:"Regeneron ISEF",track:"research",description:"World's largest pre-college science competition.",deadline:"Feb 1 2026",daysUntil:58,prize:"Up to $75,000",teamSize:"1-3",isRecommended:true,eligibility:"Global"},
-    {name:"Conrad Challenge",track:"business",description:"Innovation in aerospace, health, energy, and cyber.",deadline:"Jan 15 2026",daysUntil:41,prize:"Scholarships and grants",teamSize:"2-5",isRecommended:true,eligibility:"Global"},
-    {name:"Diamond Challenge",track:"impact",description:"Dual-track entrepreneurship competition.",deadline:"Mar 1 2026",daysUntil:86,prize:"$10,000 and mentorship",teamSize:"2-4",isRecommended:false,eligibility:"Global ages 14-18"},
-    {name:"Hackathon MLH",track:"tech",description:"Weekend coding sprints, build and ship in 24-36 hours.",deadline:"Rolling",daysUntil:30,prize:"$500-$5,000",teamSize:"2-4",isRecommended:false,eligibility:"Global"},
-    {name:"Scholastic Art and Writing",track:"arts",description:"Nation's most prestigious teen writing and art recognition.",deadline:"Dec 1 2025",daysUntil:166,prize:"Gold Key and scholarships",teamSize:"Prep partner",isRecommended:false,eligibility:"US and Canada"}
-  ];
+  // No made-up profiles anymore: keep whatever real matches exist and
+  // tell the student the new round didn't work.
+  MATCHES_ARE_DEMO=false;
+  showToast("Couldn't find new matches right now. Please try again in a moment.");
   goTo("matches");
 }
 
