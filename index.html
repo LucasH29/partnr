@@ -75,6 +75,9 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .fs-tile span{display:block;font-weight:400;color:#888;font-size:11px;margin-top:2px;}
 .cp-row{padding:10px 4px;border-bottom:1px solid #f0f0ec;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;}
 .cp-row:hover{background:#f6f5ff;}
+.app-foot{text-align:center;padding:8px 16px 28px;}
+.app-foot button{background:none;border:none;color:#999;font-size:12px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:2px;}
+.app-foot button:hover{color:#7F77DD;}
 .inv-opt{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid #e8e8e4;border-radius:10px;background:#fafaf8;font-size:14px;font-weight:600;color:#1a1a1a;text-decoration:none;cursor:pointer;font-family:inherit;}
 .inv-opt:hover{border-color:#7F77DD;background:#f6f5ff;}
 
@@ -191,6 +194,7 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 </head>
 <body>
 <div id="ROOT" class="app"></div>
+<div class="app-foot"><button id="fb-link" type="button">Report a problem or send feedback</button></div>
 <script>
 
 // ── State ──────────────────────────────────
@@ -1715,8 +1719,10 @@ var TRACK_TO_SKILLCATS={
 
 // ── Helpers ────────────────────────────────
 function R(h){document.getElementById("ROOT").innerHTML=h;}
+var CURRENT_PAGE="welcome";
 function goTo(p){
   window.scrollTo(0,0);
+  CURRENT_PAGE=p;
   if(p==="welcome")rWelcome();
   else if(p==="signin")rSignIn();
   else if(p==="signup")rSignup();
@@ -5669,6 +5675,71 @@ function bindSE(){
 }
 // After a Report/Block flow, go back to the same search.
 function returnToSkillSearch(){showTab("search");}
+
+
+// ── Report a problem / send feedback ─────────
+// Remembers the last error the app hit, so bug reports come with the
+// technical detail needed to fix them (students never have to explain it).
+var LAST_APP_ERROR="";
+(function(){
+  function note(x){try{LAST_APP_ERROR=String(x&&x.stack?x.stack:x).slice(0,900);}catch(ex){}}
+  window.addEventListener("error",function(e){note(e.error||e.message);});
+  window.addEventListener("unhandledrejection",function(e){note(e.reason);});
+  var origErr=console.error;
+  console.error=function(){try{note(Array.prototype.map.call(arguments,function(a){return a&&a.message?a.message:(typeof a==="object"?JSON.stringify(a):String(a));}).join(" "));}catch(ex){}return origErr.apply(console,arguments);};
+})();
+function describeDevice(){
+  var ua=navigator.userAgent||"";
+  var os=/iPhone|iPad/.test(ua)?"iPhone/iPad":/Android/.test(ua)?"Android":/Mac/.test(ua)?"Mac":/Windows/.test(ua)?"Windows":"Other";
+  var br=/Edg\//.test(ua)?"Edge":/CriOS|Chrome\//.test(ua)?"Chrome":/FxiOS|Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"Other browser";
+  return (os+" · "+br+" · "+window.innerWidth+"x"+window.innerHeight+" · "+ua).slice(0,300);
+}
+function openFeedback(){
+  var old=document.getElementById("fb-modal");if(old)old.remove();
+  var kind="bug";
+  var ov=document.createElement("div");ov.id="fb-modal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:230;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  ov.innerHTML="<div style=\"background:white;border-radius:16px;padding:1.25rem;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);\">"+
+    "<div style=\"font-size:17px;font-weight:700;margin-bottom:4px;\">Report a problem or send feedback</div>"+
+    "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:12px;\">Partnr is in beta. Every note helps us make it better.</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">What kind?</div>"+
+    "<div class=\"cgrow\" id=\"fb-kind\"></div>"+
+    "<div class=\"fi\"><label for=\"fb-msg\">What happened?</label><textarea id=\"fb-msg\" maxlength=\"2000\" placeholder=\"e.g. I tapped Find my partners and nothing happened\" style=\"height:100px;resize:vertical;\"></textarea></div>"+
+    "<div class=\"fi\" id=\"fb-email-wrap\" style=\"display:none;\"><label for=\"fb-email\">Your email (optional, so we can reply)</label><input id=\"fb-email\" type=\"email\" maxlength=\"200\"/></div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:8px 10px;margin-bottom:12px;\"><i class=\"ti ti-shield-check\" style=\"color:#3B6D11;\"></i> To report a person, use <b>Report</b> on their profile instead.</div>"+
+    "<button class=\"bp\" id=\"fb-send\" style=\"margin-top:0;\">Send</button>"+
+    "<button class=\"bkbtn\" id=\"fb-cancel\">Cancel</button></div>";
+  document.body.appendChild(ov);
+  mkChips("fb-kind",["Something's broken","Idea or suggestion","Other"],["Something's broken"],true);
+  getSession().then(function(sess){if(!sess){var w=document.getElementById("fb-email-wrap");if(w)w.style.display="block";}}).catch(function(){});
+  ov.addEventListener("click",function(e){if(e.target===ov)ov.remove();});
+  document.getElementById("fb-cancel").addEventListener("click",function(){ov.remove();});
+  document.getElementById("fb-send").addEventListener("click",async function(){
+    var msg=document.getElementById("fb-msg").value.trim();
+    if(msg.length<3){showErr("fb-msg","Tell us a little about what happened");return;}
+    var pick=getChips("fb-kind")[0]||"Something's broken";
+    kind=pick==="Idea or suggestion"?"idea":pick==="Other"?"other":"bug";
+    var emailEl=document.getElementById("fb-email");
+    var row={kind:kind,message:msg.slice(0,2000),page:(CURRENT_PAGE+(CURRENT_PAGE==="matches"?" / "+CURRENT_TAB:"")).slice(0,100),
+      device:describeDevice(),last_error:LAST_APP_ERROR?LAST_APP_ERROR.slice(0,1000):null,
+      contact_email:emailEl&&emailEl.value.trim()?emailEl.value.trim().slice(0,200):null};
+    var btn=this;btn.disabled=true;btn.textContent="Sending…";
+    try{
+      var res=await sba.from("app_feedback").insert(row);
+      if(res.error)throw res.error;
+      ov.querySelector("div").innerHTML="<div style=\"text-align:center;padding:1rem 0.5rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:44px;color:#1D9E75;\"></i>"+
+        "<div style=\"font-size:16px;font-weight:700;margin:8px 0 4px;\">Thanks! We got it.</div>"+
+        "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:14px;\">We read every report.</div>"+
+        "<button class=\"bp\" id=\"fb-done\" style=\"margin-top:0;\">Done</button></div>";
+      document.getElementById("fb-done").addEventListener("click",function(){ov.remove();});
+    }catch(ex){
+      console.warn("[Partnr] feedback failed:",ex);
+      btn.disabled=false;btn.textContent="Send";
+      showErr("fb-msg","Couldn't send right now. Please try again in a moment.");
+    }
+  });
+}
+(function(){var l=document.getElementById("fb-link");if(l)l.addEventListener("click",openFeedback);})();
 
 // ── Fallback demo data ───────────────────────
 function fallback(){
