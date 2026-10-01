@@ -42,6 +42,40 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .nav{display:flex;border-bottom:1px solid #e8e8e4;margin-bottom:1.5rem;overflow-x:auto;}
 .nb{padding:9px 11px;font-size:12px;cursor:pointer;color:#6b6b6b;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:inherit;}
 .nb.on{color:#534AB7;border-bottom-color:#7F77DD;font-weight:600;}
+/* Sep 30 upgrades: match cards, My board, Find students */
+.mcard{touch-action:pan-y;user-select:none;}
+.mcircle{width:42px;height:42px;flex-shrink:0;border-radius:50%;border:1px solid #ddd;background:white;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.mpass{color:#888;}.mpass:hover{background:#f6f6f3;border-color:#bbb;}
+.msave{color:#B8456E;border-color:#f1c7d6;}.msave:hover{background:#fdf0f4;}
+.mreasons{margin-top:12px;background:#f8f8f6;border-radius:10px;padding:10px 12px;}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+.bpin{background:white;border:1px solid #e8e8e4;border-radius:12px;padding:12px 30px 12px 13px;position:relative;}
+.bpin.bdragging{opacity:0.5;outline:2px dashed #7F77DD;outline-offset:2px;}
+.bgrip{position:absolute;top:30px;right:9px;color:#bbb;font-size:12px;letter-spacing:-1px;cursor:grab;touch-action:none;padding:4px 2px;user-select:none;}
+.bremove{position:absolute;top:6px;right:6px;background:none;border:none;color:#bbb;font-size:16px;cursor:pointer;line-height:1;padding:2px 4px;font-family:inherit;}
+.bremove:hover{color:#C53030;}
+.bk{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:5px;}
+.bt{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.3;}
+.bmeta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
+.bmeta span{font-size:11px;padding:3px 8px;border-radius:20px;background:#f1efe8;color:#555;}
+.bform{background:white;border:1px solid #e3e1f7;border-radius:12px;padding:12px;margin-bottom:10px;}
+.bform input,.bform textarea{width:100%;border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;margin-bottom:8px;color:#1a1a1a;}
+.bform textarea{height:70px;resize:vertical;}
+.fs-seg{display:flex;background:white;border:1px solid #ddd;border-radius:10px;padding:3px;gap:3px;}
+.fs-seg div{flex:1;text-align:center;padding:9px 6px;border-radius:7px;font-size:13px;color:#555;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fs-seg div.on{background:#7F77DD;color:white;font-weight:600;}
+.fs-sum{display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border:1px dashed #cfcce9;border-radius:8px;padding:9px 12px;font-size:13px;margin-top:14px;}
+.fs-sum b{color:#3C3489;}
+.fs-sum button{background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;}
+.fs-more{border-style:dashed !important;color:#7F77DD !important;font-weight:600;border-color:#c9c5f2 !important;}
+.fs-panel{background:white;border:1px solid #e3e1f7;border-radius:12px;padding:14px;margin-top:10px;}
+.fs-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.fs-tile{border:1px solid #e8e8e4;border-radius:10px;padding:11px 10px;cursor:pointer;font-size:13px;font-weight:600;background:#fafaf8;text-align:left;font-family:inherit;color:#1a1a1a;}
+.fs-tile:hover{border-color:#7F77DD;background:#f6f5ff;}
+.fs-tile span{display:block;font-weight:400;color:#888;font-size:11px;margin-top:2px;}
+.cp-row{padding:10px 4px;border-bottom:1px solid #f0f0ec;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;}
+.cp-row:hover{background:#f6f5ff;}
+
 .spin{width:30px;height:30px;border:2px solid #e0e0dc;border-top-color:#7F77DD;border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 1rem;}
 @keyframes sp{to{transform:rotate(360deg);}}
 .tc{padding:14px;border-radius:12px;border:1px solid #ddd;cursor:pointer;user-select:none;}
@@ -2625,12 +2659,18 @@ function openCompDetail(c,previewMode){
     "<div style=\"display:flex;gap:8px;\">"+
       (added?"<button style=\"flex:1;padding:10px;background:#3B6D11;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Added</button>":
             "<button id=\"comp-detail-add\" style=\"flex:1;padding:10px;background:"+cm.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">"+(previewMode?"Sign up to target this →":"+ Add to my targets")+"</button>")+
+      (previewMode?"":"<button id=\"comp-detail-pin\" title=\"Pin to My board\" style=\"padding:10px 14px;background:#EEEDFE;border:none;border-radius:8px;font-size:14px;cursor:pointer;color:#534AB7;font-weight:600;font-family:inherit;\">📌 Pin</button>")+
       "<button id=\"comp-detail-close\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Close</button>"+
     "</div>"+
   "</div>";
   document.body.appendChild(overlay);
   overlay.addEventListener("click",function(e){if(e.target===overlay)closeCompDetailOverlay();});
   document.getElementById("comp-detail-close").addEventListener("click",closeCompDetailOverlay);
+  var pinBtn=document.getElementById("comp-detail-pin");
+  if(pinBtn)pinBtn.addEventListener("click",async function(){
+    pinBtn.disabled=true;await pinCompetition(c.n);pinBtn.textContent="📌 Pinned";
+    if(CURRENT_TAB==="board"&&document.getElementById("tc"))renderBoard();
+  });
   var addBtn=document.getElementById("comp-detail-add");
   if(addBtn)addBtn.addEventListener("click",function(){
     addComp(c);
@@ -2679,38 +2719,6 @@ function renderCat(){
       });
     } else {d.querySelector("button").disabled=true;}
     el.appendChild(d);
-  });
-}
-
-// Restores whatever Skill Search the student actually had active before
-// stepping into a Report/Block flow, instead of dropping them on a
-// reset, blank browse-by-category screen. If a real block just
-// happened, re-running the same search naturally shows one fewer
-// result (RLS hides the blocked student), which is exactly the visible
-// confirmation that was missing - Cancel leaves the results unchanged,
-// a completed block visibly removes that one person.
-function returnToSkillSearch(){
-  showTab("search");
-  if(!LAST_SKILL_SEARCH)return;
-  var qEl=document.getElementById("ss");
-  var compEl=document.getElementById("filter-comp");
-  var cityChipEl=document.getElementById("filter-city");
-  var schoolChipEl=document.getElementById("filter-school");
-  if(qEl)qEl.value=LAST_SKILL_SEARCH.qRaw;
-  if(compEl)compEl.value=LAST_SKILL_SEARCH.compRawValue;
-  if(cityChipEl&&LAST_SKILL_SEARCH.cityOn)cityChipEl.classList.add("on");
-  if(schoolChipEl&&LAST_SKILL_SEARCH.schoolOn)schoolChipEl.classList.add("on");
-  var compRaw=LAST_SKILL_SEARCH.compRawValue||"";
-  var comp=(compRaw.indexOf("cat:")===0||compRaw.indexOf("subcat:")===0)?"":compRaw;
-  var category=compRaw.indexOf("cat:")===0?compRaw.slice(4):"";
-  var subcat=compRaw.indexOf("subcat:")===0?compRaw.slice(7):"";
-  var browseEl=document.getElementById("skill-browse");
-  var drillEl=document.getElementById("skill-drill");
-  if(browseEl)browseEl.style.display="none";
-  if(drillEl)drillEl.style.display="none";
-  srchSkill({
-    query:LAST_SKILL_SEARCH.qRaw,competition:comp,category:category,subcat:subcat,
-    city:LAST_SKILL_SEARCH.cityOn?S.city:"",school:LAST_SKILL_SEARCH.schoolOn?S.school:""
   });
 }
 
@@ -3130,10 +3138,18 @@ function openRematchModal(){
 function matchKey(m){return ((m&&m.name)||"").trim().toLowerCase()+"|"+((m&&m.school)||"").trim().toLowerCase();}
 async function loadSavedMatches(){
   try{
-    var res=await sba.from("saved_matches").select("id,match,created_at").order("created_at",{ascending:false}).order("id",{ascending:false}).limit(60);
+    var res=await sba.from("saved_matches").select("id,match,status,pass_reason,created_at").order("created_at",{ascending:false}).order("id",{ascending:false}).limit(150);
     if(res.error)throw res.error;
     var seen={};var list=[];
-    (res.data||[]).forEach(function(r){var k=matchKey(r.match);if(r.match&&!seen[k]){seen[k]=true;list.push(r.match);}});
+    (res.data||[]).forEach(function(r){
+      var k=matchKey(r.match);
+      if(r.match&&!seen[k]){
+        seen[k]=true;
+        // _rowId/_status/_reason live only in memory, never written back into the match itself
+        r.match._rowId=r.id;r.match._status=r.status||"active";r.match._reason=r.pass_reason||null;
+        list.push(r.match);
+      }
+    });
     MATCHES=list;
   }catch(ex){console.error("[Partnr] loading saved matches failed:",ex);}
 }
@@ -3143,11 +3159,14 @@ async function saveNewMatches(fresh){
   if(added.length){
     try{
       // Inserted oldest-first so the list keeps the AI's order when read back newest-first.
-      var rows=added.slice().reverse().map(function(m){return {match:m};});
-      var ins=await sba.from("saved_matches").insert(rows);
+      var ordered=added.slice().reverse();
+      var rows=ordered.map(function(m){return {match:m};});
+      var ins=await sba.from("saved_matches").insert(rows).select("id");
       if(ins.error)throw ins.error;
+      (ins.data||[]).forEach(function(r,i){if(ordered[i])ordered[i]._rowId=r.id;});
     }catch(ex){console.error("[Partnr] saving matches failed (still shown this visit):",ex);}
   }
+  added.forEach(function(m){m._status="active";});
   MATCHES=added.concat(MATCHES);
   return added.length;
 }
@@ -3174,6 +3193,10 @@ async function doFetch(){
   var secStr=Array.isArray(S.secondary)&&S.secondary.length?S.secondary.join(", "):"none";
   var neededStr=S.skillsNeeded||"open — infer from idea and role";
   var feedbackLine=REMATCH_FEEDBACK?("\nPrevious round feedback: "+REMATCH_FEEDBACK):"";
+  var passedList=MATCHES_ARE_DEMO?[]:MATCHES.filter(function(m){return m._status==="passed";});
+  var shownNames=MATCHES_ARE_DEMO?[]:MATCHES.map(function(m){return m.name;}).filter(Boolean).slice(0,40);
+  if(passedList.length)feedbackLine+="\nThe student passed on these earlier matches (avoid similar mismatches): "+passedList.slice(0,15).map(function(m){return m.name+(m._reason?" ("+m._reason+")":"");}).join("; ");
+  if(shownNames.length)feedbackLine+="\nAlready shown, never suggest these people again: "+shownNames.join(", ");
   REMATCH_FEEDBACK=""; // one-time use — consumed here so it never leaks into a later, unrelated call
   var hasPrepComp=selComps.some(function(c){return c.cross==="prep";});
   var prompt="You are Partnr AI matching engine for global high school students.\n\nStudent: "+S.name+", "+S.school+", "+S.city+", "+S.country+", "+S.grade+"\nLanguages: "+(S.languages.join(", ")||"English")+"\nPrimary Track: "+t.n+", Role: "+r.n+", Status: "+S.status+"\nSecondary Interests: "+secStr+"\nStage: "+(S.stage||"open")+"\nSkills: "+skStr()+"\nSkills needed in a partner: "+neededStr+feedbackLine+"\nProof of work: "+powStr+"\nAvailability: "+S.availability+", Commitment: "+S.commit+"\nTarget Competitions: "+compInfo+"\nIdea / Looking for: "+(S.idea||"open")+"\nLocation preference: "+(S.location||"open")+"\n\nIMPORTANT MATCHING RULES:\n- Default mode is COMPLEMENTARY: match roles and skills that fill the gap (CEO gets CTO, researcher gets engineer). \"Skills needed in a partner\" above is the strongest signal for this — prioritize matches who actually have those skills over generic role-matching alone.\n"+(hasPrepComp?"- This student has at least one PREP-PARTNER competition (individual entry, no team). For matches aimed at that competition specifically, flip the logic: prioritize someone with SIMILAR skills and a SIMILAR level, not a complementary role — they need a peer to study or sharpen work with, not a co-founder.\n":"")+"- Match skill LEVELS carefully\n- FIRST match should be local (same city, state, or US) when student is in the US — feels most real and actionable\n- SECOND match can be another US student or nearby country\n- THIRD match should be from a different continent for global diversity\n- For cross-school competitions: match globally\n- For same-school competitions: prioritize same city/region\n- For prep-partner competitions: match globally by similar skill and level, not complementary role\n- Weight target competitions heavily — students targeting same competitions are strong matches\n- Use their idea description and secondary interests to refine beyond the primary track\n\nGenerate 3 student matches. Each: name,school,city,country,grade,avatar(2 initials),avatarColor(purple/teal/coral/blue/green),track,role(vision/tech_r/mktg/ops/res_r/creative),skillsWithLevels(object),competitions(array 2-3),matchScore(85-98),why(2 specific sentences on role+skill complementarity),projectIdea,commitment,availability,timezone,isNearby(bool),languages(array),status,stage,bio(2 sentences),experience(array 3:{title,desc}),awards(array 0-2),portfolio(URL or null),lookingFor(2 sentences)\n\nGenerate 3 fictional projects that could genuinely use this student's skills. Each: title,description,neededRole,skills(2-3),competition,spots(1-2),authorName,authorSchool,authorCountry,track,posted,matchReason,stage\n\nGenerate 5 competitions for track "+t.n+". Each: name,track,description,deadline,daysUntil(integer 30-300),prize,teamSize,isRecommended(bool),eligibility\n\nReturn ONLY valid JSON: {\"matches\":[...],\"projects\":[...],\"competitions\":[...]}";
@@ -3238,11 +3261,12 @@ function rMatches(){
     "</div>"+
     "<button id=\"wlbtn\" style=\"padding:7px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;\">Notify me</button>"+
   "</div>";
-  R(logo()+wlBanner+
+  R(logo()+"<div id=\"wl-wrap\">"+wlBanner+"</div>"+
     "<div class=\"nav\">"+
       "<button class=\"nb on\" id=\"nb-matches\">Matches</button>"+
       "<button class=\"nb\" id=\"nb-recruit\">Open projects</button>"+
       "<button class=\"nb\" id=\"nb-search\">Find students</button>"+
+      "<button class=\"nb\" id=\"nb-board\">✨ My board</button>"+
       "<button class=\"nb\" id=\"nb-deadlines\">Deadlines</button>"+
       "<button class=\"nb\" id=\"nb-conns\"><i class=\"ti ti-inbox\" style=\"font-size:13px;vertical-align:-2px;margin-right:3px;\"></i>Inbox<span id=\"conn-badge\"></span></button>"+
       "<button class=\"nb\" id=\"nb-me\">My profile</button>"+
@@ -3251,13 +3275,14 @@ function rMatches(){
   );
   document.getElementById("wlbtn").addEventListener("click",openWaitlist);
   var locBar=document.createElement("div");
+  locBar.id="loc-bar";
   locBar.style.cssText="display:flex;align-items:center;gap:8px;background:#f8f8f6;border-radius:10px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#555;";
   locBar.innerHTML="<span style=\"flex:1;\">"+esc(S.locationPref||"Anyone in the world")+"</span><button id=\"loc-change\" style=\"background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;\">Change</button>";
   var rootEl=document.getElementById("ROOT");
   var navEl=rootEl?rootEl.querySelector(".nav"):null;
   if(navEl)rootEl.insertBefore(locBar,navEl);
   document.getElementById("loc-change").addEventListener("click",function(){goTo("track");});
-  ["matches","recruit","search","deadlines","conns","me"].forEach(function(t){
+  ["matches","recruit","search","board","deadlines","conns","me"].forEach(function(t){
     var b=document.getElementById("nb-"+t);
     if(b)b.addEventListener("click",function(){document.querySelectorAll(".nb").forEach(function(x){x.classList.remove("on");});this.classList.add("on");showTab(t);});
   });
@@ -3351,10 +3376,15 @@ function submitWaitlist(){
 var CURRENT_TAB="matches";
 function showTab(tab){
   CURRENT_TAB=tab;
+  // The demo-matches banner and the "who you're matched with" bar only
+  // describe the Matches tab, so they're hidden everywhere else.
+  var wlWrap=document.getElementById("wl-wrap");if(wlWrap)wlWrap.style.display=tab==="matches"?"":"none";
+  var locBarEl=document.getElementById("loc-bar");if(locBarEl)locBarEl.style.display=tab==="matches"?"flex":"none";
   var el=document.getElementById("tc");if(!el)return;
   if(tab==="matches"){el.innerHTML=mCards();bindME();}
   else if(tab==="recruit"){rRecruit();}
   else if(tab==="search"){el.innerHTML=sTab();bindSE();}
+  else if(tab==="board"){renderBoard();}
   else if(tab==="deadlines"){el.innerHTML=dCards();}
   else if(tab==="conns"){renderConnections();}
   else if(tab==="me"){el.innerHTML=meTab();bindMeTab();}
@@ -3383,12 +3413,15 @@ function mCards(){
     "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Your AI matches</div>"+
     "<button id=\"refine-rematch-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">Not the right fit? Refine & try again →</button>"+
   "</div>";
+  var activeCount=0;
   MATCHES.forEach(function(m,i){
+    if(m._status&&m._status!=="active")return; // passed ones sit in the Passed list, saved ones on My board
+    activeCount++;
     var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
     var sw=m.skillsWithLevels||{};
     var stags=Object.keys(sw).slice(0,4).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" · "+lv+"</span>";}).join("");
     var conn=CONNS.some(function(c){return c.name===m.name;});
-    h+="<div class=\"card\">"+
+    h+="<div class=\"card mcard\" data-idx=\""+i+"\">"+
       "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
         "<div class=\"av\" style=\"width:44px;height:44px;font-size:15px;background:"+cm.bg+";color:"+cm.c+";\">"+m.avatar+"</div>"+
         "<div style=\"flex:1;min-width:0;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;\">"+esc(displayName(m.name))+"</div>"+
@@ -3402,14 +3435,38 @@ function mCards(){
       "</div>"+
       "<div class=\"why\"><strong>Why you match:</strong> "+esc(m.why)+"</div>"+
       "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+m.availability+" · "+m.commitment+"</div>"+
-      "<div style=\"display:flex;gap:8px;\">"+
+      "<div style=\"display:flex;gap:8px;align-items:center;\">"+
+        "<button class=\"mcircle mpass\" data-idx=\""+i+"\" title=\"Pass\" aria-label=\"Pass\">✕</button>"+
+        "<button class=\"mcircle msave\" data-idx=\""+i+"\" title=\"Save to my board\" aria-label=\"Save to my board\">♥</button>"+
         (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
               "<button class=\"bc cob\" style=\"flex:1;background:"+t.c+";\" data-idx=\""+i+"\">Connect →</button>")+
         "<button class=\"bo pfb\" data-idx=\""+i+"\">Full profile</button>"+
-        "<button class=\"bg2 psb\">Pass</button>"+
+      "</div>"+
+      "<div class=\"mreasons\" id=\"mreasons-"+i+"\" style=\"display:none;\">"+
+        "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">Optional: why not this one?</div>"+
+        "<div class=\"cgrow\" style=\"margin-bottom:0;\">"+PASS_REASONS.map(function(rs){return "<span class=\"chip mreason\" data-idx=\""+i+"\" data-r=\""+esc(rs)+"\" role=\"button\" tabindex=\"0\">"+esc(rs)+"</span>";}).join("")+
+        "<span class=\"chip mreason\" data-idx=\""+i+"\" data-r=\"\" role=\"button\" tabindex=\"0\" style=\"color:#7F77DD;font-weight:600;\">Skip</span></div>"+
       "</div>"+
     "</div>";
   });
+  if(!activeCount){
+    h+="<div style=\"text-align:center;padding:1.5rem 1rem;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:6px;\">You've gone through all your matches</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Saved ones are on My board. Find more whenever you're ready.</div>"+
+      "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find more partners →</button></div>";
+  } else {
+    h+="<div style=\"font-size:12px;color:#999;text-align:center;margin:-4px 0 12px;\">Tip: swipe a card left to pass or right to save.</div>";
+  }
+  var passed=MATCHES.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m._status==="passed";});
+  if(passed.length){
+    h+="<button id=\"toggle-passed\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;padding:4px 0;\">"+(SHOW_PASSED?"Hide":"Show")+" passed ("+passed.length+")</button>";
+    if(SHOW_PASSED){
+      h+="<div style=\"margin-top:8px;\">"+passed.map(function(x){
+        return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border:1px solid #e8e8e4;border-radius:10px;padding:10px 12px;margin-bottom:6px;\">"+
+          "<div style=\"font-size:13px;\"><b>"+esc(displayName(x.m.name))+"</b><span style=\"color:#999;\">"+(x.m._reason?" · "+esc(x.m._reason):"")+"</span></div>"+
+          "<button class=\"bring-back\" data-idx=\""+x.i+"\" style=\"background:#EEEDFE;color:#534AB7;border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;\">Bring back</button></div>";
+      }).join("")+"</div>";
+    }
+  }
   return h;
 }
 function bindME(){
@@ -3425,7 +3482,18 @@ function bindME(){
   });
   document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){openModal(parseInt(this.dataset.idx));});});
   document.querySelectorAll(".pfb").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(this.dataset.idx));});});
-  document.querySelectorAll(".psb").forEach(function(b){b.addEventListener("click",function(){this.closest(".card").style.opacity="0.3";});});
+  document.querySelectorAll(".mpass").forEach(function(b){b.addEventListener("click",function(){
+    var box=document.getElementById("mreasons-"+b.dataset.idx);
+    if(box.style.display==="none")box.style.display="block";else passMatch(parseInt(b.dataset.idx),null);
+  });});
+  document.querySelectorAll(".mreason").forEach(function(c){c.addEventListener("click",function(){passMatch(parseInt(c.dataset.idx),c.dataset.r||null);});addKbdActivation(c);});
+  document.querySelectorAll(".msave").forEach(function(b){b.addEventListener("click",function(){saveMatch(parseInt(b.dataset.idx));});});
+  document.querySelectorAll(".mcard").forEach(enableSwipe);
+  var tp=document.getElementById("toggle-passed");
+  if(tp)tp.addEventListener("click",function(){SHOW_PASSED=!SHOW_PASSED;refreshMatchesTab();});
+  document.querySelectorAll(".bring-back").forEach(function(b){b.addEventListener("click",function(){
+    var m=MATCHES[parseInt(b.dataset.idx)];if(!m)return;setMatchStatus(m,"active",null);refreshMatchesTab();showToast(nameInSentence(m.name)+" is back in your matches");
+  });});
 }
 
 function openProfile(i){
@@ -3599,6 +3667,7 @@ async function rRecruit(){
             (p.competition_name?"<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+esc(p.competition_name)+"</span>":"")+
             getStageChip(p.stage)+
           "</div>"+
+          "<button class=\"proj-pin\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" data-desc=\""+esc(p.description)+"\" style=\"background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px;\">📌 Pin to my board</button>"+
           "<button class=\"bc real-apply-btn\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>"+
         "</div>";
       });
@@ -3612,6 +3681,9 @@ async function rRecruit(){
     });
     document.querySelectorAll(".real-apply-btn").forEach(function(b){
       b.addEventListener("click",function(){openProjectApplyModal(this.dataset.id,this.dataset.title);});
+    });
+    document.querySelectorAll(".proj-pin").forEach(function(b){
+      b.addEventListener("click",function(){pinProject(b.dataset.id,b.dataset.title,b.dataset.desc);});
     });
   }catch(ex){
     console.error("[Partnr] loading projects failed:",ex);
@@ -3795,233 +3867,6 @@ async function rManagePosting(projectId){
   }
 }
 
-
-function sTab(){
-  var compOptions=["<option value=\"\">All competitions</option>"];
-  var catKeysForFilter=["science","math","business","impact","tech","writing","arts","law"];
-  compOptions.push("<optgroup label=\"By category (broader)\">"+
-    catKeysForFilter.map(function(k){
-      var cm=CM2[k]||{n:k};
-      return "<option value=\"cat:"+k+"\">All "+esc(cm.n)+" competitions</option>";
-    }).join("")+
-    "<option value=\"subcat:coding\">All Coding competitions</option>"+
-    "<option value=\"subcat:robotics\">All Robotics competitions</option>"+
-  "</optgroup>");
-  compOptions.push("<optgroup label=\"By exact competition\">"+
-    COMPS.map(function(c){return "<option value=\""+esc(c.n)+"\">"+esc(c.n)+"</option>";}).join("")+
-  "</optgroup>");
-  compOptions=compOptions.join("");
-  return "<div class=\"slabel\" style=\"margin-top:0;\">Find students by skill</div>"+
-    "<div class=\"sub\">Find students by skill, competition, or location.</div>"+
-    "<div class=\"swrap\" style=\"margin-bottom:0.75rem;display:flex;gap:8px;\">"+
-      "<div style=\"position:relative;flex:1;\"><label for=\"ss\" style=\"display:block;font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:4px;\">Search by skill or name</label><input id=\"ss\" autocomplete=\"off\" placeholder=\"Python, Figma, debate...\" style=\"width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
-        "<div id=\"skill-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
-      "</div>"+
-      "<button id=\"ssb\" style=\"padding:10px 14px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Search →</button>"+
-    "</div>"+
-    "<div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;\">"+
-      "<div style=\"width:100%;font-size:12px;color:#6b6b6b;margin-bottom:6px;\">Browse by skill, or find others aiming for the same competition:</div>"+
-      "<button id=\"browse-toggle\" style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px;height:38px;box-sizing:border-box;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;cursor:pointer;flex:1;min-width:150px;\"><span>Browse by skill</span><i class=\"ti ti-chevron-down\" id=\"browse-chev\" style=\"font-size:15px;color:#6b6b6b;\"></i></button>"+
-      "<select id=\"filter-comp\" style=\"padding:0 10px;height:38px;box-sizing:border-box;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;flex:1;min-width:150px;\">"+compOptions+"</select>"+
-      "<div style=\"width:100%;height:0;\"></div>"+
-      "<div class=\"chip\" id=\"filter-global\" role=\"button\" tabindex=\"0\">🌍 Anyone</div>"+
-      "<div class=\"chip\" id=\"filter-city\" role=\"button\" tabindex=\"0\">📍 In "+esc(S.city||"my city")+"</div>"+
-      "<div class=\"chip\" id=\"filter-school\" role=\"button\" tabindex=\"0\">🏫 At "+esc(S.school||"my school")+"</div>"+
-      "<div class=\"chip\" id=\"filter-saved\" role=\"button\" tabindex=\"0\">★ Saved ("+(S.savedIds||[]).length+")</div>"+
-    "</div>"+
-    "<div id=\"skill-browse\" style=\"margin-bottom:1rem;display:none;\"></div>"+
-    "<div id=\"skill-drill\" style=\"margin-bottom:1rem;display:none;\"></div>"+
-    "<div id=\"sr\" style=\"margin-top:0.5rem;\"></div>";
-}
-function bindSE(){
-  var browseToggleBtn=document.getElementById("browse-toggle");
-  if(browseToggleBtn){
-    browseToggleBtn.addEventListener("click",function(){
-      var body=document.getElementById("skill-browse");
-      var chev=document.getElementById("browse-chev");
-      var opening=body.style.display==="none";
-      body.style.display=opening?"block":"none";
-      chev.style.transform=opening?"rotate(180deg)":"";
-    });
-  }
-  // Build category browser
-  var browsEl=document.getElementById("skill-browse");
-  if(!browsEl)return;
-  var catHTML=SKILL_CATS.map(function(cat){
-    var cc=SKILL_CAT_COLORS[cat.id]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
-    return "<button class=\"skill-browse-cat\" data-cat=\""+cat.id+"\" style=\"display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border:1px solid #e8e8e4;border-radius:10px;cursor:pointer;background:white;text-align:left;font-family:inherit;margin-bottom:8px;\">"+
-      "<div style=\"width:34px;height:34px;border-radius:8px;background:"+cc.bg+";display:flex;align-items:center;justify-content:center;flex-shrink:0;\">"+
-        "<i class=\"ti "+cat.icon+"\" style=\"font-size:17px;color:"+cc.color+";\"></i>"+
-      "</div>"+
-      "<div style=\"flex:1;text-align:left;\">"+
-        "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+cat.label+"</div>"+
-        "<div style=\"font-size:11px;color:#6b6b6b;margin-top:1px;\">"+cat.items.length+" skills</div>"+
-      "</div>"+
-      "<i class=\"ti ti-chevron-right\" style=\"font-size:15px;color:#ccc;\"></i>"+
-    "</button>";
-  }).join("");
-  browsEl.innerHTML=catHTML;
-
-  document.querySelectorAll(".skill-browse-cat").forEach(function(btn){
-    btn.addEventListener("click",function(){
-      var catId=this.dataset.cat;
-      var cat=SKILL_CATS.find(function(c){return c.id===catId;});
-      if(!cat)return;
-      var cc=SKILL_CAT_COLORS[catId]||{color:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
-      var drillEl=document.getElementById("skill-drill");
-      drillEl.style.display="block";
-      drillEl.innerHTML=
-        "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:10px;\">"+
-          "<button id=\"drill-back\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:13px;font-weight:600;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;\"><i class=\"ti ti-arrow-left\" style=\"font-size:13px;\"></i> All categories</button>"+
-        "</div>"+
-        "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:12px;\">"+
-          "<div style=\"width:32px;height:32px;border-radius:8px;background:"+cc.bg+";display:flex;align-items:center;justify-content:center;\">"+
-            "<i class=\"ti "+cat.icon+"\" style=\"font-size:16px;color:"+cc.color+";\"></i>"+
-          "</div>"+
-          "<div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+cat.label+"</div>"+
-        "</div>"+
-        "<div style=\"display:flex;flex-wrap:wrap;gap:7px;\">"+
-          cat.items.map(function(skill){
-            return "<button class=\"skill-drill-item\" data-skill=\""+esc(skill)+"\" style=\"padding:7px 14px;border:1px solid "+cc.color+";border-radius:20px;font-size:13px;cursor:pointer;color:"+cc.color+";background:"+cc.bg+";font-family:inherit;font-weight:500;\">"+skill+"</button>";
-          }).join("")+
-        "</div>";
-      document.getElementById("skill-browse").style.display="none";
-      document.getElementById("drill-back").addEventListener("click",function(){
-        drillEl.style.display="none";
-        document.getElementById("skill-browse").style.display="block";
-        document.getElementById("sr").innerHTML="";
-      });
-      document.querySelectorAll(".skill-drill-item").forEach(function(b){
-        b.addEventListener("click",function(){
-          var skill=this.dataset.skill;
-          document.getElementById("ss").value=skill;
-          runSkillSearch();
-          // Highlight selected
-          document.querySelectorAll(".skill-drill-item").forEach(function(x){x.style.fontWeight="500";x.style.borderWidth="1px";});
-          this.style.fontWeight="700";this.style.borderWidth="2px";
-        });
-      });
-    });
-  });
-
-  // Filter chips: toggle on/off, same visual pattern as chips elsewhere.
-  var cityChip=document.getElementById("filter-city");
-  var schoolChip=document.getElementById("filter-school");
-  var globalChip=document.getElementById("filter-global");
-  // Location is a single choice, not independent toggles - Anyone,
-  // In my city, or At my school. Anyone is the sensible default when
-  // nothing else is picked, shown as on until something else is chosen.
-  if(globalChip&&!(cityChip&&cityChip.classList.contains("on"))&&!(schoolChip&&schoolChip.classList.contains("on"))){
-    globalChip.classList.add("on");
-  }
-  [globalChip,cityChip,schoolChip].forEach(function(chip){
-    if(!chip)return;
-    chip.addEventListener("click",function(){
-      [globalChip,cityChip,schoolChip].forEach(function(c){if(c)c.classList.remove("on");});
-      chip.classList.add("on");
-      runSkillSearch();
-    });
-    addKbdActivation(chip);
-  });
-  var savedChip=document.getElementById("filter-saved");
-  if(savedChip){
-    savedChip.addEventListener("click",async function(){
-      var el=document.getElementById("sr");if(!el)return;
-      document.getElementById("skill-browse").style.display="none";
-      el.innerHTML="<div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div><div style=\"font-size:13px;color:#6b6b6b;\">Loading your saved profiles...</div></div>";
-      try{
-        var saved=await fetchSavedStudents();
-        renderSR(saved,"your saved profiles",false);
-      }catch(ex){
-        console.error("[Partnr] loading saved profiles failed:",ex);
-        el.innerHTML="<div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">Couldn't load saved profiles. Please try again.</div>";
-      }
-    });
-    addKbdActivation(savedChip);
-  }
-
-  // Gathers the current query + all active filters and runs a search.
-  // Filters alone (no typed text) are enough to trigger a real search —
-  // that's the whole point of being able to just browse by competition,
-  // city, or school without needing to guess a keyword.
-  function runSkillSearch(){
-    var q=document.getElementById("ss").value.trim();
-    var compRaw=document.getElementById("filter-comp").value;
-    var comp=(compRaw.indexOf("cat:")===0||compRaw.indexOf("subcat:")===0)?"":compRaw;
-    var category=compRaw.indexOf("cat:")===0?compRaw.slice(4):"";
-    var subcat=compRaw.indexOf("subcat:")===0?compRaw.slice(7):"";
-    var city=cityChip&&cityChip.classList.contains("on")?S.city:"";
-    var school=schoolChip&&schoolChip.classList.contains("on")?S.school:"";
-    var anyoneOn=!!(globalChip&&globalChip.classList.contains("on"));
-    if(!q&&!comp&&!category&&!subcat&&!city&&!school&&anyoneOn){
-      document.getElementById("skill-drill").style.display="none";
-      LAST_SKILL_SEARCH={qRaw:"",compRawValue:compRaw,cityOn:false,schoolOn:false};
-      srchSkill({all:true});
-      return;
-    }
-    if(!q&&!comp&&!category&&!subcat&&!city&&!school){
-      // Browse-by-category is now a manual toggle the student
-      // controls directly - clearing filters doesn't force it open or
-      // closed either, it stays exactly as they left it.
-      document.getElementById("skill-drill").style.display="none";
-      document.getElementById("sr").innerHTML="";
-      LAST_SKILL_SEARCH=null;
-      return;
-    }
-    // Browse-by-category is a tool for picking a skill to search by - it
-    // has nothing to do with the competition, city, or school filters, and
-    // it's now a manual toggle the student controls, so a search running
-    // never forces it open or closed on its own.
-    document.getElementById("skill-drill").style.display="none";
-    LAST_SKILL_SEARCH={qRaw:q,compRawValue:compRaw,cityOn:!!(cityChip&&cityChip.classList.contains("on")),schoolOn:!!(schoolChip&&schoolChip.classList.contains("on"))};
-    srchSkill({query:q,competition:comp,category:category,subcat:subcat,city:city,school:school});
-  }
-
-  document.getElementById("ssb").addEventListener("click",runSkillSearch);
-  document.getElementById("ss").addEventListener("keydown",function(e){
-    if(e.key==="Enter")runSkillSearch();
-  });
-  // Also react live as text is typed/cleared — not just on Enter or the
-  // Search button — so deleting the text alone restores the browse view.
-  document.getElementById("ss").addEventListener("input",function(){
-    if(!this.value.trim())runSkillSearch();
-  });
-  document.getElementById("filter-comp").addEventListener("change",runSkillSearch);
-
-  // Skill-name autocomplete — same pattern as the school/city
-  // autocomplete elsewhere: suggests as you type, never forces a
-  // selection, free text still works if what you want isn't listed.
-  var allSkillNames=[];
-  SKILL_CATS.forEach(function(cat){cat.items.forEach(function(item){allSkillNames.push(item);});});
-  var ssInput=document.getElementById("ss");
-  var skillSuggestBox=document.getElementById("skill-suggest");
-  if(ssInput&&skillSuggestBox){
-    ssInput.addEventListener("input",function(){
-      var q=ssInput.value.trim().toLowerCase();
-      if(q.length<2){skillSuggestBox.style.display="none";return;}
-      var matches=allSkillNames.filter(function(name){return name.toLowerCase().indexOf(q)===0;}).slice(0,8);
-      if(!matches.length){skillSuggestBox.style.display="none";return;}
-      skillSuggestBox.innerHTML=matches.map(function(name){
-        return "<div class=\"skill-suggest-item\" role=\"option\" tabindex=\"0\" data-name=\""+esc(name)+"\" style=\"padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;\">"+esc(name)+"</div>";
-      }).join("");
-      skillSuggestBox.style.display="block";
-      skillSuggestBox.querySelectorAll(".skill-suggest-item").forEach(function(item){
-        item.addEventListener("mouseenter",function(){item.style.background="#f8f8f6";});
-        item.addEventListener("mouseleave",function(){item.style.background="";});
-        addKbdActivation(item);
-        item.addEventListener("click",function(){
-          ssInput.value=item.dataset.name;
-          skillSuggestBox.style.display="none";
-        });
-      });
-    });
-    document.addEventListener("click",function(e){
-      if(e.target!==ssInput&&!skillSuggestBox.contains(e.target)){
-        skillSuggestBox.style.display="none";
-      }
-    });
-  }
-}
 
 function dCards(){
   if(!DEADLINE_DATA_LOADED){
@@ -5074,6 +4919,548 @@ function showToast(msg){
   setTimeout(function(){t.remove();},2500);
 }
 
+// ════════════════════════════════════════════════════════════════
+// Sep 30 upgrades: Pass / Save on match cards, My board, Find
+// Students rebuild. Everything for these three lives in this block.
+// ════════════════════════════════════════════════════════════════
+
+// ── Undo toast ───────────────────────────────
+// Like showToast, but with an Undo link and a longer timer.
+// Name without the trailing period displayName adds ("Jordan K." -> "Jordan K"), for use mid-sentence.
+function nameInSentence(n){return displayName(n).replace(/\.$/,"");}
+function showUndoToast(msg,onUndo){
+  var old=document.getElementById("undo-toast");if(old)old.remove();
+  var t=document.createElement("div");t.id="undo-toast";
+  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;padding:10px 16px;border-radius:12px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;gap:14px;align-items:center;max-width:92vw;";
+  var span=document.createElement("span");span.textContent=msg;t.appendChild(span);
+  var u=document.createElement("button");u.textContent="Undo";
+  u.style.cssText="background:none;border:none;color:#AFA9EC;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;padding:0;";
+  u.addEventListener("click",function(){t.remove();if(onUndo)onUndo();});
+  t.appendChild(u);document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode)t.remove();},6000);
+}
+
+// ── Pass / Save ──────────────────────────────
+var PASS_REASONS=["Wrong skills","Too far","Different goals","Just not a fit"];
+var SHOW_PASSED=false;
+
+async function setMatchStatus(m,status,reason){
+  m._status=status;m._reason=reason||null;
+  if(!m._rowId||MATCHES_ARE_DEMO)return; // example profiles only live in this visit
+  try{
+    var res=await sba.from("saved_matches").update({status:status,pass_reason:reason||null}).eq("id",m._rowId);
+    if(res.error)throw res.error;
+  }catch(ex){console.error("[Partnr] saving match status failed:",ex);}
+}
+function refreshMatchesTab(){
+  if(CURRENT_TAB==="matches"){var el=document.getElementById("tc");if(el){el.innerHTML=mCards();bindME();}}
+  else if(CURRENT_TAB==="board"){renderBoard();}
+}
+function animateCardAway(card,dir,done){
+  if(!card){done();return;}
+  card.style.transition="transform .3s ease,opacity .3s ease";
+  card.style.transform="translateX("+(dir==="left"?"-":"")+"120%) rotate("+(dir==="left"?"-":"")+"8deg)";
+  card.style.opacity="0";
+  setTimeout(done,300);
+}
+function passMatch(i,reason){
+  var m=MATCHES[i];if(!m)return;
+  var prev=m._status||"active";
+  var card=document.querySelector(".mcard[data-idx=\""+i+"\"]");
+  animateCardAway(card,"left",function(){
+    setMatchStatus(m,"passed",reason);refreshMatchesTab();
+    showUndoToast("Passed on "+nameInSentence(m.name)+". Your next round will learn from this.",function(){setMatchStatus(m,prev,null);refreshMatchesTab();});
+  });
+}
+function saveMatch(i){
+  var m=MATCHES[i];if(!m)return;
+  var prev=m._status||"active";
+  var card=document.querySelector(".mcard[data-idx=\""+i+"\"]");
+  animateCardAway(card,"right",function(){
+    setMatchStatus(m,"saved",null);refreshMatchesTab();
+    showUndoToast("Saved "+nameInSentence(m.name)+" to your board.",function(){setMatchStatus(m,prev,null);refreshMatchesTab();});
+  });
+}
+// Swipe left to pass, right to save. Vertical scrolling still works
+// (touch-action:pan-y on the card); buttons inside the card are ignored.
+function enableSwipe(card){
+  var startX=0,dx=0,active=false,pid=null;
+  card.addEventListener("pointerdown",function(e){
+    if(e.target.closest("button,a,input,textarea"))return;
+    active=true;startX=e.clientX;dx=0;pid=e.pointerId;card.style.transition="none";
+  });
+  card.addEventListener("pointermove",function(e){
+    if(!active||e.pointerId!==pid)return;
+    dx=e.clientX-startX;
+    if(Math.abs(dx)>8){try{card.setPointerCapture(pid);}catch(ex){}}
+    card.style.transform="translateX("+dx+"px) rotate("+(dx/30)+"deg)";
+    card.style.boxShadow=dx<-60?"0 0 0 2px #ccc":dx>60?"0 0 0 2px #f1c7d6":"";
+  });
+  function end(){
+    if(!active)return;active=false;card.style.boxShadow="";
+    var i=parseInt(card.dataset.idx);
+    if(dx<-110)passMatch(i,null);
+    else if(dx>110)saveMatch(i);
+    else{card.style.transition="transform .2s ease";card.style.transform="";}
+  }
+  card.addEventListener("pointerup",end);card.addEventListener("pointercancel",end);
+}
+
+// ── My board ─────────────────────────────────
+var BOARD_PINS=null; // null = not loaded yet this visit
+
+async function loadBoardPins(force){
+  if(BOARD_PINS&&!force)return BOARD_PINS;
+  try{
+    var res=await sba.from("board_pins").select("id,kind,title,data,position,created_at").order("position",{ascending:true}).order("id",{ascending:true});
+    if(res.error)throw res.error;
+    BOARD_PINS=res.data||[];
+  }catch(ex){console.error("[Partnr] loading board failed:",ex);BOARD_PINS=BOARD_PINS||[];}
+  return BOARD_PINS;
+}
+async function addBoardPin(kind,title,data){
+  await loadBoardPins();
+  var maxPos=BOARD_PINS.filter(function(p){return p.kind===kind||(kind!=="goal"&&kind!=="competition"&&(p.kind==="idea"||p.kind==="link"));})
+    .reduce(function(a,p){return Math.max(a,p.position||0);},0);
+  var row={kind:kind,title:String(title).slice(0,200),data:data||{},position:maxPos+1};
+  try{
+    var res=await sba.from("board_pins").insert(row).select("id,kind,title,data,position,created_at");
+    if(res.error)throw res.error;
+    BOARD_PINS.push(res.data[0]);
+    return res.data[0];
+  }catch(ex){console.error("[Partnr] pinning failed:",ex);showToast("Couldn't pin that. Please try again.");return null;}
+}
+async function removeBoardPin(id){
+  var pin=BOARD_PINS.find(function(p){return p.id===id;});
+  BOARD_PINS=BOARD_PINS.filter(function(p){return p.id!==id;});
+  renderBoard();
+  try{var res=await sba.from("board_pins").delete().eq("id",id);if(res.error)throw res.error;}
+  catch(ex){console.error("[Partnr] removing pin failed:",ex);if(pin)BOARD_PINS.push(pin);renderBoard();showToast("Couldn't remove that. Please try again.");return;}
+  if(pin)showUndoToast("Removed from your board.",async function(){var again=await addBoardPin(pin.kind,pin.title,pin.data);if(again)renderBoard();});
+}
+async function updatePinData(pin){
+  try{var res=await sba.from("board_pins").update({data:pin.data}).eq("id",pin.id);if(res.error)throw res.error;}
+  catch(ex){console.error("[Partnr] updating pin failed:",ex);}
+}
+async function pinCompetition(name){
+  await loadBoardPins();
+  if(BOARD_PINS.some(function(p){return p.kind==="competition"&&p.data&&p.data.name===name;})){showToast("Already on your board");return;}
+  var pin=await addBoardPin("competition",name,{name:name});
+  if(pin)showToast("📌 Pinned "+name+" to your board");
+}
+async function pinProject(id,title,description){
+  await loadBoardPins();
+  if(BOARD_PINS.some(function(p){return p.kind==="idea"&&p.data&&p.data.projectId===id;})){showToast("Already on your board");return;}
+  var pin=await addBoardPin("idea",title,{projectId:id,note:description||""});
+  if(pin)showToast("📌 Pinned to your board");
+}
+function competitionDeadlineLine(name){
+  var d=(typeof DEADLINE_DATA!=="undefined")?DEADLINE_DATA[name]:null;
+  if(d&&d.status==="confirmed"&&d.deadline_date){
+    var days=daysUntilISODate(d.deadline_date);
+    if(days>=0)return "<div style=\"font-size:12px;font-weight:600;color:#B8456E;\">Deadline in "+days+" day"+(days===1?"":"s")+"</div>";
+  }
+  return "<div style=\"font-size:12px;color:#999;\">Deadline not confirmed yet</div>";
+}
+// Partner order is a per-device convenience only, kept in this browser.
+function partnerOrderKey(){return "partnr_partner_order_"+(S.email||"me");}
+function getPartnerOrder(){try{return JSON.parse(localStorage.getItem(partnerOrderKey())||"[]");}catch(ex){return [];}}
+function setPartnerOrder(keys){try{localStorage.setItem(partnerOrderKey(),JSON.stringify(keys));}catch(ex){}}
+
+function boardSection(id,label,count,addLabel,addId,inner,emptyMsg){
+  return "<div style=\"margin-bottom:1.5rem;\">"+
+    "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\">"+
+      "<div class=\"slabel\" style=\"margin:0;\">"+label+" <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+count+"</span></div>"+
+      (addLabel?"<button id=\""+addId+"\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:0;\">"+addLabel+"</button>":"")+
+    "</div>"+
+    "<div id=\""+id+"-form\"></div>"+
+    (count?"<div class=\"bgrid\" data-sec=\""+id+"\">"+inner+"</div>":"<div style=\"font-size:13px;color:#999;padding:12px 14px;border:1px dashed #ddd;border-radius:12px;\">"+emptyMsg+"</div>")+
+  "</div>";
+}
+function pinShell(key,inner,extraStyle){
+  return "<div class=\"bpin\" data-key=\""+esc(key)+"\" style=\""+(extraStyle||"")+"\">"+
+    "<span class=\"bgrip\" title=\"Drag to reorder\">⋮⋮</span>"+
+    "<button class=\"bremove\" data-key=\""+esc(key)+"\" title=\"Remove\">×</button>"+inner+"</div>";
+}
+
+// First visit to My board: start it with what the student already told
+// us at signup, so it never opens empty. Their target competitions become
+// competition pins, and what they wrote on page 1 becomes their first goal
+// with three starter steps. Runs once per account (a flag is kept in the
+// goal's data) and only when the board is completely empty.
+async function seedBoardIfNew(){
+  if(!BOARD_PINS||BOARD_PINS.length)return;
+  var flagKey="partnr_board_seeded_"+(S.email||"me");
+  try{if(localStorage.getItem(flagKey))return;localStorage.setItem(flagKey,"1");}catch(ex){}
+  var idea=(S.idea||"").trim();
+  if(idea){
+    var title=idea.length>120?idea.slice(0,120).replace(/\s+\S*$/,"")+"…":idea;
+    await addBoardPin("goal",title,{fromProfile:true,steps:[
+      {t:"Find a partner on Partnr",done:false},
+      {t:"Pick a competition to aim for",done:false},
+      {t:"Make a plan together",done:false}
+    ]});
+  }
+  var names=(S.comps||[]).slice(0,10);
+  for(var i=0;i<names.length;i++){await addBoardPin("competition",names[i],{name:names[i],fromProfile:true});}
+}
+async function renderBoard(){
+  var el=document.getElementById("tc");if(!el)return;
+  if(!BOARD_PINS)el.innerHTML="<div style=\"text-align:center;padding:2rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div>";
+  await loadBoardPins();
+  await seedBoardIfNew();
+  var realSaved=[];
+  try{realSaved=await fetchSavedStudents();}catch(ex){console.error("[Partnr] loading saved students failed:",ex);}
+  if(CURRENT_TAB!=="board")return;
+
+  var goals=BOARD_PINS.filter(function(p){return p.kind==="goal";});
+  var comps=BOARD_PINS.filter(function(p){return p.kind==="competition";});
+  var ideas=BOARD_PINS.filter(function(p){return p.kind==="idea"||p.kind==="link";});
+
+  var goalHtml=goals.map(function(p){
+    var steps=(p.data&&p.data.steps)||[];
+    var done=steps.filter(function(s){return s.done;}).length;
+    var pct=steps.length?Math.round(done/steps.length*100):0;
+    return pinShell("pin:"+p.id,
+      "<div class=\"bk\" style=\"color:#534AB7;\">Goal</div><div class=\"bt\">"+esc(p.title)+"</div>"+
+      (steps.length?"<div style=\"height:6px;background:#fff;border-radius:3px;margin:8px 0 4px;overflow:hidden;\"><div style=\"height:100%;width:"+pct+"%;background:#7F77DD;\"></div></div>"+
+        "<div style=\"font-size:12px;color:#555;margin-bottom:6px;\">"+done+" of "+steps.length+" steps done</div>"+
+        steps.map(function(s,si){return "<label style=\"display:flex;gap:6px;align-items:flex-start;font-size:12px;color:#444;margin-top:4px;cursor:pointer;\"><input type=\"checkbox\" class=\"gstep\" data-id=\""+p.id+"\" data-i=\""+si+"\""+(s.done?" checked":"")+" style=\"margin-top:2px;\"> <span style=\""+(s.done?"text-decoration:line-through;color:#999;":"")+"\">"+esc(s.t)+"</span></label>";}).join(""):""),
+      "background:#EEEDFE;border-color:#d9d6fb;");
+  }).join("");
+
+  var compHtml=comps.map(function(p){
+    var name=(p.data&&p.data.name)||p.title;
+    var c=COMPS.find(function(x){return x.n===name;});
+    var cm=c?(CM2[c.cat]||{c:"#7F77DD",n:""}):{c:"#7F77DD",n:"Competition"};
+    var xs=c?getCrossStyle(c.cross):null;
+    return pinShell("pin:"+p.id,
+      "<div class=\"bk\" style=\"color:"+cm.c+";\">"+esc(cm.n||"Competition")+"</div>"+
+      "<div class=\"bt bcomp\" data-name=\""+esc(name)+"\" style=\"cursor:pointer;\">"+esc(name)+"</div>"+
+      (c?"<div class=\"bmeta\"><span>"+esc(xs.lbl)+"</span><span>"+esc(c.team)+"</span><span>"+esc(c.eli)+"</span></div>":"")+
+      competitionDeadlineLine(name));
+  }).join("");
+
+  // Saved partners: AI matches saved with ♥, plus real students starred in Find students.
+  var partnerItems=[];
+  MATCHES.forEach(function(m,i){if(m._status==="saved")partnerItems.push({key:"ai:"+matchKey(m),type:"ai",idx:i,m:m});});
+  realSaved.forEach(function(s){partnerItems.push({key:"real:"+s._realId,type:"real",s:s});});
+  var order=getPartnerOrder();
+  partnerItems.sort(function(a,b){var ia=order.indexOf(a.key),ib=order.indexOf(b.key);return (ia<0?9999:ia)-(ib<0?9999:ib);});
+  var partnerHtml=partnerItems.map(function(it){
+    var name,place,skills,av,col;
+    if(it.type==="ai"){
+      var m=it.m;name=displayName(m.name);place=locationLine(m.school,m.city,m.country,sharesSchoolRequiredComp(m.competitions));
+      skills=Object.keys(m.skillsWithLevels||{}).slice(0,2);av=m.avatar;col=CM[m.avatarColor]||CM.purple;
+    } else {
+      var s=it.s;name=displayName(s.name);place=locationLine(s.school,s.city,s.country,false);
+      skills=[s.keySkill].concat(s.otherSkills||[]).filter(function(x){return x&&x!=="Partner";}).slice(0,2);av=s.avatar;col=CM[s.avatarColor]||CM.purple;
+    }
+    return pinShell(it.key,
+      "<div class=\"bt\" style=\"display:flex;align-items:center;gap:8px;\"><span class=\"av\" style=\"width:30px;height:30px;font-size:12px;background:"+col.bg+";color:"+col.c+";\">"+esc(av)+"</span>"+esc(name)+"</div>"+
+      (skills.length?"<div class=\"bmeta\">"+skills.map(function(x){return "<span>"+esc(x)+"</span>";}).join("")+"</div>":"")+
+      "<div style=\"font-size:12px;color:#6b6b6b;\">"+place+" · "+(it.type==="ai"?"Saved from Matches":"Saved from Find students")+"</div>"+
+      (it.type==="ai"?"<button class=\"bopen\" data-idx=\""+it.idx+"\" style=\"margin-top:8px;background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:0;\">View profile →</button>":""));
+  }).join("");
+
+  var ideaHtml=ideas.map(function(p){
+    var d=p.data||{};
+    var isLink=p.kind==="link";
+    var host=isLink&&d.url?String(d.url).replace(/^https?:\/\//,"").split("/")[0]:"";
+    return pinShell("pin:"+p.id,
+      "<div class=\"bk\" style=\"color:"+(isLink?"#6D3F94":"#4A7F1E")+";\">"+(isLink?"Link":(d.projectId?"Open project":"Project idea"))+"</div>"+
+      "<div class=\"bt\">"+esc(p.title)+"</div>"+
+      (d.note?"<div style=\"font-size:12px;color:#555;line-height:1.45;\">"+esc(String(d.note).slice(0,160))+"</div>":"")+
+      (isLink&&d.url?"<a href=\""+safeUrl(d.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12px;color:#7F77DD;font-weight:600;text-decoration:none;\">"+esc(host)+" ↗</a>":""));
+  }).join("");
+
+  el.innerHTML=
+    "<div class=\"sub\" style=\"margin-bottom:1rem;\">Your goals, competitions, partners and ideas in one place. Drag the ⋮⋮ handle to reorder.</div>"+
+    boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,"Add a goal and break it into steps you can check off.")+
+    boardSection("comps","Competitions",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here.")+
+    boardSection("partners","Saved partners",partnerItems.length,"+ Find students","add-partner",partnerHtml,"Tap ♥ on a match or ★ in Find students to save partners here.")+
+    boardSection("ideas","Ideas & links",ideas.length,"+ Add an idea or link","add-idea",ideaHtml,"Pin an open project, or add an idea, article, video or doc.");
+
+  bindBoard(partnerItems);
+}
+
+function bindBoard(partnerItems){
+  document.getElementById("add-goal").addEventListener("click",function(){
+    var f=document.getElementById("goals-form");
+    if(f.innerHTML){f.innerHTML="";return;}
+    f.innerHTML="<div class=\"bform\"><input id=\"g-title\" placeholder=\"Your goal, e.g. Publish a research paper by spring\" maxlength=\"200\"/>"+
+      "<textarea id=\"g-steps\" placeholder=\"Steps, one per line (optional)\"></textarea><div id=\"g-err\"></div>"+
+      "<button class=\"bp\" id=\"g-save\" style=\"margin-top:0;\">Add goal</button></div>";
+    document.getElementById("g-save").addEventListener("click",async function(){
+      var t=document.getElementById("g-title").value.trim();
+      if(!t){document.getElementById("g-err").innerHTML="<div class=\"sec-err\">Write your goal first.</div>";return;}
+      var steps=document.getElementById("g-steps").value.split("\n").map(function(x){return x.trim();}).filter(Boolean).slice(0,12).map(function(x){return {t:x.slice(0,140),done:false};});
+      this.disabled=true;
+      if(await addBoardPin("goal",t,{steps:steps}))renderBoard();else this.disabled=false;
+    });
+  });
+  document.getElementById("add-comp").addEventListener("click",function(){openCompPicker(function(name){pinCompetition(name).then(renderBoard);});});
+  document.getElementById("add-partner").addEventListener("click",function(){var b=document.getElementById("nb-search");if(b)b.click();});
+  document.getElementById("add-idea").addEventListener("click",function(){
+    var f=document.getElementById("ideas-form");
+    if(f.innerHTML){f.innerHTML="";return;}
+    f.innerHTML="<div class=\"bform\"><input id=\"i-title\" placeholder=\"Title, e.g. Free sunscreen stations at sports fields\" maxlength=\"200\"/>"+
+      "<input id=\"i-url\" placeholder=\"Link (optional): article, video, website, Google Doc\"/>"+
+      "<textarea id=\"i-note\" placeholder=\"Notes (optional)\"></textarea><div id=\"i-err\"></div>"+
+      "<button class=\"bp\" id=\"i-save\" style=\"margin-top:0;\">Pin it</button></div>";
+    document.getElementById("i-save").addEventListener("click",async function(){
+      var t=document.getElementById("i-title").value.trim(),u=document.getElementById("i-url").value.trim(),n=document.getElementById("i-note").value.trim();
+      var errEl=document.getElementById("i-err");
+      if(!t&&!u){errEl.innerHTML="<div class=\"sec-err\">Add a title or a link.</div>";return;}
+      if(u&&!/^https?:\/\//i.test(u))u="https://"+u;
+      if(u&&safeUrl(u)==="#"){errEl.innerHTML="<div class=\"sec-err\">That link doesn't look right. Check it and try again.</div>";return;}
+      if(!t)t=u.replace(/^https?:\/\//,"").split("/")[0];
+      this.disabled=true;
+      if(await addBoardPin(u?"link":"idea",t,u?{url:u,note:n}:{note:n}))renderBoard();else this.disabled=false;
+    });
+  });
+  document.querySelectorAll(".gstep").forEach(function(cb){
+    cb.addEventListener("change",function(){
+      var pin=BOARD_PINS.find(function(p){return p.id===parseInt(cb.dataset.id);});if(!pin)return;
+      pin.data.steps[parseInt(cb.dataset.i)].done=cb.checked;updatePinData(pin);renderBoard();
+    });
+  });
+  document.querySelectorAll(".bcomp").forEach(function(t){
+    t.addEventListener("click",function(){var c=COMPS.find(function(x){return x.n===t.dataset.name;});if(c)openCompDetail(c,false,true);});
+  });
+  document.querySelectorAll(".bopen").forEach(function(b){b.addEventListener("click",function(){openProfile(parseInt(b.dataset.idx));});});
+  document.querySelectorAll(".bremove").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var key=b.dataset.key;
+      if(key.indexOf("pin:")===0){removeBoardPin(parseInt(key.slice(4)));return;}
+      var it=partnerItems.find(function(x){return x.key===key;});if(!it)return;
+      if(it.type==="ai"){
+        var m=it.m;setMatchStatus(m,"passed",null);renderBoard();
+        showUndoToast("Removed "+nameInSentence(m.name)+" from your board.",function(){setMatchStatus(m,"saved",null);renderBoard();});
+      } else {
+        var id=it.s._realId;await toggleSaveProfile(id);renderBoard();
+        showUndoToast("Removed "+nameInSentence(it.s.name)+" from your board.",async function(){await toggleSaveProfile(id);renderBoard();});
+      }
+    });
+  });
+  document.querySelectorAll(".bgrid").forEach(enableBoardDrag);
+}
+
+// Drag to reorder inside one section. Works with mouse and touch:
+// press the ⋮⋮ handle and drag. Order is saved when you let go.
+function enableBoardDrag(grid){
+  grid.querySelectorAll(".bgrip").forEach(function(grip){
+    grip.addEventListener("pointerdown",function(e){
+      e.preventDefault();
+      var card=grip.closest(".bpin");card.classList.add("bdragging");
+      try{grip.setPointerCapture(e.pointerId);}catch(ex){}
+      function move(ev){
+        var under=document.elementFromPoint(ev.clientX,ev.clientY);
+        var target=under?under.closest(".bpin"):null;
+        if(!target||target===card||target.parentNode!==grid)return;
+        var r=target.getBoundingClientRect();
+        var after=(ev.clientY>r.top+r.height/2)||(ev.clientX>r.left+r.width/2&&ev.clientY>r.top);
+        grid.insertBefore(card,after?target.nextSibling:target);
+      }
+      function up(){
+        document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);document.removeEventListener("pointercancel",up);
+        card.classList.remove("bdragging");saveBoardOrder(grid);
+      }
+      // Listen on the whole page so the drag keeps tracking even when the
+      // pointer moves off the small handle.
+      document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);document.addEventListener("pointercancel",up);
+    });
+  });
+}
+async function saveBoardOrder(grid){
+  var keys=Array.prototype.map.call(grid.querySelectorAll(".bpin"),function(c){return c.dataset.key;});
+  if(grid.dataset.sec==="partners"){setPartnerOrder(keys);return;}
+  var updates=[];
+  keys.forEach(function(k,i){
+    var id=parseInt(k.slice(4));var pin=BOARD_PINS.find(function(p){return p.id===id;});
+    if(pin&&pin.position!==i+1){pin.position=i+1;updates.push(sba.from("board_pins").update({position:i+1}).eq("id",id));}
+  });
+  BOARD_PINS.sort(function(a,b){return a.position-b.position;});
+  try{var results=await Promise.all(updates);results.forEach(function(r){if(r.error)throw r.error;});}
+  catch(ex){console.error("[Partnr] saving board order failed:",ex);}
+}
+
+// Searchable competition list in an overlay, used by "+ Pin a
+// competition" on the board and "+ More competitions" in Find students.
+function openCompPicker(onPick,opts){
+  opts=opts||{};
+  var old=document.getElementById("comp-picker");if(old)old.remove();
+  var ov=document.createElement("div");ov.id="comp-picker";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:210;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  var catKeys=["science","math","business","impact","tech","writing","arts","law"].filter(function(k){return COMPS.some(function(c){return c.cat===k;});});
+  var cat="all";
+  ov.innerHTML="<div style=\"background:white;border-radius:16px;padding:1.25rem;max-width:460px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.2);\">"+
+    "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;\"><div style=\"font-size:16px;font-weight:700;\">All competitions ("+COMPS.length+")</div>"+
+    "<button id=\"cp-close\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;\">Close</button></div>"+
+    "<input id=\"cp-q\" placeholder=\"Search competitions\" style=\"width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:10px;\"/>"+
+    "<div id=\"cp-cats\" class=\"cgrow\" style=\"margin-bottom:8px;\"></div>"+
+    "<div id=\"cp-list\" style=\"overflow-y:auto;flex:1;border-top:1px solid #f0f0ec;\"></div></div>";
+  document.body.appendChild(ov);
+  function close(){ov.remove();}
+  ov.addEventListener("click",function(e){if(e.target===ov)close();});
+  document.getElementById("cp-close").addEventListener("click",close);
+  function draw(){
+    var q=document.getElementById("cp-q").value.trim().toLowerCase();
+    document.getElementById("cp-cats").innerHTML=["all"].concat(catKeys).map(function(k){
+      return "<span class=\"chip"+(cat===k?" on":"")+"\" data-c=\""+k+"\">"+(k==="all"?"All":esc((CM2[k]||{n:k}).n))+"</span>";
+    }).join("");
+    document.querySelectorAll("#cp-cats .chip").forEach(function(ch){ch.addEventListener("click",function(){cat=ch.dataset.c;draw();});});
+    var list=COMPS.filter(function(c){return (cat==="all"||c.cat===cat)&&(!q||c.n.toLowerCase().indexOf(q)>=0);});
+    var h="";
+    if(opts.allowCategory&&cat!=="all"&&!q){
+      h+="<div class=\"cp-row\" data-v=\"cat:"+cat+"\" style=\"font-weight:600;color:#534AB7;\">All "+esc((CM2[cat]||{n:cat}).n)+" competitions</div>";
+    }
+    h+=list.map(function(c){var cm=CM2[c.cat]||{c:"#7F77DD",n:""};
+      return "<div class=\"cp-row\" data-v=\""+esc(c.n)+"\">"+esc(c.n)+"<small style=\"color:"+cm.c+";font-weight:600;font-size:11px;white-space:nowrap;\">"+esc(cm.n)+"</small></div>";}).join("");
+    var listEl=document.getElementById("cp-list");
+    listEl.innerHTML=h||"<div style=\"padding:12px 4px;color:#999;font-size:13px;\">No matches</div>";
+    listEl.querySelectorAll(".cp-row").forEach(function(r){r.addEventListener("click",function(){close();onPick(r.dataset.v);});});
+  }
+  document.getElementById("cp-q").addEventListener("input",draw);
+  draw();
+  document.getElementById("cp-q").focus();
+}
+
+// ── Find students (rebuilt) ──────────────────
+// Two clear rows: "Looking for" (a skill and/or a competition) and
+// "Where" (anyone / my city / my school), plus a one-line summary.
+var FS={skill:"",comp:"",where:"anyone",extra:[]};
+function fsCompLabel(v){
+  if(!v)return "";
+  if(v.indexOf("cat:")===0)return "All "+((CM2[v.slice(4)]||{n:v.slice(4)}).n)+" competitions";
+  if(v.indexOf("subcat:")===0)return "All "+(v.slice(7)==="coding"?"Coding":"Robotics")+" competitions";
+  return v;
+}
+function fsQuickChips(){
+  var chips=[];
+  var trackKeys=[];if(S.track)trackKeys.push(S.track);
+  (S.secondary||[]).forEach(function(n){var k=Object.keys(TR).find(function(kk){return TR[kk].n===n;});if(k&&trackKeys.indexOf(k)<0)trackKeys.push(k);});
+  var catIds=[];trackKeys.forEach(function(tk){(TRACK_TO_SKILLCATS[tk]||[]).forEach(function(c){if(catIds.indexOf(c)<0)catIds.push(c);});});
+  catIds.forEach(function(cid){var c=SKILL_CATS.find(function(x){return x.id===cid;});if(c&&c.items[0]&&chips.length<3)chips.push({t:"skill",v:c.items[0]});});
+  if(!chips.length)SKILL_CATS.filter(function(c){return c.id!=="math";}).slice(0,3).forEach(function(c){chips.push({t:"skill",v:c.items[0]});});
+  (S.comps||[]).slice(0,2).forEach(function(n){chips.push({t:"comp",v:n});});
+  FS.extra.forEach(function(e){if(!chips.some(function(c){return c.v===e.v;}))chips.push(e);});
+  return chips;
+}
+function sTab(){
+  var whereOpts=[["anyone","🌍 Anyone"],["city","📍 "+(S.city||"My city")],["school","🏫 "+(S.school||"My school")]];
+  return "<div style=\"position:relative;margin-bottom:4px;\">"+
+      "<label for=\"ss\" class=\"sr-only\" style=\"position:absolute;left:-9999px;\">Search</label>"+
+      "<i class=\"ti ti-search\" style=\"position:absolute;left:13px;top:13px;font-size:16px;color:#999;\"></i>"+
+      "<input id=\"ss\" placeholder=\"Search a skill, competition, or name\" autocomplete=\"off\" style=\"width:100%;padding:12px 14px 12px 38px;border:1px solid #ddd;border-radius:10px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<div id=\"skill-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.08);z-index:20;overflow:hidden;\"></div>"+
+    "</div>"+
+    "<div class=\"slabel\">Looking for</div>"+
+    "<div class=\"cgrow\" id=\"fs-quick\" style=\"margin-bottom:0;\"></div>"+
+    "<div id=\"fs-skill-panel\" class=\"fs-panel\" style=\"display:none;\"></div>"+
+    "<div class=\"slabel\">Where</div>"+
+    "<div id=\"fs-where\" class=\"fs-seg\">"+whereOpts.map(function(o){return "<div data-v=\""+o[0]+"\" role=\"button\" tabindex=\"0\" class=\""+(FS.where===o[0]?"on":"")+"\">"+esc(o[1])+"</div>";}).join("")+"</div>"+
+    "<div class=\"fs-sum\"><span>Showing <b id=\"fs-what\"></b> · <b id=\"fs-wh\"></b></span><button id=\"fs-clear\">Clear</button></div>"+
+    "<div id=\"sr\" style=\"margin-top:0.75rem;\"></div>";
+}
+function fsRenderQuick(){
+  var el=document.getElementById("fs-quick");if(!el)return;
+  el.innerHTML=fsQuickChips().map(function(q){
+    var on=(q.t==="skill"&&FS.skill===q.v)||(q.t==="comp"&&FS.comp===q.v);
+    return "<span class=\"chip"+(on?" on":"")+"\" data-t=\""+q.t+"\" data-v=\""+esc(q.v)+"\" role=\"button\" tabindex=\"0\">"+(q.t==="comp"?"🏆 ":"")+esc(q.t==="comp"?fsCompLabel(q.v):q.v)+"</span>";
+  }).join("")+
+  "<span class=\"chip fs-more\" id=\"fs-more-s\" role=\"button\" tabindex=\"0\">+ More skills</span>"+
+  "<span class=\"chip fs-more\" id=\"fs-more-c\" role=\"button\" tabindex=\"0\">+ More competitions</span>";
+  el.querySelectorAll(".chip[data-t]").forEach(function(c){
+    c.addEventListener("click",function(){
+      if(c.dataset.t==="skill")FS.skill=(FS.skill===c.dataset.v?"":c.dataset.v);else FS.comp=(FS.comp===c.dataset.v?"":c.dataset.v);
+      fsRun();
+    });
+    addKbdActivation(c);
+  });
+  var ms=document.getElementById("fs-more-s");ms.addEventListener("click",function(){fsSkillPanel(null,true);});addKbdActivation(ms);
+  var mc=document.getElementById("fs-more-c");mc.addEventListener("click",function(){openCompPicker(function(v){fsPick("comp",v);},{allowCategory:true});});addKbdActivation(mc);
+}
+function fsPick(t,v){
+  if(t==="skill")FS.skill=v;else FS.comp=v;
+  if(!FS.extra.some(function(e){return e.v===v;}))FS.extra.push({t:t,v:v});
+  var p=document.getElementById("fs-skill-panel");if(p)p.style.display="none";
+  fsRun();
+}
+function fsSkillPanel(catId,toggle){
+  var p=document.getElementById("fs-skill-panel");if(!p)return;
+  if(toggle&&p.style.display!=="none"&&!catId){p.style.display="none";return;}
+  p.style.display="block";
+  var head="<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;\"><b style=\"font-size:14px;\">"+(catId?esc(SKILL_CATS.find(function(c){return c.id===catId;}).label):"All skills")+"</b>"+
+    "<button id=\"fs-sp-close\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;\">Close</button></div>";
+  if(!catId){
+    p.innerHTML=head+"<div class=\"fs-tiles\">"+SKILL_CATS.map(function(c){
+      return "<button class=\"fs-tile\" data-c=\""+c.id+"\">"+esc(c.label)+"<span>"+c.items.length+" skills</span></button>";}).join("")+"</div>";
+    p.querySelectorAll(".fs-tile").forEach(function(b){b.addEventListener("click",function(){fsSkillPanel(b.dataset.c);});});
+  } else {
+    var cat=SKILL_CATS.find(function(c){return c.id===catId;});
+    p.innerHTML=head+"<button id=\"fs-sp-back\" style=\"background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:0;margin-bottom:10px;\">← All categories</button>"+
+      "<div class=\"cgrow\">"+cat.items.map(function(i){return "<span class=\"chip"+(FS.skill===i?" on":"")+"\" data-v=\""+esc(i)+"\">"+esc(i)+"</span>";}).join("")+"</div>";
+    document.getElementById("fs-sp-back").addEventListener("click",function(){fsSkillPanel(null);});
+    p.querySelectorAll(".chip").forEach(function(ch){ch.addEventListener("click",function(){fsPick("skill",ch.dataset.v);});});
+  }
+  document.getElementById("fs-sp-close").addEventListener("click",function(){p.style.display="none";});
+}
+function fsRun(){
+  fsRenderQuick();
+  var what=[FS.skill,fsCompLabel(FS.comp)].filter(Boolean);
+  var whatEl=document.getElementById("fs-what");if(whatEl)whatEl.textContent=what.length?what.join(" + "):"everyone";
+  var whEl=document.getElementById("fs-wh");
+  if(whEl)whEl.textContent=FS.where==="city"?("In "+(S.city||"my city")):FS.where==="school"?("At "+(S.school||"my school")):"Anyone";
+  document.querySelectorAll("#fs-where div").forEach(function(d){d.classList.toggle("on",d.dataset.v===FS.where);});
+  var comp=FS.comp,category="",subcat="";
+  if(comp.indexOf("cat:")===0){category=comp.slice(4);comp="";}
+  else if(comp.indexOf("subcat:")===0){subcat=comp.slice(7);comp="";}
+  var city=FS.where==="city"?S.city:"",school=FS.where==="school"?S.school:"";
+  LAST_SKILL_SEARCH={fs:true};
+  if(!FS.skill&&!comp&&!category&&!subcat&&!city&&!school){srchSkill({all:true});return;}
+  srchSkill({query:FS.skill,competition:comp,category:category,subcat:subcat,city:city,school:school});
+}
+function bindSE(){
+  document.querySelectorAll("#fs-where div").forEach(function(d){
+    d.addEventListener("click",function(){FS.where=d.dataset.v;fsRun();});
+    addKbdActivation(d);
+  });
+  document.getElementById("fs-clear").addEventListener("click",function(){FS.skill="";FS.comp="";FS.where="anyone";var ss=document.getElementById("ss");if(ss)ss.value="";fsRun();});
+  // Search box: suggests skills and competitions as you type. Enter
+  // searches the typed text directly (skill or name).
+  var ss=document.getElementById("ss"),box=document.getElementById("skill-suggest");
+  var allSkillNames=[];SKILL_CATS.forEach(function(cat){cat.items.forEach(function(item){allSkillNames.push(item);});});
+  ss.addEventListener("input",function(){
+    var v=ss.value.trim().toLowerCase();
+    if(v.length<2){box.style.display="none";return;}
+    var hits=allSkillNames.filter(function(n){return n.toLowerCase().indexOf(v)>=0;}).slice(0,4).map(function(n){return {t:"skill",v:n,l:"Skill"};})
+      .concat(COMPS.filter(function(c){return c.n.toLowerCase().indexOf(v)>=0;}).slice(0,4).map(function(c){return {t:"comp",v:c.n,l:"Competition"};}));
+    hits.push({t:"text",v:ss.value.trim(),l:"Search names & skills"});
+    box.innerHTML=hits.map(function(h){
+      return "<div class=\"skill-suggest-item\" role=\"option\" tabindex=\"0\" data-t=\""+h.t+"\" data-v=\""+esc(h.v)+"\" style=\"padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;gap:10px;\">"+
+        (h.t==="comp"?"🏆 ":h.t==="text"?"🔍 ":"")+esc(h.t==="text"?"\""+h.v+"\"":h.v)+"<small style=\"color:#999;font-size:11px;white-space:nowrap;\">"+h.l+"</small></div>";
+    }).join("");
+    box.style.display="block";
+    box.querySelectorAll(".skill-suggest-item").forEach(function(item){
+      item.addEventListener("mouseenter",function(){item.style.background="#f6f5ff";});
+      item.addEventListener("mouseleave",function(){item.style.background="";});
+      addKbdActivation(item);
+      item.addEventListener("click",function(){
+        box.style.display="none";ss.value="";
+        fsPick(item.dataset.t==="comp"?"comp":"skill",item.dataset.v);
+      });
+    });
+  });
+  ss.addEventListener("keydown",function(e){
+    if(e.key==="Enter"&&ss.value.trim()){box.style.display="none";var v=ss.value.trim();ss.value="";fsPick("skill",v);}
+  });
+  document.addEventListener("click",function(e){if(box&&e.target!==ss&&!box.contains(e.target))box.style.display="none";});
+  fsRun();
+}
+// After a Report/Block flow, go back to the same search.
+function returnToSkillSearch(){showTab("search");}
+
 // ── Fallback demo data ───────────────────────
 function fallback(){
   if(MATCHES.length&&!MATCHES_ARE_DEMO){
@@ -5104,7 +5491,7 @@ function fallback(){
 
 function resetAll(){
   S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],skillsNeeded:""};
-  MATCHES=[];MATCHES_ARE_DEMO=false;PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
+  MATCHES=[];MATCHES_ARE_DEMO=false;BOARD_PINS=null;FS={skill:"",comp:"",where:"anyone",extra:[]};SHOW_PASSED=false;PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   try{localStorage.removeItem("partnr_pending_signup");}catch(ex){}
   signOutUser().catch(function(){});
   goTo("welcome");
