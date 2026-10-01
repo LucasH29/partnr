@@ -2358,10 +2358,10 @@ function rSignup(){
       addKbdActivation(item);
       item.addEventListener("click",function(){
         schoolInput.value=item.dataset.name;
-        // Only fill the city when the list knows it (many public schools
-        // are listed by district, so the student types their own city).
+        // Fill the city only when the list knows it AND the student hasn't
+        // already typed one (never overwrite a city they entered).
         var cityInput=document.getElementById("icity");
-        if(cityInput&&item.dataset.city)cityInput.value=item.dataset.city;
+        if(cityInput&&item.dataset.city&&!cityInput.value.trim())cityInput.value=item.dataset.city;
         var countrySelect=document.getElementById("icountry");
         if(countrySelect){
           countrySelect.value="United States";
