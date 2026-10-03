@@ -45,6 +45,9 @@ h2{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;}
 .tb-right{display:flex;align-items:center;gap:12px;position:relative;}
 .tb-icon{position:relative;width:44px;height:44px;border-radius:50%;background:none;border:none;cursor:pointer;color:#555;font-size:22px;display:flex;align-items:center;justify-content:center;padding:0;}
 .tb-icon:hover,.tb-icon.on{background:#EEEDFE;color:#534AB7;}
+/* Inbox envelope: a touch bigger so it's easy to spot and tap. */
+.nb.tb-icon{width:46px;height:46px;padding:0;flex:none;font-size:26px;color:#444;}
+.nb.tb-icon i{font-size:26px;}
 .tb-icon #conn-badge{position:absolute;top:0;right:-4px;}
 .tb-icon #conn-badge span{margin:0!important;}
 .tb-av{width:38px;height:38px;border-radius:50%;background:#EEEDFE;color:#534AB7;font-weight:700;font-size:14px;border:2px solid transparent;cursor:pointer;font-family:inherit;padding:0;}
@@ -89,6 +92,21 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .mcircle{width:42px;height:42px;flex-shrink:0;border-radius:50%;border:1px solid #ddd;background:white;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .mpass{color:#888;}.mpass:hover{background:#f6f6f3;border-color:#bbb;}
 .msave{color:#B8456E;border-color:#f1c7d6;}.msave:hover{background:#fdf0f4;}
+.todo-card{background:white;border:1px solid #e8e8e4;border-radius:14px;padding:6px 14px;}
+.todo-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #f0efeb;}
+.todo-row:first-child{border-top:none;}
+.todo-row.next{background:#faf9ff;margin:0 -14px;padding:10px 14px;}
+.todo-auto{width:20px;height:20px;border-radius:50%;border:2px solid #d6d4cc;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;margin-top:1px;}
+.todo-row.done .todo-auto{background:#1D9E75;border-color:#1D9E75;}
+.todo-box{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#1D9E75;cursor:pointer;}
+.todo-t{font-size:14px;color:#1a1a1a;line-height:1.4;}
+.todo-row.done .todo-t{color:#999;text-decoration:line-through;}
+.todo-hint{font-size:11px;color:#aaa;font-weight:400;margin-left:4px;}
+.todo-acts{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;}
+.todo-act{background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:0;}
+.msave.on{background:#B8456E;color:white;border-color:#B8456E;}
+.msaved-note{font-size:12px;color:#B8456E;font-weight:600;margin:-2px 0 10px;}
+.msaved-note a{color:#B8456E;}
 .mreasons{margin-top:12px;background:#f8f8f6;border-radius:10px;padding:10px 12px;}
 .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
 .bpin{background:white;border:1px solid #e8e8e4;border-radius:12px;padding:12px 40px 12px 13px;position:relative;}
@@ -356,6 +374,13 @@ async function lookupStateFromZip(country,zip){
     if(!res.ok)return "";
     var data=await res.json();
     var pl=data&&data.places&&data.places[0];
+    // Also keep an approximate spot (rounded to about 1 km) so "my city /
+    // region" can include nearby towns. Never shown to other students.
+    if(pl&&pl.latitude&&pl.longitude){
+      S.lat=Math.round(parseFloat(pl.latitude)*100)/100;
+      S.lng=Math.round(parseFloat(pl.longitude)*100)/100;
+      S.geoZip=String(zip).trim();
+    }
     return (pl&&(pl["state abbreviation"]||pl.state))||"";
   }catch(ex){console.warn("[Partnr] state lookup failed (non-fatal):",ex);return "";}
 }
@@ -582,10 +607,14 @@ async function saveProfile(){
     // badge itself when the profile is saved.
   }
 
-  if(!S.state&&S.zip&&S.country)S.state=await lookupStateFromZip(S.country,S.zip);
+  if(S.zip&&S.country&&(!S.state||S.geoZip!==String(S.zip).trim())){
+    var st=await lookupStateFromZip(S.country,S.zip);
+    if(st)S.state=st;
+  }
+  if(!S.zip){S.lat=null;S.lng=null;}
   var upsertRes=await sba.from("students").upsert({
     id:uid,name:S.name,email:S.email,school:savedSchoolName,country:S.country,city:S.city,
-    zip:S.zip,state:S.state||null,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
+    zip:S.zip,state:S.state||null,lat:(S.lat==null?null:S.lat),lng:(S.lng==null?null:S.lng),grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,links:S.links||[],proof_of_work:S.proofOfWork||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null,fun_fact:(S.funFact||"").trim().slice(0,150)||null,
@@ -632,9 +661,9 @@ async function loadProfileIntoState(uid){
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
   S.secondary=p.secondary||[];S.status=(p.status||"").replace(/^I have a project.*$/,"I have a project and need partners");S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=(p.location_pref||"").replace("🏣","🏫");
-  S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
+  S.links=p.links||[];S.proofOfWork=(p.proof_of_work||[]).map(function(it){if(it&&it.link){var l=normalizeHandleLink(it.link);if(l!==it.link)it.link=l;}return it;});S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
-  S.dob=p.dob||"";S.state=p.state||"";
+  S.dob=p.dob||"";S.state=p.state||"";S.lat=p.lat==null?null:Number(p.lat);S.lng=p.lng==null?null:Number(p.lng);S.geoZip=(p.lat!=null&&p.zip)?String(p.zip).trim():"";
   S.skillsNeeded=p.skills_needed||"";S.funFact=p.fun_fact||"";S.termsVersion=p.terms_version||"";S.emailPrefs=p.email_prefs||{};
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
@@ -1164,7 +1193,14 @@ function readEmailLinkParams(){
     var q=new URLSearchParams(window.location.search);
     var tok=q.get("unsubscribe");
     if(q.get("settings")==="email")OPEN_EMAIL_SETTINGS=true;
-    if(tok||OPEN_EMAIL_SETTINGS){
+    // Email buttons say where to land: ?open=inbox, ?open=chat&c=<connection>,
+    // ?open=applications&p=<project>, ?open=projects, ?open=matches.
+    // Kept in this browser so it still works if they have to sign in first.
+    var openView=q.get("open");
+    if(openView){
+      try{localStorage.setItem(OPEN_KEY,JSON.stringify({v:openView,c:q.get("c")||"",p:q.get("p")||"",t:Date.now()}));}catch(ex){}
+    }
+    if(tok||OPEN_EMAIL_SETTINGS||openView){
       // Tidy the address bar so a refresh or shared link doesn't repeat it.
       history.replaceState(null,"",window.location.pathname+window.location.hash);
     }
@@ -1189,6 +1225,43 @@ function readPendingSignup(){
 }
 function clearPendingSignup(){try{localStorage.removeItem(PENDING_KEY);}catch(ex){}}
 
+// Opens the page an email button pointed to, once the student is signed in.
+var OPEN_KEY="partnr_open_after_login";
+function waitFor(test,ms){
+  return new Promise(function(resolve){
+    var start=Date.now();
+    (function poll(){
+      var el=test();
+      if(el)return resolve(el);
+      if(Date.now()-start>ms)return resolve(null);
+      setTimeout(poll,150);
+    })();
+  });
+}
+async function applyPendingOpen(){
+  var d=null;
+  try{d=JSON.parse(localStorage.getItem(OPEN_KEY)||"null");localStorage.removeItem(OPEN_KEY);}catch(ex){}
+  if(!d||!d.v||Date.now()-(d.t||0)>24*60*60*1000)return;
+  if(d.v==="inbox"){selectTab("conns");return;}
+  if(d.v==="chat"){
+    selectTab("conns");
+    if(!d.c)return;
+    var btn=await waitFor(function(){return document.querySelector(".conn-chat[data-conn=\""+CSS.escape(d.c)+"\"]");},8000);
+    if(btn&&CURRENT_TAB==="conns")btn.click();
+    return;
+  }
+  if(d.v==="projects"){selectTab("recruit");return;}
+  if(d.v==="applications"){
+    selectTab("recruit");
+    if(!d.p)return;
+    var ready=await waitFor(function(){return document.querySelector(".my-posting-manage[data-id=\""+CSS.escape(d.p)+"\"]");},8000);
+    if(ready&&CURRENT_TAB==="recruit")ready.click();
+    return;
+  }
+  if(d.v==="board"){selectTab("board");return;}
+  if(d.v==="matches")selectTab("matches");
+}
+
 // ── App boot ─────────────────────────────────
 async function boot(){
   var unsub=readEmailLinkParams();
@@ -1199,9 +1272,16 @@ async function boot(){
       await loadBlockedIds();
       var profile=await loadProfileIntoState(session.user.id);
       if(profile&&profile.onboarded){
+        // Older profiles: add the approximate location from their zip once.
+        if(S.zip&&S.country&&S.lat==null){
+          lookupStateFromZip(S.country,S.zip).then(function(){
+            if(S.lat!=null)sba.from("students").update({lat:S.lat,lng:S.lng}).eq("id",session.user.id).then(function(){},function(){});
+          });
+        }
         await loadSavedMatches();
         goTo("matches");
         if(OPEN_EMAIL_SETTINGS){OPEN_EMAIL_SETTINGS=false;openEmailSettings();}
+        else applyPendingOpen();
         return;
       }
       if(profile){
@@ -1867,7 +1947,7 @@ var SKILL_CAT_COLORS={
 var SKILL_CATS=[
   {id:"math",label:"Math",question:"What math courses have you taken?",icon:"ti-math-function",type:"course",hint:"The course itself tells us your level - select everything you have studied",
    items:["Algebra 1","Algebra 2","Geometry","Trigonometry","Pre-Calculus","Statistics & Probability","Calculus (AB/BC)","Linear Algebra","Multivariable Calculus","Differential Equations","Number Theory","Combinatorics & Discrete Math","Real Analysis"]},
-  {id:"coding",label:"Coding & CS",question:"What programming languages and tools do you use?",icon:"ti-code",type:"level",hint:"Select every programming language or tool you know - then tap your level. Spoken languages are on your profile already.",
+  {id:"coding",label:"Coding & CS",question:"What programming languages and tools do you use?",icon:"ti-code",type:"level",hint:"Tap every programming language or tool you know. Spoken languages are on your profile already.",
    items:["Python","JavaScript","Java","C / C++","Swift","Kotlin","Go","R","MATLAB","SQL","HTML / CSS","React / Next.js","Node.js","TensorFlow / PyTorch","Firebase / Databases","API Development","Cybersecurity","Git / GitHub","Arduino","Raspberry Pi","Unity / Game Dev","Bash / Linux","No-code (Webflow / Bubble / Zapier)"]},
   {id:"science",label:"Science & Research",question:"What science fields do you know or work in?",icon:"ti-microscope",type:"level",hint:"Select fields you have genuinely studied, researched, or worked in",
    items:["Biology","Animal Sciences","Plant Sciences","Microbiology","Molecular Biology","Genetics / Gene Editing","Neuroscience","Biomedical / Translational Medicine","Anatomy & Physiology","Ecology / Environmental Science","Biochemistry","Chemistry","Materials Science","Physics","Astrophysics / Astronomy","Earth Science / Geology","Synthetic Biology","Bioinformatics","Forensic Science","Statistics / Data Analysis","Experimental Design","Scientific Writing"]},
@@ -2007,9 +2087,43 @@ function saveEditAndReturn(btnId){
     returnFromEdit(dest,true);
   }).catch(function(e){if(btn){btn.disabled=false;btn.textContent="Save and go back";}showSaveError(e);});
 }
-function logo(big){return "<div class=\"logo"+(big?" big":"")+"\">Partn<span>r</span></div>";}
+function logo(big){return "<div class=\"logo"+(big?" big":"")+"\" role=\"link\" tabindex=\"0\" aria-label=\"Partnr home\" style=\"cursor:pointer;\">Partn<span>r</span></div>";}
+// Tapping the Partnr logo goes home: Matches when signed in, the welcome
+// page when not. It does nothing in the middle of sign-up, so nobody
+// loses what they've typed.
+document.addEventListener("click",function(e){
+  var lg=e.target.closest&&e.target.closest(".logo");if(!lg)return;
+  var onboarding=["signup","track","skills","goals","loading"];
+  if(onboarding.indexOf(CURRENT_PAGE)>=0)return;
+  if(CURRENT_PAGE==="matches"){
+    if(typeof unsubscribeChatChannel==="function"){try{unsubscribeChatChannel();}catch(ex){}}
+    backToTab("matches");
+  } else goTo("welcome");
+});
 // 5-step progress bar
 function sb(n){var h="<div class=\"sbar\">";for(var i=1;i<=4;i++)h+="<div class=\"sd"+(i<=n?" done":"")+"\">"+"</div>";return h+"</div>";}
+// Checks a link a student adds to their profile. Returns "" when it's
+// fine, or the message to show. Links are for showing work, so personal
+// social media (a way to reach someone privately) isn't allowed.
+// Public pages for a club, nonprofit or project (Instagram, TikTok, YouTube...)
+// are fine to show work. Messaging apps are a private way in, so they're not.
+var MESSAGING_HOSTS=["snapchat.com","discord.gg","discord.com","whatsapp.com","wa.me","t.me","telegram.me","kik.com","groupme.com"];
+// Turns "@vpwaterclub" or "@vpwaterclub (instagram)" into a real link.
+function normalizeHandleLink(raw){
+  var m=String(raw||"").trim().replace(/^https?:\/\//i,"").match(/^@([A-Za-z0-9._]{1,30})\s*(?:\(?\s*(instagram|insta|ig|tiktok|youtube|x|twitter)\s*\)?)?$/i);
+  if(!m)return raw;
+  var site=(m[2]||"instagram").toLowerCase();
+  var base=site==="tiktok"?"https://www.tiktok.com/@":site==="youtube"?"https://www.youtube.com/@":(site==="x"||site==="twitter")?"https://x.com/":"https://www.instagram.com/";
+  return base+m[1];
+}
+function linkProblem(url){
+  var u;
+  try{u=new URL(url);}catch(ex){return "That doesn't look like a working link. Try something like https://yourproject.org";}
+  var host=u.hostname.toLowerCase().replace(/^www\./,"");
+  if(!/^https?:$/.test(u.protocol)||host.indexOf(".")<0||/\s/.test(url))return "That doesn't look like a working link. Try something like https://yourproject.org";
+  if(MESSAGING_HOSTS.some(function(h){return host===h||host.slice(-h.length-1)==="."+h;}))return "Messaging app links aren't allowed, so students can't be contacted outside Partnr. Link to a website, a public club page, GitHub, or a document instead.";
+  return "";
+}
 function safeUrl(u){u=(u||"").toString();return /^https?:\/\//i.test(u)?esc(u):"#";}
 function esc(s){return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 // Marks a required field/section label. A single small red asterisk,
@@ -2482,6 +2596,10 @@ function rTrack(){
     "<h2>Find the right partner to bring your ideas to life.</h2>"+
     "<div class=\"sub\">Whether you’re starting a project, joining one, or exploring possibilities, connect with students who share your interests and ambition.</div>"+
     "<div class=\"fi\" style=\"margin-top:0;\"><label for=\"iidea\">Describe a project you have in mind or the kind you’d be interested in joining. <span style=\"font-weight:600;color:#534AB7;font-size:12px;\">Required. A sentence or two is all it takes.</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to start a nonprofit tackling food waste and need a partner who's into grassroots organizing, or: I know Python and want to join a biology research project...\">"+esc(S.idea)+"</textarea></div>"+
+    "<div id=\"interest-row\" style=\"margin:-4px 0 1rem;\">"+
+      "<div style=\"font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:6px;\">Your interests <span style=\"font-weight:400;\">(we pick these from what you wrote. Tap to change, up to 2)</span></div>"+
+      "<div class=\"cgrow\" id=\"interest-row-chips\" style=\"margin-bottom:0;\"></div>"+
+    "</div>"+
     "<div class=\"slabel\">Status"+req()+"</div>"+
     "<div class=\"cgrow\" id=\"status\"></div>"+
     compSectionHTML+
@@ -2501,6 +2619,13 @@ function rTrack(){
   mkChips("status",["I have a project and need partners","Open to joining a project","Just exploring"],[S.status],true);
   mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
   renderInterestChips();
+  INTEREST_MANUAL=!!(EDIT_RETURN&&S.track); // editing: keep what they chose
+  var ideaBox=document.getElementById("iidea"),ideaTimer=null;
+  ideaBox.addEventListener("input",function(){
+    clearTimeout(ideaTimer);
+    ideaTimer=setTimeout(function(){autoPickInterests(ideaBox.value);},400);
+  });
+  if(!S.track&&ideaBox.value.trim())autoPickInterests(ideaBox.value);
   document.getElementById("s3").addEventListener("click",step3);
   document.getElementById("bk").addEventListener("click",function(){goTo("signup");});
   document.querySelectorAll(".loc-opt").forEach(function(el){
@@ -2565,8 +2690,45 @@ function rTrack(){
 // a stronger signal (a picked competition, or an AI-read of typed
 // interest text) updates the interest programmatically, so the chips
 // never silently disagree with what's actually stored.
+// Words in the project description that point to each interest. Matched
+// as whole words, so "art" doesn't match "start" and "ai" doesn't match "said".
+var INTEREST_WORDS={
+  impact:["nonprofit","non profit","non-profit","charity","charities","volunteer","volunteering","community","help people","helps people","helping people","awareness","fundraiser","fundraising","donate","donations","social impact","homeless","underserved","tutoring"],
+  research:["research","researching","study","experiment","experiments","science","scientific","lab","biology","chemistry","physics","medicine","medical","cancer","melanoma","disease","diseases","health","neuroscience","psychology","isef","regeneron","publish","paper","data"],
+  business:["business","startup","start-up","company","entrepreneur","entrepreneurship","sell","selling","sales","marketing","brand","revenue","deca","fbla","customers","ecommerce","e-commerce"],
+  tech:["app","apps","website","web app","coding","code","software","ai","machine learning","robot","robots","robotics","engineering","hardware","game","programming","python","javascript","hackathon","device"],
+  law:["law","legal","policy","mock trial","model un","government","politics","political","rights","justice","constitution","lawyer"],
+  arts:["art","arts","film","movie","music","writing","write","story","stories","poetry","poem","design","photography","magazine","journalism","video","theater","theatre","animation"]
+};
+var INTEREST_MANUAL=false; // once the student taps an interest, stop auto-picking
+function autoPickInterests(text){
+  if(INTEREST_MANUAL)return;
+  var t=" "+(text||"").toLowerCase().replace(/[^a-z0-9\- ]+/g," ").replace(/\s+/g," ")+" ";
+  var scores=[];
+  Object.keys(INTEREST_WORDS).forEach(function(k){
+    var score=0,first=1e9;
+    INTEREST_WORDS[k].forEach(function(w){
+      var idx=t.indexOf(" "+w+" ");
+      if(idx>=0){score++;if(idx<first)first=idx;}
+    });
+    if(score)scores.push({k:k,score:score,first:first});
+  });
+  if(!scores.length)return;
+  // Strongest signals win; ties go to whichever was mentioned first.
+  scores.sort(function(a,b){return b.score-a.score||a.first-b.first;});
+  var top=scores.slice(0,2);
+  // Of the two, whatever the student wrote about first is the main interest.
+  top.sort(function(a,b){return a.first-b.first;});
+  S.track=top[0].k;
+  S.secondary=top.slice(1).map(function(x){return TR[x.k].n;});
+  renderInterestChips();
+  var e=document.getElementById("sec-err-interest-row");if(e)e.remove();
+}
 function renderInterestChips(){
-  var el=document.getElementById("interest-chips");if(!el)return;
+  ["interest-chips","interest-row-chips"].forEach(function(id){renderInterestChipsInto(document.getElementById(id));});
+}
+function renderInterestChipsInto(el){
+  if(!el)return;
   var keys=["research","business","impact","tech","law","arts"];
   el.innerHTML="";
   keys.forEach(function(k){
@@ -2575,6 +2737,7 @@ function renderInterestChips(){
     c.setAttribute("role","button");c.setAttribute("tabindex","0");c.setAttribute("aria-pressed",on?"true":"false");
     if(on){c.style.background=TR[k].bg;c.style.borderColor=TR[k].c;c.style.color=TR[k].tc;c.style.fontWeight="600";}
     c.addEventListener("click",function(){
+      INTEREST_MANUAL=true;
       var currentlyOn=S.track===k||(Array.isArray(S.secondary)&&S.secondary.indexOf(TR[k].n)>=0);
       if(currentlyOn){
         // Turning off: demote secondary to primary if needed, or just clear.
@@ -2582,8 +2745,10 @@ function renderInterestChips(){
         else{S.secondary=(S.secondary||[]).filter(function(n){return n!==TR[k].n;});}
       } else {
         var onCount=(S.track?1:0)+((S.secondary||[]).length);
-        if(onCount>=2)return; // cap at 2 total, same as before
-        if(!S.track)S.track=k;else S.secondary=(S.secondary||[]).concat([TR[k].n]).slice(0,2);
+        // Cap at 2 total. Tapping a third swaps out the second one.
+        if(!S.track)S.track=k;
+        else if(onCount>=2)S.secondary=[TR[k].n];
+        else S.secondary=(S.secondary||[]).concat([TR[k].n]).slice(0,1);
       }
       renderInterestChips();
     });
@@ -2593,6 +2758,20 @@ function renderInterestChips(){
 }
 
 // ── Skills ──────────────────────────────────
+var COMPCAT_TO_SKILLCATS={science:["science"],business:["business"],impact:["social"],tech:["coding","engineering"],writing:["writing"],arts:["design","writing"],law:["humanities"]};
+function skillCatsFromProfile(){
+  var out=[];
+  function add(list){(list||[]).forEach(function(c){if(out.indexOf(c)<0)out.push(c);});}
+  (S.comps||[]).forEach(function(name){
+    var c=COMPS.find(function(x){return x.n===name;});
+    if(c)add(COMPCAT_TO_SKILLCATS[c.cat]);
+  });
+  var t=" "+(S.idea||"").toLowerCase().replace(/[^a-z0-9\- ]+/g," ").replace(/\s+/g," ")+" ";
+  Object.keys(INTEREST_WORDS).forEach(function(k){
+    if(INTEREST_WORDS[k].some(function(w){return t.indexOf(" "+w+" ")>=0;}))add(TRACK_TO_SKILLCATS[k]);
+  });
+  return out;
+}
 function rSkills(){
   var activeTrackKeys=[];
   if(S.track)activeTrackKeys.push(S.track);
@@ -2604,6 +2783,9 @@ function rSkills(){
   activeTrackKeys.forEach(function(tk){
     (TRACK_TO_SKILLCATS[tk]||[]).forEach(function(cid){if(activeCatIds.indexOf(cid)<0)activeCatIds.push(cid);});
   });
+  // Also open the skill groups that fit the competitions they picked and
+  // what they wrote in their description, not only the interest chips.
+  skillCatsFromProfile().forEach(function(cid){if(activeCatIds.indexOf(cid)<0)activeCatIds.push(cid);});
   var mathCat=SKILL_CATS.find(function(c){return c.id==="math";});
   var activeCats=activeCatIds.map(function(id){return SKILL_CATS.find(function(c){return c.id===id;});}).filter(Boolean);
   var extraCats=SKILL_CATS.filter(function(c){return c.id!=="math"&&activeCatIds.indexOf(c.id)<0;});
@@ -2631,7 +2813,7 @@ function rSkills(){
   } else {
     var POW_LABELS={
       Project:{title:"Title",titlePh:"e.g. ISEF Project: Microplastics in Groundwater",showRole:false,showLink:true,linkPh:"https://... (GitHub, blog, portfolio, paper, Google Drive)"},
-      Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"https://... (Instagram, club site, any social)"},
+      Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"Club website or public page, e.g. @yourclub (Instagram)"},
       Internship:{title:"Organization name",titlePh:"e.g. Research Internship at XYZ Lab",showRole:true,showLink:false,linkPh:""}
     };
     var curLabels=POW_LABELS[powTypePicked]||POW_LABELS.Project;
@@ -2702,7 +2884,7 @@ function rSkills(){
 
   var POW_LABELS_LIVE={
     Project:{title:"Title",titlePh:"e.g. ISEF Project: Microplastics in Groundwater",showRole:false,showLink:true,linkPh:"https://... (GitHub, blog, portfolio, paper, Google Drive)"},
-    Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"https://... (Instagram, club site, any social)"},
+    Club:{title:"Club name",titlePh:"e.g. Coding Club, Robotics Team",showRole:true,showLink:true,linkPh:"Club website or public page, e.g. @yourclub (Instagram)"},
     Internship:{title:"Organization name",titlePh:"e.g. Research Internship at XYZ Lab",showRole:true,showLink:false,linkPh:""}
   };
   document.querySelectorAll(".pow-type-pill").forEach(function(b){
@@ -2744,7 +2926,12 @@ function rSkills(){
       var linkWrap=document.getElementById("pow-link-wrap");
       var linkEl=document.getElementById("pow-link");
       var link=(linkWrap&&linkWrap.style.display!=="none"&&linkEl)?linkEl.value.trim():"";
+      link=normalizeHandleLink(link);
       if(link&&!/^https?:\/\//i.test(link))link="https://"+link;
+      if(link){
+        var lp=linkProblem(link);
+        if(lp){showErr("pow-link",lp);scrollToFirstErr();return;}
+      }
       S.proofOfWork.push({type:powTypePicked,title:t,role:role,desc:document.getElementById("pow-desc").value.trim(),link:link});
       powTypePicked="Project";
       rSkills();
@@ -2802,9 +2989,12 @@ function chipHTML(catId,item){
   var lv=S.skillLevels[key];
   // A picked skill keeps its level buttons open until a level is chosen,
   // even after the student opens another skill.
-  var isOpen=openSkillKey===key||(on&&!lv&&!NO_LEVEL_ITEMS.has(item));
-  if(NO_LEVEL_ITEMS.has(item)){
-    var notedOn=lv==="noted";
+  // Levels are off for now: every skill except math courses is one tap
+  // to add and one tap to remove. Old saved levels still count as picked.
+  var noLevel=!isMath||NO_LEVEL_ITEMS.has(item);
+  var isOpen=openSkillKey===key||(on&&!lv&&!noLevel);
+  if(noLevel){
+    var notedOn=on;
     return "<button class=\"chip skill-chip no-level-chip"+(notedOn?" on":"")+"\" data-key=\""+key+"\" data-item=\""+esc(item)+"\">"+esc(item)+"</button>";
   }
   if(isOpen){
@@ -2836,7 +3026,7 @@ function wireChipContainer(container){
     btn.addEventListener("click",function(){
       var key=this.dataset.key;
       if(this.classList.contains("no-level-chip")){
-        if(S.skillLevels[key]==="noted")delete S.skillLevels[key];
+        if(S.skillLevels[key]!==undefined)delete S.skillLevels[key];
         else S.skillLevels[key]="noted";
         rSkills();
         return;
@@ -2909,8 +3099,14 @@ function renderSkillRecap(){
   var pills=keys.map(function(k){
     var name=k.indexOf(":")>=0?k.split(":")[1]:k;
     var lv=S.skillLevels[k];
+    var isMathKey=k.indexOf("math:")===0;
+    if(!isMathKey||lv==="noted"){
+      return "<span style=\"display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 6px 4px 10px;\">"+esc(name)+
+        "<button type=\"button\" class=\"recap-x\" data-key=\""+esc(k)+"\" aria-label=\"Remove "+esc(name)+"\" style=\"background:none;border:none;color:#7F77DD;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;\">×</button></span>";
+    }
     if(lv&&lv!=="noted"){
-      return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 10px;\">"+esc(name)+" · "+esc(lv)+"</span>";
+      return "<span style=\"display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 6px 4px 10px;\">"+esc(name)+" · "+esc(lv)+
+        "<button type=\"button\" class=\"recap-x\" data-key=\""+esc(k)+"\" aria-label=\"Remove "+esc(name)+"\" style=\"background:none;border:none;color:#7F77DD;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;\">×</button></span>";
     }
     if(lv==="noted"){
       return "<span style=\"display:inline-block;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 10px;\">"+esc(name)+"</span>";
@@ -2919,6 +3115,14 @@ function renderSkillRecap(){
   });
   el.innerHTML="<div style=\"font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px;\">Selected ("+keys.length+")</div>"+
     "<div style=\"display:flex;flex-wrap:wrap;gap:6px;\">"+pills.join("")+"</div>";
+  el.querySelectorAll(".recap-x").forEach(function(b){
+    b.addEventListener("click",function(e){
+      e.stopPropagation();
+      delete S.skillLevels[this.dataset.key];
+      if(openSkillKey===this.dataset.key)openSkillKey=null;
+      rSkills();
+    });
+  });
 }
 
 // Search reaches every real skill in every category, not just what's
@@ -3391,7 +3595,7 @@ async function step2(){
 }
 function step3(){
   var valid=true;
-  if(!S.track){showSecErr("exbtn","Pick an interest below, or search for a competition above");valid=false;}
+  if(!S.track){showSecErr("interest-row","Pick at least one interest so we can find the right partners");valid=false;}
   var statusSel=getChips("status")[0]||"";
   if(!statusSel){showSecErr("status","Select your current status");valid=false;}
   var idea=document.getElementById("iidea").value.trim();
@@ -3470,7 +3674,7 @@ function showSaveError(err){
 // ── Loading + API ───────────────────────────
 function rLoading(){
   R(logo()+"<div style=\"text-align:center;padding:3rem 1rem;\"><div class=\"spin\"></div><div id=\"lmsg\" style=\"font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:6px;\">Analyzing your profile...</div><div style=\"font-size:14px;color:#6b6b6b;\">Finding your best partners worldwide</div></div>");
-  var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skill levels...","Building your results..."];
+  var ms=["Analyzing your profile...","Searching students globally...","Matching roles & skills...","Building your results..."];
   var i=0;var iv=setInterval(function(){i++;var el=document.getElementById("lmsg");if(el&&i<ms.length)el.textContent=ms[i];else clearInterval(iv);},900);
 }
 // Instead of a random re-roll, this asks two quick things before spending
@@ -3567,8 +3771,10 @@ var MATCH_NOTE=""; // e.g. "No one at Viewpoint yet, so here are students in Enc
 var NO_REAL_MATCHES=false;
 
 function normLoc(x){return (x||"").toString().trim().toLowerCase();}
+// Same rule as the database: "Oak Park High School." = "Oak Park High".
+function normSchool(x){return normLoc(x).replace(/[^a-z0-9 ]+/g," ").replace(/\b(the|school|senior|sr|hs)\b/g," ").replace(/\s+/g," ").trim();}
 async function loadMatchCandidates(myId){
-  var res=await sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links,skills_needed,fun_fact").eq("onboarded",true).neq("id",myId).limit(300);
+  var res=await sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links,skills_needed,fun_fact,near_me").eq("onboarded",true).neq("id",myId).limit(300);
   if(res.error)throw res.error;
   var shownReal={};MATCHES.forEach(function(m){if(m.realId)shownReal[m.realId]=true;});
   var people=(res.data||[]).filter(function(s){return !BLOCKED_IDS[s.id]&&!shownReal[s.id];});
@@ -3584,8 +3790,9 @@ async function loadMatchCandidates(myId){
 }
 // Same school, then city, then same state, then same country, then anyone.
 function locationRank(s){
-  if(S.school&&s.school&&normLoc(s.school)===normLoc(S.school))return 0;
-  if(normLoc(s.city)===normLoc(S.city)&&normLoc(s.country)===normLoc(S.country))return 1;
+  if(S.school&&s.school&&normSchool(s.school)===normSchool(S.school))return 0;
+  // Same city, or within about 25 miles (the database works this out).
+  if(s.near_me||(normLoc(s.city)===normLoc(S.city)&&normLoc(s.country)===normLoc(S.country)))return 1;
   if(S.state&&normLoc(s.state)===normLoc(S.state)&&normLoc(s.country)===normLoc(S.country))return 2;
   if(normLoc(s.country)===normLoc(S.country))return 3;
   return 4;
@@ -3594,7 +3801,7 @@ function pickByPreference(people){
   var pref=(S.locationPref||"").toLowerCase();
   var startLevel=pref.indexOf("school")>=0?0:pref.indexOf("city")>=0?1:4;
   var levels=[0,1,2,3,4].filter(function(l){return l>=startLevel;});
-  var names={0:"at "+(S.school||"your school"),1:"in "+(S.city||"your city"),2:"in "+(S.state||"your state"),3:"in "+(S.country||"your country"),4:"around the world"};
+  var names={0:"at "+(S.school||"your school"),1:"in or near "+(S.city||"your city"),2:"in "+(S.state||"your state"),3:"in "+(S.country||"your country"),4:"around the world"};
   for(var i=0;i<levels.length;i++){
     var lvl=levels[i];
     var found=people.filter(function(s){return locationRank(s)<=lvl;});
@@ -3829,7 +4036,7 @@ function rMatches(){
   var locBar=document.createElement("div");
   locBar.id="loc-bar";
   locBar.style.cssText="display:flex;align-items:center;gap:8px;background:#f8f8f6;border-radius:10px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#555;";
-  locBar.innerHTML="<span style=\"flex:1;\">"+esc(S.locationPref||"Anyone in the world")+"</span><button id=\"loc-change\" style=\"background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;\">Change</button>";
+  locBar.innerHTML="<span style=\"flex:1;\"><span style=\"color:#888;\">Matching you with:</span> "+esc(S.locationPref||"🌍 Anyone in the world")+"</span><button id=\"loc-change\" style=\"background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;\">Change who I match with</button>";
   var rootEl=document.getElementById("ROOT");
   var navEl=rootEl?rootEl.querySelector(".nav"):null;
   if(navEl)rootEl.insertBefore(locBar,navEl);
@@ -3860,6 +4067,9 @@ function markTab(t){
   var wl=document.getElementById("wl-wrap");if(wl&&t!=="matches")wl.style.display="none";
 }
 function selectTab(t){showTab(t);window.scrollTo(0,0);}
+// Full-screen pages (apply, chat, workspace) replace the whole app, so
+// going "back" has to rebuild the tab bar first, then open the tab.
+function backToTab(t){goTo("matches");selectTab(t);}
 
 // The menu behind the student's initials in the top-right corner.
 function bindProfileMenu(){
@@ -4023,7 +4233,7 @@ function passedListHtml(){
       }).join("")+"</div>";
 }
 function mCards(){
-  var hasActive=MATCHES.some(function(m){return !m._status||m._status==="active";});
+  var hasActive=MATCHES.some(function(m){return m._status!=="passed";});
   if(NO_REAL_MATCHES&&!hasActive){
     // Early days: few students yet. Make being early feel good, say
     // plainly that matches are coming, and give them something to do now.
@@ -4054,11 +4264,12 @@ function mCards(){
   if(MATCH_NOTE)h+="<div style=\"font-size:13px;color:#534AB7;background:#EEEDFE;border-radius:8px;padding:8px 12px;margin-bottom:10px;\">"+esc(MATCH_NOTE)+"</div>";
   var activeCount=0;
   MATCHES.forEach(function(m,i){
-    if(m._status&&m._status!=="active")return; // passed ones sit in the Passed list, saved ones on My board
+    if(m._status==="passed")return; // passed ones sit in the Passed list
+    var isSaved=m._status==="saved"; // saved ones stay here and also show on My board
     activeCount++;
     var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
     var sw=m.skillsWithLevels||{};
-    var stags=Object.keys(sw).slice(0,4).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" · "+lv+"</span>";}).join("");
+    var stags=Object.keys(sw).slice(0,4).map(function(sk){return "<span class=\"tag\">"+esc(sk)+"</span>";}).join("");
     var conn=CONNS.some(function(c){return c.name===m.name;});
     h+="<div class=\"card mcard\" data-idx=\""+i+"\">"+
       "<div style=\"display:flex;align-items:center;gap:11px;margin-bottom:10px;\">"+
@@ -4075,9 +4286,10 @@ function mCards(){
       "<div class=\"why\"><strong>Why you match:</strong> "+esc(m.why)+"</div>"+
       (m.funFact?"<div style=\"font-size:12px;color:#555;margin:-4px 0 10px;\">\u2728 "+esc(m.funFact)+"</div>":"")+
       "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\"><i class=\"ti ti-clock\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>"+esc([m.availability,m.commitment].filter(Boolean).join(" · "))+"</div>"+
+      (isSaved?"<div class=\"msaved-note\">♥ Saved. <a href=\"#\" class=\"go-board\">See it on My board</a></div>":"")+
       "<div style=\"display:flex;gap:8px;align-items:center;\">"+
         "<button class=\"mcircle mpass\" data-idx=\""+i+"\" title=\"Pass\" aria-label=\"Pass\">✕</button>"+
-        "<button class=\"mcircle msave\" data-idx=\""+i+"\" title=\"Save to my board\" aria-label=\"Save to my board\">♥</button>"+
+        "<button class=\"mcircle msave"+(isSaved?" on":"")+"\" data-idx=\""+i+"\" title=\""+(isSaved?"Unsave":"Save to my board")+"\" aria-label=\""+(isSaved?"Unsave":"Save to my board")+"\" aria-pressed=\""+(isSaved?"true":"false")+"\">♥</button>"+
         (conn?"<button class=\"bc\" style=\"flex:1;background:#3B6D11;\" disabled><i class=\"ti ti-check\" style=\"font-size:12px;vertical-align:-1px;margin-right:3px;\"></i>Request sent</button>":
               "<button class=\"bc cob\" style=\"flex:1;background:"+t.c+";\" data-idx=\""+i+"\">Connect →</button>")+
         "<button class=\"bo pfb\" data-idx=\""+i+"\">Full profile</button>"+
@@ -4091,7 +4303,7 @@ function mCards(){
   });
   if(!activeCount){
     h+="<div style=\"text-align:center;padding:1.5rem 1rem;\"><div style=\"font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:6px;\">You've gone through all your matches</div>"+
-      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Saved ones are on My board. Find more whenever you're ready.</div>"+
+      "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Find more whenever you're ready.</div>"+
       "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find more partners →</button></div>";
   } else {
     h+="<div style=\"font-size:12px;color:#999;text-align:center;margin:-4px 0 12px;\">Tip: swipe a card left to pass or right to save.</div>";
@@ -4128,6 +4340,7 @@ function bindME(){
   });});
   document.querySelectorAll(".mreason").forEach(function(c){c.addEventListener("click",function(){passMatch(parseInt(c.dataset.idx),c.dataset.r||null);});addKbdActivation(c);});
   document.querySelectorAll(".msave").forEach(function(b){b.addEventListener("click",function(){saveMatch(parseInt(b.dataset.idx));});});
+  document.querySelectorAll(".go-board").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();selectTab("board");});});
   document.querySelectorAll(".mcard").forEach(enableSwipe);
   var tp=document.getElementById("toggle-passed");
   if(tp)tp.addEventListener("click",function(){SHOW_PASSED=!SHOW_PASSED;refreshMatchesTab();});
@@ -4252,8 +4465,7 @@ async function rRecruit(){
     "<div style=\"flex:1;min-width:200px;\"><div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">Have a project?</div>"+
     "<div style=\"font-size:13px;color:#555;line-height:1.5;\">Post it and find partners with the skills you need.</div></div>"+
     "<button id=\"post-project-btn\" style=\"background:#7F77DD;color:white;border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;\">Post a project →</button>"+
-  "</div>"+
-  "<div class=\"slabel\" style=\"margin-top:0;\">Open projects looking for a partner</div>";
+  "</div>";
   var myPostingsRes,items;
   try{
     var session=await getSession();
@@ -4276,6 +4488,31 @@ async function rRecruit(){
       }
     }
     items=await loadRealProjects();
+    // The student's own applications, so they can see what they applied
+    // to and whether the owner answered.
+    var myApps=[],appliedByProject={};
+    if(myId){
+      var appsRes=await sba.from("project_applications").select("project_id,status,created_at").eq("applicant_id",myId).order("created_at",{ascending:false});
+      myApps=appsRes.data||[];
+      myApps.forEach(function(a){appliedByProject[a.project_id]=a.status;});
+      if(myApps.length){
+        var titleById={};items.forEach(function(it){titleById[it.project.id]=it.project.title;});
+        var missing=myApps.map(function(a){return a.project_id;}).filter(function(id){return !titleById[id];});
+        if(missing.length){
+          var tRes=await sba.from("projects").select("id,title").in("id",missing);
+          (tRes.data||[]).forEach(function(r){titleById[r.id]=r.title;});
+        }
+        h+="<div class=\"slabel\">Your applications</div>";
+        myApps.forEach(function(a){
+          var st=a.status==="accepted"?"<span style=\"color:#1D7A5C;font-weight:600;\">Accepted. Message them in your Inbox</span>":
+            a.status==="declined"?"<span style=\"color:#6b6b6b;\">Not this time</span>":
+            "<span style=\"color:#854F0B;\">Waiting to hear back</span>";
+          h+="<div class=\"pit\"><div style=\"flex:1;min-width:0;\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(titleById[a.project_id]||"A project")+"</div>"+
+            "<div style=\"font-size:11px;\">"+st+"</div></div></div>";
+        });
+        h+="<div style=\"height:0.5rem;\"></div>";
+      }
+    }
 
     // Relevance sort: your own track and any skill overlap float to the
     // top, so "Open projects" isn't just one flat list everyone sees
@@ -4293,6 +4530,7 @@ async function rRecruit(){
       .sort(function(a,b){return b.score-a.score||a.idx-b.idx;})
       .map(function(x){return x.item;});
 
+    h+="<div class=\"slabel\">Open projects looking for a partner</div>";
     if(!items.length){
       h+="<p style=\"font-size:13px;color:#6b6b6b;line-height:1.6;\">No open postings right now. <a href=\"#\" class=\"open-proj-find-link\" style=\"color:#534AB7;font-weight:600;text-decoration:none;\">Find students</a> to team up with, or be the first to post a project above.</p>";
     } else {
@@ -4312,7 +4550,9 @@ async function rRecruit(){
             getStageChip(p.stage)+
           "</div>"+
           "<button class=\"proj-pin\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" data-desc=\""+esc(p.description)+"\" style=\"background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px;\">📌 Pin to my board</button>"+
-          "<button class=\"bc real-apply-btn\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>"+
+          (appliedByProject[p.id]?
+            "<div style=\"background:#f1f1ee;color:#555;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;text-align:center;\">✓ Applied"+(appliedByProject[p.id]==="accepted"?" · Accepted":appliedByProject[p.id]==="declined"?"":" · Waiting to hear back")+"</div>":
+            "<button class=\"bc real-apply-btn\" data-id=\""+esc(p.id)+"\" data-title=\""+esc(p.title)+"\" style=\"background:"+t.c+";color:white;border:none;border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Apply with your profile →</button>")+
         "</div>";
       });
     }
@@ -4497,10 +4737,11 @@ function openProjectApplyModal(projectId,title){
           "<button id=\"pa-send\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send application →</button>"+
           "<button id=\"pa-cancel\" style=\"padding:10px 16px;background:#f8f8f6;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;\">Cancel</button>"+
         "</div>"+
+        "<div id=\"pa-err\"></div>"+
       "</div>"+
     "</div>"
   );
-  document.getElementById("pa-cancel").addEventListener("click",function(){showTab("recruit");});
+  document.getElementById("pa-cancel").addEventListener("click",function(){backToTab("recruit");});
   document.getElementById("pa-send").addEventListener("click",async function(){
     var msg=document.getElementById("pa-msg").value.trim();
     if(!msg){showErr("pa-msg","Write a short message before sending");scrollToFirstErr();return;}
@@ -4510,12 +4751,13 @@ function openProjectApplyModal(projectId,title){
     var res=await sba.from("project_applications").insert({project_id:projectId,applicant_id:session.user.id,message:msg});
     if(res.error){
       btn.disabled=false;btn.textContent="Send application →";
-      if(res.error.code==="23505")showInlineError(btn,"You've already applied to this project.");
-      else showInlineError(btn,"Couldn't send. Please try again.");
+      var errAnchor=document.getElementById("pa-err");
+      if(res.error.code==="23505")showInlineError(errAnchor,"You've already applied to this project. Check Your applications in Open projects.");
+      else showInlineError(errAnchor,"Couldn't send. Please try again.");
       return;
     }
-    R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Application sent!</div><button id=\"pa-done\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to projects</button></div></div>");
-    document.getElementById("pa-done").addEventListener("click",function(){showTab("recruit");});
+    R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Application sent!</div><div style=\"font-size:14px;color:#555;line-height:1.6;max-width:360px;margin:0 auto 16px;\">The project owner gets an email and will see your message. We'll email you if they accept. You can check it anytime under <b>Your applications</b> in Open projects.</div><button id=\"pa-done\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to projects</button></div></div>");
+    document.getElementById("pa-done").addEventListener("click",function(){backToTab("recruit");});
   });
 }
 
@@ -4893,7 +5135,7 @@ function meTab(){
   function skillTagHTML(k,small){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
     var sizeStyle=small?"font-size:11px;padding:3px 9px;":"";
-    if(lv==="studied"||lv==="noted")return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
+    if(lv==="studied"||lv==="noted"||LEVELS.indexOf(lv)>=0)return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
     return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";"+sizeStyle+"\">"+skill+" · "+lv+"</span>";
   }
   var mathTagsHTML=mathKeysForView.map(function(k){return skillTagHTML(k,true);}).join("");
@@ -4912,7 +5154,7 @@ function meTab(){
   var linksViewHTML=(S.links||[]).length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Links</div>"+
     S.links.map(function(l){return "<a href=\""+safeUrl(l.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#534AB7;text-decoration:none;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>"+esc(l.url)+"</a>";}).join(""):"";
   return "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My profile</div>"+
-    "<div class=\"page-note\">This is what other students see.</div>"+
+    "<div class=\"page-note\">This is what other students see. <i class=\"ti ti-lock\" style=\"font-size:12px;vertical-align:-1px;\"></i> Your school name only shows to students at your school and partners you've connected with.</div>"+
     "<div class=\"card\">"+
     "<div class=\"me-head\" style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
@@ -4980,7 +5222,7 @@ async function rWorkspace(connectionId,otherName){
     "<input id=\"ws-file-input\" type=\"file\" accept=\".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv\" style=\"margin-bottom:1rem;\"/>"+
     "<div id=\"ws-upload-status\" style=\"font-size:12px;color:#6b6b6b;\"></div>"
   );
-  document.getElementById("ws-back").addEventListener("click",function(){showTab("conns");});
+  document.getElementById("ws-back").addEventListener("click",function(){backToTab("conns");});
   document.getElementById("ws-link-add").addEventListener("click",function(){addWorkspaceLink(connectionId);});
   document.getElementById("ws-file-input").addEventListener("change",function(){uploadWorkspaceFile(connectionId,this);});
   loadWorkspaceItems(connectionId);
@@ -5141,7 +5383,7 @@ async function rChat(connectionId,otherName){
   );
   document.getElementById("chat-back").addEventListener("click",function(){
     unsubscribeChatChannel();
-    showTab("conns");
+    backToTab("conns");
   });
   var pendingSend=false;
   function doSend(force){
@@ -5804,14 +6046,16 @@ function passMatch(i,reason){
     showUndoToast("Passed on "+nameInSentence(m.name)+". Your next round will learn from this.",function(){setMatchStatus(m,prev,null);refreshMatchesTab();});
   });
 }
-function saveMatch(i){
+// Saving keeps the card in Matches (marked Saved) and also puts it on
+// My board. Tapping the heart again unsaves it; swiping right only saves.
+function saveMatch(i,saveOnly){
   var m=MATCHES[i];if(!m)return;
-  var prev=m._status||"active";
-  var card=document.querySelector(".mcard[data-idx=\""+i+"\"]");
-  animateCardAway(card,"right",function(){
-    setMatchStatus(m,"saved",null);refreshMatchesTab();
-    showUndoToast("Saved "+nameInSentence(m.name)+" to your board.",function(){setMatchStatus(m,prev,null);refreshMatchesTab();});
-  });
+  if(m._status==="saved"){
+    if(saveOnly){refreshMatchesTab();return;}
+    setMatchStatus(m,"active",null);refreshMatchesTab();return;
+  }
+  setMatchStatus(m,"saved",null);refreshMatchesTab();
+  showToast("Saved "+nameInSentence(m.name)+". You'll also find them on My board.");
 }
 // Swipe left to pass, right to save. Vertical scrolling still works
 // (touch-action:pan-y on the card); buttons inside the card are ignored.
@@ -5832,7 +6076,7 @@ function enableSwipe(card){
     if(!active)return;active=false;card.style.boxShadow="";
     var i=parseInt(card.dataset.idx);
     if(dx<-110)passMatch(i,null);
-    else if(dx>110)saveMatch(i);
+    else if(dx>110)saveMatch(i,true);
     else{card.style.transition="transform .2s ease";card.style.transform="";}
   }
   card.addEventListener("pointerup",end);card.addEventListener("pointercancel",end);
@@ -5899,6 +6143,197 @@ function partnerOrderKey(){return "partnr_partner_order_"+(S.email||"me");}
 function getPartnerOrder(){try{return JSON.parse(localStorage.getItem(partnerOrderKey())||"[]");}catch(ex){return [];}}
 function setPartnerOrder(keys){try{localStorage.setItem(partnerOrderKey(),JSON.stringify(keys));}catch(ex){}}
 
+// ── To-do list (top of My board) ───────────────
+// Five steps in the order a project actually happens. Most check
+// themselves from what the student has done; "Work on it together" is
+// checked by hand. Students can add, edit and delete their own to-dos.
+var OUTCOME_RESULTS=["Submitted","Placed","Won","Launched","Still going"];
+async function loadTodoState(){
+  var session=await getSession();if(!session)return null;
+  var me=session.user.id;
+  var st={me:me,todos:[],posted:0,joined:0,partners:0,outcomes:0};
+  try{
+    var r=await Promise.all([
+      sba.from("student_todos").select("id,title,done,builtin,position,created_at").order("position",{ascending:true}).order("id",{ascending:true}),
+      sba.from("projects").select("id",{count:"exact",head:true}).eq("student_id",me),
+      sba.from("project_applications").select("id",{count:"exact",head:true}).eq("applicant_id",me).eq("status","accepted"),
+      sba.from("connections").select("id",{count:"exact",head:true}).eq("status","accepted").or("student_a_id.eq."+me+",student_b_id.eq."+me),
+      sba.from("project_outcomes").select("id",{count:"exact",head:true})
+    ]);
+    st.todos=(r[0].data||[]);st.posted=r[1].count||0;st.joined=r[2].count||0;st.partners=r[3].count||0;st.outcomes=r[4].count||0;
+  }catch(ex){console.error("[Partnr] loading to-dos failed:",ex);}
+  return st;
+}
+async function renderTodos(){
+  var wrap=document.getElementById("todo-wrap");if(!wrap)return;
+  var st=await loadTodoState();
+  wrap=document.getElementById("todo-wrap");if(!wrap||!st)return;
+  var workRow=st.todos.find(function(t){return t.builtin==="work";});
+  var mine=st.todos.filter(function(t){return !t.builtin;});
+  var steps=[
+    {key:"profile",t:"Finish your profile",done:true},
+    {key:"start",t:"Pick a competition, post a project, or join one",done:(S.comps||[]).length>0||(BOARD_PINS||[]).some(function(p){return p.kind==="competition";})||st.posted>0||st.joined>0,
+      acts:[["todo-go-comp","Pick a competition"],["todo-go-projects","Browse projects"]]},
+    {key:"partner",t:"Find a partner",done:st.partners>0,acts:[["todo-go-matches","See your matches"]]},
+    {key:"work",t:"Work on it together",done:!!(workRow&&workRow.done),manual:true,acts:[["todo-go-inbox","Open your inbox"]]},
+    {key:"share",t:"Share how it went",done:st.outcomes>0,acts:[["todo-share",st.outcomes>0?"Share another result":"Tell us how it turned out"]]}
+  ];
+  var doneCount=steps.filter(function(x){return x.done;}).length;
+  var nextKey=(steps.find(function(x){return !x.done;})||{}).key;
+  var h="<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\">"+
+      "<div class=\"slabel\" style=\"margin:0;\">To-do <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+steps.length+" done</span></div>"+
+    "</div>"+
+    "<div class=\"todo-card\">";
+  steps.forEach(function(x){
+    // Shortcuts show on the next step to do, on "Work on it together"
+    // until it's checked, and always on "Share how it went".
+    var showActs=!!x.acts&&(x.key==="share"||(!x.done&&(x.key===nextKey||x.key==="work")));
+    h+="<div class=\"todo-row"+(x.done?" done":"")+(x.key===nextKey?" next":"")+"\">"+
+      (x.manual?"<input type=\"checkbox\" id=\"todo-work\" class=\"todo-box\""+(x.done?" checked":"")+" aria-label=\"Mark done\"/>":
+        "<span class=\"todo-auto\" aria-hidden=\"true\">"+(x.done?"✓":"")+"</span>")+
+      "<div style=\"flex:1;min-width:0;\"><div class=\"todo-t\">"+esc(x.t)+(x.manual||x.done||x.key==="share"?"":" <span class=\"todo-hint\">checks itself</span>")+"</div>"+
+      (showActs?"<div class=\"todo-acts\">"+x.acts.map(function(a){return "<button type=\"button\" class=\"todo-act\" id=\""+a[0]+"\">"+esc(a[1])+" →</button>";}).join("")+"</div>":"")+
+      (x.key==="share"?"<div id=\"outcome-form\"></div>":"")+
+      "</div></div>";
+  });
+  h+="</div>";
+  // The student's own to-dos
+  h+="<div class=\"todo-card\" style=\"margin-top:10px;\">"+
+    "<div style=\"font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:6px;\">Your own to-dos</div>"+
+    mine.map(function(t){
+      return "<div class=\"todo-row"+(t.done?" done":"")+"\" data-id=\""+t.id+"\">"+
+        "<input type=\"checkbox\" class=\"todo-box my-todo-box\" data-id=\""+t.id+"\""+(t.done?" checked":"")+" aria-label=\"Mark done\"/>"+
+        "<div class=\"todo-t my-todo-t\" data-id=\""+t.id+"\" role=\"button\" tabindex=\"0\" title=\"Tap to edit\" style=\"flex:1;cursor:text;\">"+esc(t.title)+"</div>"+
+        "<button type=\"button\" class=\"bremove my-todo-del\" data-id=\""+t.id+"\" aria-label=\"Delete to-do\" style=\"position:static;\">×</button>"+
+      "</div>";
+    }).join("")+
+    "<div style=\"display:flex;gap:8px;margin-top:6px;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a to-do, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+    "<button type=\"button\" id=\"todo-add\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
+    "<div id=\"todo-err\"></div>"+
+  "</div>";
+  wrap.innerHTML=h;
+  bindTodos(st,workRow);
+}
+function bindTodos(st,workRow){
+  function on(id,fn){var b=document.getElementById(id);if(b)b.addEventListener("click",fn);}
+  on("todo-go-comp",function(){openCompPicker(function(name){pinCompetition(name).then(renderBoard);});});
+  on("todo-go-projects",function(){selectTab("recruit");});
+  on("todo-go-matches",function(){selectTab("matches");});
+  on("todo-go-inbox",function(){selectTab("conns");});
+  on("todo-share",function(){openOutcomeForm();});
+  var wb=document.getElementById("todo-work");
+  if(wb)wb.addEventListener("change",async function(){
+    var done=this.checked;
+    var res=workRow?await sba.from("student_todos").update({done:done}).eq("id",workRow.id)
+                   :await sba.from("student_todos").insert({title:"Work on it together",builtin:"work",done:done});
+    if(res.error){this.checked=!done;showInlineError(document.getElementById("todo-err"),"Couldn't save. Please try again.");return;}
+    renderTodos();
+  });
+  document.querySelectorAll(".my-todo-box").forEach(function(b){
+    b.addEventListener("change",async function(){
+      var res=await sba.from("student_todos").update({done:this.checked}).eq("id",this.dataset.id);
+      if(res.error){showInlineError(document.getElementById("todo-err"),"Couldn't save. Please try again.");}
+      renderTodos();
+    });
+  });
+  document.querySelectorAll(".my-todo-del").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var res=await sba.from("student_todos").delete().eq("id",this.dataset.id);
+      if(res.error){showInlineError(document.getElementById("todo-err"),"Couldn't delete. Please try again.");return;}
+      renderTodos();
+    });
+  });
+  // Tap a to-do to edit it. Enter or tapping away saves; Escape cancels.
+  document.querySelectorAll(".my-todo-t").forEach(function(el){
+    function startEdit(){
+      if(el.querySelector("input"))return;
+      var old=el.textContent;
+      el.innerHTML="<input maxlength=\"140\" style=\"width:100%;padding:6px 10px;border:1px solid #AFA9EC;border-radius:6px;font-size:13px;font-family:inherit;\"/>";
+      var inp=el.querySelector("input");inp.value=old;inp.focus();
+      var finished=false;
+      async function save(){
+        if(finished)return;finished=true;
+        var v=inp.value.trim();
+        if(!v||v===old){renderTodos();return;}
+        var res=await sba.from("student_todos").update({title:v}).eq("id",el.dataset.id);
+        if(res.error)showInlineError(document.getElementById("todo-err"),"Couldn't save. Please try again.");
+        renderTodos();
+      }
+      inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();save();}else if(e.key==="Escape"){finished=true;renderTodos();}});
+      inp.addEventListener("blur",save);
+    }
+    el.addEventListener("click",startEdit);
+    el.addEventListener("keydown",function(e){if(e.key==="Enter"&&!el.querySelector("input")){e.preventDefault();startEdit();}});
+  });
+  var addBtn=document.getElementById("todo-add"),addInp=document.getElementById("todo-new");
+  async function addTodo(){
+    var v=addInp.value.trim();
+    if(!v){showErr("todo-new","Write your to-do first");return;}
+    addBtn.disabled=true;
+    var pos=st.todos.reduce(function(a,t){return Math.max(a,t.position||0);},0)+1;
+    var res=await sba.from("student_todos").insert({title:v.slice(0,140),position:pos});
+    addBtn.disabled=false;
+    if(res.error){showInlineError(document.getElementById("todo-err"),"Couldn't add. Please try again.");return;}
+    renderTodos();
+  }
+  if(addBtn){
+    addBtn.addEventListener("click",addTodo);
+    addInp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addTodo();}});
+  }
+}
+// "Share how it went": saved for Partnr, emailed to hello@projectpartnr.com,
+// and added to the student's profile under Experience.
+function openOutcomeForm(){
+  var f=document.getElementById("outcome-form");if(!f)return;
+  if(f.innerHTML){f.innerHTML="";return;}
+  var picked="";
+  f.innerHTML="<div class=\"bform\" style=\"margin-top:10px;\">"+
+    "<label for=\"oc-title\" style=\"font-size:12px;font-weight:600;color:#555;\">What did you make?</label>"+
+    "<div><input id=\"oc-title\" maxlength=\"120\" placeholder=\"e.g. Water filter for rural schools\"/></div>"+
+    "<div style=\"font-size:12px;font-weight:600;color:#555;margin-top:4px;\">How did it turn out?</div>"+
+    "<div class=\"cgrow\" id=\"oc-result\" style=\"margin-bottom:0;\">"+OUTCOME_RESULTS.map(function(r){return "<button type=\"button\" class=\"chip oc-chip\" data-r=\""+r+"\">"+r+"</button>";}).join("")+"</div>"+
+    "<input id=\"oc-detail\" maxlength=\"120\" placeholder=\"Details (optional), e.g. 2nd place at Conrad Challenge regionals\"/>"+
+    "<div><input id=\"oc-link\" maxlength=\"300\" placeholder=\"Link (optional): website, video, paper, GitHub\"/></div>"+
+    "<textarea id=\"oc-notes\" maxlength=\"600\" placeholder=\"Anything else you want to tell us? (optional)\"></textarea>"+
+    "<label style=\"display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#333;font-weight:400;cursor:pointer;\"><input type=\"checkbox\" id=\"oc-feature\" style=\"width:18px;height:18px;flex-shrink:0;margin:1px 0 0;padding:0;accent-color:#534AB7;\"/><span>Partnr can feature this, for example on our website or social media.</span></label>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;\">We'll also add it to your profile under Experience. You can remove it anytime.</div>"+
+    "<div id=\"oc-err\"></div>"+
+    "<button class=\"bp\" id=\"oc-save\" style=\"margin-top:0;\">Share it</button></div>";
+  f.querySelectorAll(".oc-chip").forEach(function(c){
+    c.addEventListener("click",function(){
+      picked=this.dataset.r;
+      f.querySelectorAll(".oc-chip").forEach(function(x){x.classList.toggle("on",x===c);});
+      var e=document.getElementById("sec-err-oc-result");if(e)e.remove();
+    });
+  });
+  document.getElementById("oc-save").addEventListener("click",async function(){
+    var title=document.getElementById("oc-title").value.trim();
+    var detail=document.getElementById("oc-detail").value.trim();
+    var link=normalizeHandleLink(document.getElementById("oc-link").value.trim());
+    var notes=document.getElementById("oc-notes").value.trim();
+    var valid=true;
+    if(!title){showErr("oc-title","Give it a name");valid=false;}
+    if(!picked){showSecErr("oc-result","Pick how it turned out");valid=false;}
+    if(link&&!/^https?:\/\//i.test(link))link="https://"+link;
+    if(link){var lp=linkProblem(link);if(lp){showErr("oc-link",lp);valid=false;}}
+    if(!valid){scrollToFirstErr();return;}
+    var btn=this;btn.disabled=true;btn.textContent="Sharing…";
+    var res=await sba.from("project_outcomes").insert({title:title,result:picked,result_detail:detail||null,link:link||null,details:notes||null,feature_ok:document.getElementById("oc-feature").checked});
+    if(res.error){
+      btn.disabled=false;btn.textContent="Share it";
+      showInlineError(document.getElementById("oc-err"),res.error.message&&res.error.message.indexOf("tomorrow")>=0?res.error.message:"Couldn't share. Please try again.");
+      return;
+    }
+    // Add it to Experience on their profile.
+    if((S.proofOfWork||[]).length<8){
+      S.proofOfWork=(S.proofOfWork||[]).concat([{type:"Project",title:title,desc:picked+(detail?": "+detail:""),link:link||""}]);
+      try{var session=await getSession();if(session)await sba.from("students").update({proof_of_work:S.proofOfWork}).eq("id",session.user.id);}catch(ex){console.error("[Partnr] adding outcome to profile failed:",ex);}
+    }
+    showToast("Thanks for sharing! It's on your profile now.");
+    renderTodos();
+  });
+}
+
 function boardSection(id,label,count,addLabel,addId,inner,emptyMsg){
   return "<div style=\"margin-bottom:1.5rem;\">"+
     "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\">"+
@@ -5924,7 +6359,7 @@ async function seedBoardIfNew(){
   if(!BOARD_PINS||BOARD_PINS.length)return;
   var flagKey="partnr_board_seeded_"+(S.email||"me");
   try{if(localStorage.getItem(flagKey))return;localStorage.setItem(flagKey,"1");}catch(ex){}
-  var idea=(S.idea||"").trim();
+  var idea=""; // The To-do list replaces the old auto-made goal.
   if(idea){
     var title=idea.length>120?idea.slice(0,120).replace(/\s+\S*$/,"")+"…":idea;
     // Only suggest a competition step to students who picked one.
@@ -6022,16 +6457,19 @@ async function renderBoard(){
   el.innerHTML=
     "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My board</div>"+
     "<div class=\"page-note\">Your private place to plan. Only you can see this. Drag the ⋮⋮ handle to reorder.</div>"+
-    boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,"Add a goal and break it into steps you can check off.")+
+    "<div id=\"todo-wrap\" style=\"margin-bottom:1.5rem;\"></div>"+
+    (goals.length?boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,""):"")+
     boardSection("comps","Competitions",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here.")+
     boardSection("partners","Saved partners",partnerItems.length,"+ Find students","add-partner",partnerHtml,"Tap ♥ on a match or ★ in Find students to save partners here.")+
     boardSection("ideas","Ideas & links",ideas.length,"+ Add an idea or link","add-idea",ideaHtml,"Pin an open project, or add an idea, article, video or doc.");
 
   bindBoard(partnerItems);
+  renderTodos();
 }
 
 function bindBoard(partnerItems){
-  document.getElementById("add-goal").addEventListener("click",function(){
+  var addGoalBtn=document.getElementById("add-goal");
+  if(addGoalBtn)addGoalBtn.addEventListener("click",function(){
     var f=document.getElementById("goals-form");
     if(f.innerHTML){f.innerHTML="";return;}
     f.innerHTML="<div class=\"bform\"><input id=\"g-title\" placeholder=\"Your goal, e.g. Publish a research paper by spring\" maxlength=\"200\"/>"+
