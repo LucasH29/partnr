@@ -120,6 +120,10 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .app-foot{text-align:center;padding:8px 16px 28px;}
 .app-foot button{background:none;border:none;color:#999;font-size:12px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:2px;}
 .app-foot button:hover{color:#7F77DD;}
+.foot-links{font-size:12px;color:#999;margin-bottom:6px;line-height:1.8;}
+.foot-links a{color:#888;text-decoration:none;}
+#termswrap a{color:#534AB7;font-weight:600;}
+.foot-links a:hover{color:#7F77DD;text-decoration:underline;}
 .inv-opt{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid #e8e8e4;border-radius:10px;background:#fafaf8;font-size:14px;font-weight:600;color:#1a1a1a;text-decoration:none;cursor:pointer;font-family:inherit;}
 .inv-opt:hover{border-color:#7F77DD;background:#f6f5ff;}
 
@@ -236,11 +240,11 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 </head>
 <body>
 <div id="ROOT" class="app"></div>
-<div class="app-foot"><button id="fb-link" type="button">Report a problem or send feedback</button></div>
+<div class="app-foot"><div class="foot-links"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="guidelines.html" target="_blank" rel="noopener">Community Guidelines</a> · <a href="parents.html" target="_blank" rel="noopener">For Parents</a></div><button id="fb-link" type="button">Report a problem or send feedback</button></div>
 <script>
 
 // ── State ──────────────────────────────────
-var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],schoolVerification:"self_reported",skillsNeeded:"",dob:"",funFact:"",emailPrefs:{}};
+var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],schoolVerification:"self_reported",skillsNeeded:"",dob:"",funFact:"",emailPrefs:{},termsVersion:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,notSureActiveTab="browse",activeCats=[],modalTarget=null;
 var MATCHES_ARE_DEMO=false; // true while the example profiles from fallback() are on screen
 // Remembers the last real Skill Search (query/filters), so backing out
@@ -251,6 +255,8 @@ var MATCHES_ARE_DEMO=false; // true while the example profiles from fallback() a
 var LAST_SKILL_SEARCH=null;
 var REMATCH_FEEDBACK="";
 var SCHOOL_LIST=null,schoolListLoading=null,PENDING_GOOGLE_SESSION=null;
+// Bump this when the Terms or Privacy Policy change in an important way.
+var TERMS_VERSION="2026-10-02";
 var SCHOOL_LIST_FILES=["ca_schools_autocomplete.json","tx_schools_autocomplete.json","fl_schools_autocomplete.json"];
 var WORLD_CITIES=null,worldCitiesLoading=null;
 
@@ -582,7 +588,8 @@ async function saveProfile(){
     zip:S.zip,state:S.state||null,grade:S.grade,track:S.track,role:S.role,secondary:S.secondary,status:S.status,
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,links:S.links||[],proof_of_work:S.proofOfWork||[],
-    stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null,fun_fact:(S.funFact||"").trim().slice(0,150)||null
+    stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null,fun_fact:(S.funFact||"").trim().slice(0,150)||null,
+    terms_version:S.termsVersion||undefined // the database stamps the time
   });
   if(upsertRes.error)return upsertRes;
   // The database decides the school badge (and may correct the school
@@ -628,7 +635,7 @@ async function loadProfileIntoState(uid){
   S.links=p.links||[];S.proofOfWork=p.proof_of_work||[];S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
   S.dob=p.dob||"";S.state=p.state||"";
-  S.skillsNeeded=p.skills_needed||"";S.funFact=p.fun_fact||"";S.emailPrefs=p.email_prefs||{};
+  S.skillsNeeded=p.skills_needed||"";S.funFact=p.fun_fact||"";S.termsVersion=p.terms_version||"";S.emailPrefs=p.email_prefs||{};
 
   var skillsRes=await sba.from("skills").select("*").eq("student_id",uid);
   S.skillLevels={};
@@ -2294,6 +2301,14 @@ function rSignup(){
       "<input id=\"langother\" placeholder=\"Add a language (e.g. Somali, Wolof, Tigrinya...)\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<button id=\"langaddbtn\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button>"+
     "</div>"+
+    (EDIT_RETURN?"":
+    "<div id=\"termswrap\" style=\"background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:12px 14px;margin:0.5rem 0 1rem;\">"+
+      "<label for=\"iterms\" style=\"display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:#1a1a1a;font-weight:400;cursor:pointer;\">"+
+        "<input id=\"iterms\" type=\"checkbox\" style=\"width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#534AB7;\""+(S.termsVersion?" checked":"")+"/>"+
+        "<span>I'm 13 to 19, and I agree to Partnr's <a href=\"terms.html\" target=\"_blank\" rel=\"noopener\">Terms</a>, <a href=\"privacy.html\" target=\"_blank\" rel=\"noopener\">Privacy Policy</a> and <a href=\"guidelines.html\" target=\"_blank\" rel=\"noopener\">Community Guidelines</a>. If I'm under 18, a parent or guardian has reviewed them with me.</span>"+
+      "</label>"+
+      "<div style=\"font-size:12px;color:#6b6b6b;margin:6px 0 0 28px;\">Parents: see our <a href=\"parents.html\" target=\"_blank\" rel=\"noopener\">guide for parents</a>.</div>"+
+    "</div>")+
     "<button class=\"bp\" id=\"s2\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
@@ -3305,6 +3320,8 @@ async function step2(){
   if(!langs.length){showSecErr("lang-other-wrap","Select at least one language you speak");valid=false;}
   var city=document.getElementById("icity").value.trim();
   if(!city){showErr("icity","Enter your city");valid=false;}
+  var termsBox=document.getElementById("iterms");
+  if(termsBox&&!termsBox.checked){showSecErr("termswrap","Please check the box to agree to the Terms before continuing");valid=false;}
   var zipVal="";
   if(co&&hasZip(co)){
     zipVal=document.getElementById("izip").value.trim();
@@ -3326,6 +3343,7 @@ async function step2(){
     return;
   }
   S.name=n;S.email=e;S.school=sc;S.grade=g;S.country=co;S.city=city;S.zip=zipVal;S.languages=langs;S.dob=dob;
+  if(termsBox&&termsBox.checked)S.termsVersion=TERMS_VERSION;
   var funEl=document.getElementById("ifun");if(funEl)S.funFact=funEl.value.trim().slice(0,150);
   if(EDIT_RETURN){saveEditAndReturn("s2");return;}
 
@@ -6369,7 +6387,7 @@ function fallback(){
 }
 
 function resetAll(){
-  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],skillsNeeded:"",dob:"",funFact:"",emailPrefs:{}};
+  S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],skillsNeeded:"",dob:"",funFact:"",emailPrefs:{},termsVersion:""};
   MATCHES=[];MATCHES_ARE_DEMO=false;BOARD_PINS=null;FS={skill:"",comp:"",where:"anyone",extra:[]};SHOW_PASSED=false;PROJECTS=[];COMPS_DATA=[];CONNS=[];selComps=[];modalTarget=null;exploreOpen=false;activeCats=[];
   clearPendingSignup();
   signOutUser().catch(function(){});
