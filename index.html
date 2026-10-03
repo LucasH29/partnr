@@ -6164,8 +6164,23 @@ async function loadTodoState(){
   }catch(ex){console.error("[Partnr] loading to-dos failed:",ex);}
   return st;
 }
+// Older goals had their own checklists. Move those steps into the To-do
+// list once, so the board only ever has one list.
+async function moveGoalStepsToTodos(){
+  var withSteps=(BOARD_PINS||[]).filter(function(p){return p.kind==="goal"&&p.data&&(p.data.steps||[]).length;});
+  for(var i=0;i<withSteps.length;i++){
+    var p=withSteps[i];
+    var rows=p.data.steps.slice(0,12).map(function(x,k){return {title:String(x.t||"").slice(0,140)||"Step",done:!!x.done,position:k};});
+    var ins=await sba.from("student_todos").insert(rows);
+    if(ins.error){console.error("[Partnr] moving goal steps failed:",ins.error);continue;}
+    var nd=Object.assign({},p.data);delete nd.steps;
+    await sba.from("board_pins").update({data:nd}).eq("id",p.id);
+    p.data=nd;
+  }
+}
 async function renderTodos(){
   var wrap=document.getElementById("todo-wrap");if(!wrap)return;
+  try{await moveGoalStepsToTodos();}catch(ex){console.error(ex);}
   var st=await loadTodoState();
   wrap=document.getElementById("todo-wrap");if(!wrap||!st)return;
   var workRow=st.todos.find(function(t){return t.builtin==="work";});
@@ -6397,15 +6412,11 @@ async function renderBoard(){
   }
   var ideas=BOARD_PINS.filter(function(p){return p.kind==="idea"||p.kind==="link";});
 
+  // Goals are the big picture, one line each. The steps to get there
+  // live in the To-do list, so there's only one checklist on the board.
   var goalHtml=goals.map(function(p){
-    var steps=(p.data&&p.data.steps)||[];
-    var done=steps.filter(function(s){return s.done;}).length;
-    var pct=steps.length?Math.round(done/steps.length*100):0;
     return pinShell("pin:"+p.id,
-      "<div class=\"bk\" style=\"color:#534AB7;\">Goal</div><div class=\"bt\">"+esc(p.title)+"</div>"+
-      (steps.length?"<div style=\"height:6px;background:#fff;border-radius:3px;margin:8px 0 4px;overflow:hidden;\"><div style=\"height:100%;width:"+pct+"%;background:#7F77DD;\"></div></div>"+
-        "<div style=\"font-size:12px;color:#555;margin-bottom:6px;\">"+done+" of "+steps.length+" steps done</div>"+
-        steps.map(function(s,si){return "<label style=\"display:flex;gap:6px;align-items:flex-start;font-size:12px;color:#444;margin-top:4px;cursor:pointer;\"><input type=\"checkbox\" class=\"gstep\" data-id=\""+p.id+"\" data-i=\""+si+"\""+(s.done?" checked":"")+" style=\"margin-top:2px;\"> <span style=\""+(s.done?"text-decoration:line-through;color:#999;":"")+"\">"+esc(s.t)+"</span></label>";}).join(""):""),
+      "<div class=\"bk\" style=\"color:#534AB7;\">Goal</div><div class=\"bt\">"+esc(p.title)+"</div>",
       "background:#EEEDFE;border-color:#d9d6fb;");
   }).join("");
 
@@ -6458,7 +6469,7 @@ async function renderBoard(){
     "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My board</div>"+
     "<div class=\"page-note\">Your private place to plan. Only you can see this. Drag the ⋮⋮ handle to reorder.</div>"+
     "<div id=\"todo-wrap\" style=\"margin-bottom:1.5rem;\"></div>"+
-    (goals.length?boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,""):"")+
+    boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,"Your big goals, like \"Publish research by spring\" or \"Win DECA states.\" The steps go in your to-do list above.")+
     boardSection("comps","Competitions",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here.")+
     boardSection("partners","Saved partners",partnerItems.length,"+ Find students","add-partner",partnerHtml,"Tap ♥ on a match or ★ in Find students to save partners here.")+
     boardSection("ideas","Ideas & links",ideas.length,"+ Add an idea or link","add-idea",ideaHtml,"Pin an open project, or add an idea, article, video or doc.");
@@ -6473,14 +6484,13 @@ function bindBoard(partnerItems){
     var f=document.getElementById("goals-form");
     if(f.innerHTML){f.innerHTML="";return;}
     f.innerHTML="<div class=\"bform\"><input id=\"g-title\" placeholder=\"Your goal, e.g. Publish a research paper by spring\" maxlength=\"200\"/>"+
-      "<textarea id=\"g-steps\" placeholder=\"Steps, one per line (optional)\"></textarea><div id=\"g-err\"></div>"+
+      "<div id=\"g-err\"></div>"+
       "<button class=\"bp\" id=\"g-save\" style=\"margin-top:0;\">Add goal</button></div>";
     document.getElementById("g-save").addEventListener("click",async function(){
       var t=document.getElementById("g-title").value.trim();
       if(!t){document.getElementById("g-err").innerHTML="<div class=\"sec-err\">Write your goal first.</div>";return;}
-      var steps=document.getElementById("g-steps").value.split("\n").map(function(x){return x.trim();}).filter(Boolean).slice(0,12).map(function(x){return {t:x.slice(0,140),done:false};});
       this.disabled=true;
-      if(await addBoardPin("goal",t,{steps:steps}))renderBoard();else this.disabled=false;
+      if(await addBoardPin("goal",t,{}))renderBoard();else this.disabled=false;
     });
   });
   document.getElementById("add-comp").addEventListener("click",function(){openCompPicker(function(name){pinCompetition(name).then(renderBoard);});});
