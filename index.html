@@ -92,6 +92,7 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .mcircle{width:42px;height:42px;flex-shrink:0;border-radius:50%;border:1px solid #ddd;background:white;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .mpass{color:#888;}.mpass:hover{background:#f6f6f3;border-color:#bbb;}
 .msave{color:#B8456E;border-color:#f1c7d6;}.msave:hover{background:#fdf0f4;}
+.rate-card{background:#faf9ff;border:1.5px solid #d9d6fb;border-radius:14px;padding:14px;margin-bottom:12px;}
 .mloc{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#f1f0ec;border-radius:10px;padding:8px 12px;margin:10px 0;font-size:13px;color:#555;}
 .mloc button{background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;}
 .nfit-toggle{width:100%;text-align:left;background:white;border:1px solid #d9d6fb;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;color:#534AB7;cursor:pointer;font-family:inherit;margin-bottom:10px;}
@@ -4088,6 +4089,92 @@ function openInviteMenu(){
   });
 }
 
+// ── "Tell us what you think" ────────────────────
+// Two quick questions. Shown once as a card on Matches, after a student's
+// first connection is accepted or after a week on Partnr ("Not now" brings
+// it back once, a week later). Always available from the profile menu.
+// Answers are private and emailed to hello@projectpartnr.com.
+var RATE_USEFUL=["😀 Really useful","🙂 Pretty useful","😐 Not very useful"];
+var RATE_HELPS=["Yes","Maybe","No"];
+var RATE_STATE=null; // checked once per visit
+function rateFormHtml(p){
+  return "<div style=\"font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:6px;\">How useful is Partnr so far?</div>"+
+    "<div class=\"cgrow\" id=\""+p+"-useful\" style=\"margin-bottom:12px;\"></div>"+
+    "<div style=\"font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:6px;\">Do you think Partnr could help other teens find project partners?</div>"+
+    "<div class=\"cgrow\" id=\""+p+"-helps\" style=\"margin-bottom:12px;\"></div>"+
+    "<label for=\""+p+"-comment\" style=\"font-size:12px;font-weight:600;color:#555;\">What would make it better? <span style=\"font-weight:400;color:#888;\">(optional)</span></label>"+
+    "<textarea id=\""+p+"-comment\" maxlength=\"600\" style=\"width:100%;height:60px;resize:none;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;margin:4px 0 8px;\"></textarea>"+
+    "<label style=\"display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#444;cursor:pointer;margin-bottom:12px;\"><input type=\"checkbox\" id=\""+p+"-quote\" style=\"width:16px;height:16px;flex-shrink:0;margin-top:1px;accent-color:#534AB7;\"/><span>Partnr can quote what I wrote (first name and grade only)</span></label>"+
+    "<div id=\""+p+"-err\"></div>"+
+    "<div style=\"display:flex;gap:8px;\"><button type=\"button\" class=\"bp\" id=\""+p+"-send\" style=\"margin:0;flex:1;\">Send</button>"+
+    "<button type=\"button\" class=\"bkbtn\" id=\""+p+"-later\" style=\"margin:0;width:auto;padding:0 18px;\">Not now</button></div>";
+}
+function bindRateForm(p,source,onDone,onLater){
+  mkChips(p+"-useful",RATE_USEFUL,[],true);
+  mkChips(p+"-helps",RATE_HELPS,[],true);
+  document.getElementById(p+"-later").addEventListener("click",onLater);
+  document.getElementById(p+"-send").addEventListener("click",async function(){
+    var useful=(getChips(p+"-useful")[0]||"").replace(/^\S+\s/,"");
+    var helps=getChips(p+"-helps")[0]||"";
+    var valid=true;
+    if(!useful){showSecErr(p+"-useful","Pick one");valid=false;}
+    if(!helps){showSecErr(p+"-helps","Pick one");valid=false;}
+    if(!valid)return;
+    var btn=this;btn.disabled=true;btn.textContent="Sending…";
+    var res=await sba.from("app_ratings").insert({usefulness:useful,helps_teens:helps,
+      comment:document.getElementById(p+"-comment").value.trim().slice(0,600)||null,
+      quote_ok:document.getElementById(p+"-quote").checked,source:source});
+    if(res.error){btn.disabled=false;btn.textContent="Send";showInlineError(document.getElementById(p+"-err"),"Couldn't send. Please try again.");return;}
+    if(RATE_STATE)RATE_STATE.done=true;
+    onDone();
+  });
+}
+async function maybeShowRateCard(){
+  var el=document.getElementById("rate-card");if(!el||MATCHES_ARE_DEMO)return;
+  try{
+    if(!RATE_STATE){
+      var session=await getSession();if(!session)return;
+      var me=session.user.id;
+      var r=await Promise.all([
+        sba.from("students").select("created_at,rating_dismiss_count,rating_dismissed_at").eq("id",me).single(),
+        sba.from("app_ratings").select("id",{count:"exact",head:true}),
+        sba.from("connections").select("id",{count:"exact",head:true}).eq("status","accepted").or("student_a_id.eq."+me+",student_b_id.eq."+me)
+      ]);
+      var row=r[0].data||{};
+      RATE_STATE={me:me,done:(r[1].count||0)>0,dismissed:row.rating_dismiss_count||0,dismissedAt:row.rating_dismissed_at,created:row.created_at,partners:r[2].count||0,hidden:false};
+    }
+    var st=RATE_STATE,WEEK=7*24*60*60*1000;
+    var weekOld=st.created&&Date.now()-new Date(st.created).getTime()>WEEK;
+    var waitedAfterLater=!st.dismissed||(st.dismissedAt&&Date.now()-new Date(st.dismissedAt).getTime()>WEEK);
+    var show=!st.done&&!st.hidden&&st.dismissed<2&&waitedAfterLater&&(st.partners>0||weekOld);
+    el=document.getElementById("rate-card");if(!el)return;
+    if(!show){el.innerHTML="";return;}
+    el.innerHTML="<div class=\"rate-card\"><div style=\"font-size:12px;font-weight:700;color:#534AB7;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;\">Quick question</div>"+rateFormHtml("rc")+"</div>";
+    bindRateForm("rc","card",function(){
+      el.innerHTML="<div class=\"rate-card\" style=\"text-align:center;font-size:14px;font-weight:600;color:#1D7A5C;\">Thanks! That really helps us make Partnr better.</div>";
+      setTimeout(function(){var e=document.getElementById("rate-card");if(e)e.innerHTML="";},3000);
+    },async function(){
+      st.hidden=true;st.dismissed+=1;st.dismissedAt=new Date().toISOString();
+      el.innerHTML="";
+      await sba.from("students").update({rating_dismiss_count:st.dismissed,rating_dismissed_at:st.dismissedAt}).eq("id",st.me);
+    });
+  }catch(ex){console.warn("[Partnr] rating card skipped (non-fatal):",ex);}
+}
+function openRateModal(){
+  var old=document.getElementById("rate-modal");if(old)old.remove();
+  var ov=document.createElement("div");ov.id="rate-modal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:220;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  ov.innerHTML="<div role=\"dialog\" aria-label=\"Tell us what you think\" style=\"background:white;border-radius:16px;padding:1.25rem;max-width:420px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);\">"+
+    "<div style=\"font-size:17px;font-weight:700;margin-bottom:12px;\">Tell us what you think</div>"+rateFormHtml("rm")+"</div>";
+  document.body.appendChild(ov);
+  ov.addEventListener("click",function(e){if(e.target===ov)ov.remove();});
+  bindRateForm("rm","menu",function(){
+    ov.remove();showToast("Thanks! That really helps us make Partnr better.");
+    var c=document.getElementById("rate-card");if(c)c.innerHTML="";
+  },function(){ov.remove();});
+  var later=document.getElementById("rm-later");if(later)later.textContent="Cancel";
+}
+
 // ── Matches page ─────────────────────────────
 function rMatches(){
   // Waitlist banner
@@ -4118,6 +4205,7 @@ function rMatches(){
           "<button class=\"pm-it\" data-act=\"email\">Email settings</button>"+
           "<button class=\"pm-it\" data-act=\"blocked\">Blocked students</button>"+
           "<div class=\"pm-hr\"></div>"+
+          "<button class=\"pm-it\" data-act=\"rate\">Tell us what you think</button>"+
           "<button class=\"pm-it\" data-act=\"feedback\">Report a problem</button>"+
           "<button class=\"pm-it\" data-act=\"signout\">Sign out</button>"+
         "</div>"+
@@ -4192,6 +4280,7 @@ function bindProfileMenu(){
       else if(act==="blocked"){selectTab("me");renderBlockedList();}
       else if(act==="email")openEmailSettings();
       else if(act==="feedback")openFeedback();
+      else if(act==="rate")openRateModal();
       else if(act==="signout")resetAll();
     });
   });
@@ -4356,6 +4445,7 @@ function mCards(){
   var h="<div style=\"font-size:20px;font-weight:700;margin-bottom:2px;\">Picked for you</div>"+
     "<div class=\"page-note\">Students whose interests, skills and competitions fit yours.</div>"+
     "<div class=\"mloc\"><span><span style=\"color:#888;\">Matching you with:</span> "+esc(S.locationPref||"🌍 Anyone in the world")+"</span><button type=\"button\" id=\"loc-change\">Change your profile settings</button></div>"+
+    "<div id=\"rate-card\"></div>"+
     "<button type=\"button\" id=\"nfit-toggle\" class=\"nfit-toggle\" aria-expanded=\""+(NFIT_OPEN?"true":"false")+"\">Not the right fit? Find other students <span aria-hidden=\"true\">"+(NFIT_OPEN?"▴":"▾")+"</span></button>"+
     "<div id=\"nfit-panel\" class=\"nfit-panel\" style=\""+(NFIT_OPEN?"":"display:none;")+"\">"+
       "<div style=\"font-size:13px;color:#555;margin-bottom:6px;\">Tell us what's off and we'll find new matches.</div>"+
@@ -4428,6 +4518,7 @@ function bindME(){
     goTo("loading");
     doFetch();
   });
+  maybeShowRateCard();
   var lc=document.getElementById("loc-change");
   if(lc)lc.addEventListener("click",function(){
     EDIT_RETURN="matches";EDIT_START_PREF=S.locationPref||"";
