@@ -92,6 +92,14 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .mcircle{width:42px;height:42px;flex-shrink:0;border-radius:50%;border:1px solid #ddd;background:white;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .mpass{color:#888;}.mpass:hover{background:#f6f6f3;border-color:#bbb;}
 .msave{color:#B8456E;border-color:#f1c7d6;}.msave:hover{background:#fdf0f4;}
+.mloc{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#f1f0ec;border-radius:10px;padding:8px 12px;margin:10px 0;font-size:13px;color:#555;}
+.mloc button{background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;}
+.nfit-toggle{width:100%;text-align:left;background:white;border:1px solid #d9d6fb;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;color:#534AB7;cursor:pointer;font-family:inherit;margin-bottom:10px;}
+.nfit-panel{background:white;border:1px solid #d9d6fb;border-radius:12px;padding:12px;margin:-4px 0 12px;}
+.nfit-panel textarea{width:100%;height:56px;resize:none;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;}
+.nfit-panel input{padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;}
+.nfit-or{font-size:11px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;}
+.nfit-sbtn{padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
 .todo-card{background:white;border:1px solid #e8e8e4;border-radius:14px;padding:6px 14px;}
 .todo-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #f0efeb;}
 .todo-row:first-child{border-top:none;}
@@ -913,7 +921,7 @@ async function fetchSavedStudents(){
   return students.map(function(s){
     var mySkills=skillsByStudent[s.id]||[];
     var keySkill=mySkills[0]?mySkills[0].skill_name:"Partner";
-    var keyLevel=(mySkills[0]&&mySkills[0].level)||"Intermediate";
+    var keyLevel=(mySkills[0]&&mySkills[0].level)||"";
     var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
     return {
       name:s.name,school:s.school,city:s.city,country:s.country,grade:s.grade,
@@ -921,7 +929,7 @@ async function fetchSavedStudents(){
       track:s.track,role:s.role,
       availability:s.availability||"Not specified",
       status:s.status||"Open to connecting",
-      bio:s.idea||"Hasn't added a bio yet.",
+      bio:s.idea||"",
       keySkill:keySkill,keyLevel:keyLevel,
       otherSkills:otherSkills,
       competitions:compsByStudent[s.id]||[],
@@ -1035,8 +1043,9 @@ async function searchRealStudents(opts,excludeId){
 
   var studentsQuery=sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links").eq("onboarded",true).limit(60);
   if(idList!==null)studentsQuery=studentsQuery.in("id",idList);
-  if(city)studentsQuery=studentsQuery.ilike("city",city);
-  if(school)studentsQuery=studentsQuery.ilike("school",school);
+  // "Near me" = same city or within about 25 miles (worked out by the
+  // database, so nobody's location is ever sent to the browser).
+  if(city)studentsQuery=studentsQuery.eq("near_me",true);
   if(country)studentsQuery=studentsQuery.ilike("country",country);
   if(excludeId)studentsQuery=studentsQuery.neq("id",excludeId);
 
@@ -1048,6 +1057,9 @@ async function searchRealStudents(opts,excludeId){
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
   students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
   // Nearest first: same school, city, state, country, then everyone else.
+  // "My school": only your own school (the school name is hidden for
+  // everyone else anyway). Same spelling rules as the database.
+  if(school)students=students.filter(function(s){return s.school&&normSchool(s.school)===normSchool(school);});
   students.sort(function(a,b){return locationRank(a)-locationRank(b);});
   console.log("[Partnr search] filters:",{query:query,city:city,school:school,competition:competition},"| matched:",students.length);
   if(!students.length)return [];
@@ -1066,7 +1078,7 @@ async function searchRealStudents(opts,excludeId){
     var mySkills=skillsByStudent[s.id]||[];
     var matched=skillMatch[s.id];
     var keySkill=matched?matched.skill:(mySkills[0]?mySkills[0].skill_name:fallbackLabel);
-    var keyLevel=(matched&&matched.level)||(mySkills[0]&&mySkills[0].level)||"Intermediate";
+    var keyLevel=(matched&&matched.level)||(mySkills[0]&&mySkills[0].level)||"";
     var otherSkills=mySkills.filter(function(x){return x.skill_name!==keySkill;}).slice(0,3).map(function(x){return x.skill_name;});
     return {
       name:s.name,school:s.school,city:s.city,country:s.country,grade:s.grade,
@@ -1074,7 +1086,7 @@ async function searchRealStudents(opts,excludeId){
       track:s.track,role:s.role,
       availability:s.availability||"Not specified",
       status:s.status||"Open to connecting",
-      bio:s.idea||"Hasn't added a bio yet.",
+      bio:s.idea||"",
       keySkill:keySkill||fallbackLabel,keyLevel:keyLevel,
       otherSkills:otherSkills,
       competitions:compsByStudent[s.id]||[],
@@ -1527,8 +1539,8 @@ var TR={
 };
 var RO={vision:{n:"Vision / CEO",i:"ti-bulb"},tech_r:{n:"Tech / CTO",i:"ti-code"},mktg:{n:"Marketing / CMO",i:"ti-speakerphone"},ops:{n:"Operations / COO",i:"ti-list-check"},res_r:{n:"Research Lead",i:"ti-microscope"},creative:{n:"Creative Lead",i:"ti-palette"}};
 var CM={purple:{bg:"#EEEDFE",c:"#534AB7"},teal:{bg:"#E1F5EE",c:"#0F6E56"},coral:{bg:"#FAECE7",c:"#993C1D"},blue:{bg:"#E6F1FB",c:"#185FA5"},green:{bg:"#EAF3DE",c:"#3B6D11"}};
-var LB={Beginner:"#F1EFE8",Intermediate:"#E6F1FB",Advanced:"#EEEDFE",Expert:"#EAF3DE"};
-var LT={Beginner:"#444",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D11"};
+var LB={Beginner:"#F1EFE8",Experienced:"#EEEDFE",Intermediate:"#E6F1FB",Advanced:"#EEEDFE",Expert:"#EAF3DE"};
+var LT={Beginner:"#444",Experienced:"#3C3489",Intermediate:"#0C447C",Advanced:"#3C3489",Expert:"#3B6D11"};
 
 // Competition category colors — unique per category
 var CM2={
@@ -1947,7 +1959,7 @@ var SKILL_CAT_COLORS={
 var SKILL_CATS=[
   {id:"math",label:"Math",question:"What math courses have you taken?",icon:"ti-math-function",type:"course",hint:"The course itself tells us your level - select everything you have studied",
    items:["Algebra 1","Algebra 2","Geometry","Trigonometry","Pre-Calculus","Statistics & Probability","Calculus (AB/BC)","Linear Algebra","Multivariable Calculus","Differential Equations","Number Theory","Combinatorics & Discrete Math","Real Analysis"]},
-  {id:"coding",label:"Coding & CS",question:"What programming languages and tools do you use?",icon:"ti-code",type:"level",hint:"Tap every programming language or tool you know. Spoken languages are on your profile already.",
+  {id:"coding",label:"Coding & CS",question:"What programming languages and tools do you use?",icon:"ti-code",type:"level",hint:"Tap every programming language or tool you know, then Beginner or Experienced. Spoken languages are on your profile already.",
    items:["Python","JavaScript","Java","C / C++","Swift","Kotlin","Go","R","MATLAB","SQL","HTML / CSS","React / Next.js","Node.js","TensorFlow / PyTorch","Firebase / Databases","API Development","Cybersecurity","Git / GitHub","Arduino","Raspberry Pi","Unity / Game Dev","Bash / Linux","No-code (Webflow / Bubble / Zapier)"]},
   {id:"science",label:"Science & Research",question:"What science fields do you know or work in?",icon:"ti-microscope",type:"level",hint:"Select fields you have genuinely studied, researched, or worked in",
    items:["Biology","Animal Sciences","Plant Sciences","Microbiology","Molecular Biology","Genetics / Gene Editing","Neuroscience","Biomedical / Translational Medicine","Anatomy & Physiology","Ecology / Environmental Science","Biochemistry","Chemistry","Materials Science","Physics","Astrophysics / Astronomy","Earth Science / Geology","Synthetic Biology","Bioinformatics","Forensic Science","Statistics / Data Analysis","Experimental Design","Scientific Writing"]},
@@ -1969,8 +1981,14 @@ var SKILL_CATS=[
 // to every student rating themselves). Each tier keeps its familiar
 // short label but is grounded by a one-line definition shown inline
 // when it's selected, so nobody has to guess what "Advanced" means.
-var LEVELS=["Beginner","Intermediate","Advanced"];
-var LEVEL_DEFS={"Beginner":"Just started learning this","Intermediate":"Used it in a class or project","Advanced":"Comfortable enough to lead this part"};
+var LEVELS=["Beginner","Experienced"];
+// Only tools have a level (coding, engineering, design). Everything else
+// is one tap. Older profiles saved Intermediate/Advanced, shown as Experienced.
+var LEVEL_CATS=["coding","engineering","design"];
+// Show a level only when it's a real one (not "noted"/"studied"/blank).
+function showLv(lv){return !!lv&&lv!=="noted"&&lv!=="studied";}
+function lvLabel(lv){return (lv==="Intermediate"||lv==="Advanced"||lv==="Expert")?"Experienced":lv;}
+var LEVEL_DEFS={"Experienced":"Used it in a real class or project","Beginner":"Just started learning this","Intermediate":"Used it in a class or project","Advanced":"Comfortable enough to lead this part"};
 // Math is a different kind of question ("what have you taken", not
 // "how good are you") so it gets its own two-tag system rather than
 // being forced into the same proficiency scale as a tool or subject.
@@ -2392,15 +2410,15 @@ function rSignup(){
       "<div id=\"schoolSuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"icountry\">Country"+req()+"</label><select id=\"icountry\">"+countryOpts()+"</select></div>"+
-    "<div class=\"fi\" style=\"position:relative;\"><label for=\"icity\">City"+req()+"</label><input id=\"icity\" autocomplete=\"off\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/>"+
-      "<div id=\"citySuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
-    "</div>"+
     "<div id=\"zipwrap\" style=\""+(co&&hasZip(co)?"":"display:none;")+"\">"+
-      "<div class=\"fi\"><label for=\"izip\">Zip / Postal code"+(co&&hasZip(co)?req():"")+"</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
+      "<div class=\"fi\"><label for=\"izip\">Home zip / postal code"+(co&&hasZip(co)?req():"")+"</label><input id=\"izip\" placeholder=\"e.g. 91501\" value=\""+esc(S.zip)+"\"/></div>"+
+    "</div>"+
+    "<div class=\"fi\" style=\"position:relative;\"><label for=\"icity\">Home city"+req()+"</label><div style=\"font-size:12px;color:#6b6b6b;margin-bottom:6px;\">Where you live, not your school. We use it to find students near you.</div><input id=\"icity\" autocomplete=\"off\" placeholder=\"e.g. Burbank\" value=\""+esc(S.city)+"\"/>"+
+      "<div id=\"citySuggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:220px;overflow-y:auto;z-index:50;margin-top:2px;\"></div>"+
     "</div>"+
     "<div class=\"fi\"><label for=\"igrade\">Grade / Year"+req()+"</label><select id=\"igrade\">"+gradeOpts()+"</select></div>"+
     "<div class=\"fi\"><label for=\"idob\">Date of birth"+req()+"</label><input id=\"idob\" type=\"date\" value=\""+esc(S.dob)+"\"/></div>"+
-    "<div class=\"fi\"><label for=\"ifun\">Something fun about you <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><div style=\"font-size:12px;color:#6b6b6b;margin-bottom:6px;\">A hobby, a talent or a random fact. It gives a new partner an easy way to start talking.</div><input id=\"ifun\" maxlength=\"150\" placeholder=\"e.g. I bake sourdough and can solve a Rubik's cube in a minute\" value=\""+esc(S.funFact)+"\"/></div>"+
+    (!EDIT_RETURN?"":"<div class=\"fi\"><label for=\"ifun\">Something fun about you <span style=\"font-weight:400;color:#6b6b6b;\">(optional)</span></label><div style=\"font-size:12px;color:#6b6b6b;margin-bottom:6px;\">A hobby, a talent or a random fact. It gives a new partner an easy way to start talking.</div><input id=\"ifun\" maxlength=\"150\" placeholder=\"e.g. I bake sourdough and can solve a Rubik's cube in a minute\" value=\""+esc(S.funFact)+"\"/></div>")+
     "<div class=\"slabel\" style=\"margin-top:0;\">Languages spoken"+req()+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">Which languages would you be comfortable working in? Your country's languages appear first.</div>"+
     "<div id=\"lang-suggested\" style=\""+(COUNTRY_LANGS[co]?"":"display:none;")+"\">"+
@@ -2490,7 +2508,7 @@ function rSignup(){
         // Fill the city only when the list knows it AND the student hasn't
         // already typed one (never overwrite a city they entered).
         var cityInput=document.getElementById("icity");
-        if(cityInput&&item.dataset.city&&!cityInput.value.trim())cityInput.value=item.dataset.city;
+        /* Home city comes from the student's own zip, not the school's city. */
         var countrySelect=document.getElementById("icountry");
         if(countrySelect){
           countrySelect.value="United States";
@@ -2595,16 +2613,15 @@ function rTrack(){
   R(logo()+sb(2)+
     "<h2>Find the right partner to bring your ideas to life.</h2>"+
     "<div class=\"sub\">Whether you’re starting a project, joining one, or exploring possibilities, connect with students who share your interests and ambition.</div>"+
+    "<div class=\"slabel\" style=\"margin-top:0;\">Status"+req()+" <span style=\"font-weight:400;color:#6b6b6b;text-transform:none;letter-spacing:0;\">Pick all that fit</span></div>"+
+    "<div class=\"cgrow\" id=\"status\"></div>"+
     "<div class=\"fi\" style=\"margin-top:0;\"><label for=\"iidea\">Describe a project you have in mind or the kind you’d be interested in joining. <span style=\"font-weight:600;color:#534AB7;font-size:12px;\">Required. A sentence or two is all it takes.</span></label><textarea id=\"iidea\" placeholder=\"e.g. I want to start a nonprofit tackling food waste and need a partner who's into grassroots organizing, or: I know Python and want to join a biology research project...\">"+esc(S.idea)+"</textarea></div>"+
     "<div id=\"interest-row\" style=\"margin:-4px 0 1rem;\">"+
       "<div style=\"font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:6px;\">Your interests <span style=\"font-weight:400;\">(we pick these from what you wrote. Tap to change, up to 2)</span></div>"+
       "<div class=\"cgrow\" id=\"interest-row-chips\" style=\"margin-bottom:0;\"></div>"+
     "</div>"+
-    "<div class=\"slabel\">Status"+req()+"</div>"+
-    "<div class=\"cgrow\" id=\"status\"></div>"+
+
     compSectionHTML+
-    "<div class=\"slabel\">Commitment"+req()+"</div>"+
-    "<div class=\"cgrow\" id=\"commit\"></div>"+
     "<div class=\"slabel\">Who do you want to connect with?"+req()+"</div>"+
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:10px;\">You can change this anytime from your matches page.</div>"+
     "<div id=\"loc-pref\" style=\"display:grid;gap:8px;margin-bottom:1rem;\">"+
@@ -2616,8 +2633,20 @@ function rTrack(){
     "<button class=\"bp\" id=\"s3\">Continue →</button>"+
     "<button class=\"bkbtn\" id=\"bk\">← Back</button>"
   );
-  mkChips("status",["I have a project and need partners","Open to joining a project","Just exploring"],[S.status],true);
-  mkChips("commit",["Casual","Serious","All in"],[S.commit],true);
+  // Status can be more than one ("I have a project" and "Open to joining").
+  // "Just exploring" goes on its own.
+  var STATUS_OPTS=["I have a project and need partners","Open to joining a project","Just exploring"];
+  mkChips("status",STATUS_OPTS,String(S.status||"").split(" · ").filter(Boolean),false);
+  document.querySelectorAll("#status .chip").forEach(function(c){
+    c.addEventListener("click",function(){
+      if(!c.classList.contains("on"))return;
+      var exploring=c.textContent==="Just exploring";
+      document.querySelectorAll("#status .chip").forEach(function(x){
+        if(x!==c&&((x.textContent==="Just exploring")!==exploring)){x.classList.remove("on");x.setAttribute("aria-pressed","false");}
+      });
+    });
+  });
+  // Commitment was removed: "hours a week" on the Skills page covers it.
   renderInterestChips();
   INTEREST_MANUAL=!!(EDIT_RETURN&&S.track); // editing: keep what they chose
   var ideaBox=document.getElementById("iidea"),ideaTimer=null;
@@ -2693,10 +2722,10 @@ function rTrack(){
 // Words in the project description that point to each interest. Matched
 // as whole words, so "art" doesn't match "start" and "ai" doesn't match "said".
 var INTEREST_WORDS={
-  impact:["nonprofit","non profit","non-profit","charity","charities","volunteer","volunteering","community","help people","helps people","helping people","awareness","fundraiser","fundraising","donate","donations","social impact","homeless","underserved","tutoring"],
-  research:["research","researching","study","experiment","experiments","science","scientific","lab","biology","chemistry","physics","medicine","medical","cancer","melanoma","disease","diseases","health","neuroscience","psychology","isef","regeneron","publish","paper","data"],
+  impact:["nonprofit","non profit","non-profit","charity","charities","volunteer","volunteering","community","help people","helps people","helping people","awareness","fundraiser","fundraising","donate","donations","social impact","homeless","underserved","tutoring","clean water","water","access","developing countries","rural","low-income","deficiency","malnutrition","food insecurity","refugees","conservation"],
+  research:["research","researching","study","experiment","experiments","science","scientific","lab","biology","chemistry","physics","medicine","medical","cancer","melanoma","disease","diseases","health","neuroscience","psychology","isef","regeneron","publish","paper","data","crispr","gene","genes","genetics","gene editing","dna","biotech","iodine","nutrient","nutrients","deficiency","animal","animals","wildlife","conservation","species","ecology","environmental","climate","chemical","chemicals","bacteria","virus","water quality","microdosing"],
   business:["business","startup","start-up","company","entrepreneur","entrepreneurship","sell","selling","sales","marketing","brand","revenue","deca","fbla","customers","ecommerce","e-commerce"],
-  tech:["app","apps","website","web app","coding","code","software","ai","machine learning","robot","robots","robotics","engineering","hardware","game","programming","python","javascript","hackathon","device"],
+  tech:["app","apps","website","web app","coding","code","software","ai","machine learning","robot","robots","robotics","engineering","hardware","game","programming","python","javascript","hackathon","device","prototype","invent","invention","filter","sensor","3d print","3d printing","build a"],
   law:["law","legal","policy","mock trial","model un","government","politics","political","rights","justice","constitution","lawyer"],
   arts:["art","arts","film","movie","music","writing","write","story","stories","poetry","poem","design","photography","magazine","journalism","video","theater","theatre","animation"]
 };
@@ -2758,6 +2787,66 @@ function renderInterestChipsInto(el){
 }
 
 // ── Skills ──────────────────────────────────
+// "Suggested for you": the AI reads the description, interests and
+// competitions and picks skills from Partnr's own list (never made-up
+// ones). Asked once per description; every category stays below it.
+var AI_SKILLS={sig:"",items:null,loading:false,failed:false};
+function aiSkillSig(){return [S.idea||"",S.track||"",(S.secondary||[]).join(","),(S.comps||[]).join(",")].join("|");}
+async function fetchAiSkillSuggestions(){
+  var sig=aiSkillSig();
+  if(AI_SKILLS.sig===sig&&(AI_SKILLS.items||AI_SKILLS.loading||AI_SKILLS.failed))return;
+  if(!(S.idea||"").trim()){AI_SKILLS={sig:sig,items:[],loading:false,failed:false};return;}
+  AI_SKILLS={sig:sig,items:null,loading:true,failed:false};
+  try{
+    var session=await getSession();if(!session)throw new Error("no session");
+    var list=SKILL_CATS.filter(function(c){return c.id!=="math";}).map(function(c){return c.id+": "+c.items.join(", ");}).join("\n");
+    var interests=[(TR[S.track]||{}).n].concat(S.secondary||[]).filter(Boolean).join(", ");
+    var prompt="A high school student on Partnr wrote this about the project they want to do: \""+String(S.idea).slice(0,600)+"\"\n"+
+      "Their interests: "+(interests||"not picked")+". Competitions they picked: "+((S.comps||[]).join(", ")||"none")+".\n\n"+
+      "Here is Partnr's complete skill list, grouped by category id:\n"+list+"\n\n"+
+      "Pick the 6 to 10 skills from this exact list that matter most for THIS project, including skills a partner would bring. "+
+      "Cover every part of what they described (for example the science, the building, and the community side) and skip skills that don't really fit. "+
+      "Use names EXACTLY as written above. Never invent a skill.\n"+
+      "Return ONLY valid JSON: {\"skills\":[{\"cat\":\"category id\",\"name\":\"exact skill name\"}]}";
+    var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({prompt:prompt,mode:"suggest_skills",max_tokens:600})
+    });
+    if(!res.ok)throw new Error("status "+res.status);
+    var d=await res.json();if(d.error)throw new Error("api error");
+    var parsed=parseModelJson(d);
+    // Only keep skills that really exist in that category.
+    var seen={};
+    var items=(parsed.skills||[]).filter(function(x){
+      var cat=SKILL_CATS.find(function(c){return c.id===x.cat&&c.id!=="math";});
+      var ok=cat&&cat.items.indexOf(x.name)>=0&&!seen[x.cat+":"+x.name];
+      if(ok)seen[x.cat+":"+x.name]=true;
+      return ok;
+    }).slice(0,10);
+    if(AI_SKILLS.sig===sig)AI_SKILLS={sig:sig,items:items,loading:false,failed:false};
+  }catch(ex){
+    console.warn("[Partnr] skill suggestions unavailable (non-fatal):",ex);
+    if(AI_SKILLS.sig===sig)AI_SKILLS={sig:sig,items:null,loading:false,failed:true};
+  }
+}
+function renderAiSkillSuggestions(){
+  var el=document.getElementById("ai-skill-group");if(!el)return;
+  if(AI_SKILLS.sig!==aiSkillSig()||(!AI_SKILLS.items&&!AI_SKILLS.loading&&!AI_SKILLS.failed)){
+    fetchAiSkillSuggestions().then(function(){if(CURRENT_PAGE==="skills")renderAiSkillSuggestions();});
+  }
+  if(AI_SKILLS.failed||(AI_SKILLS.items&&!AI_SKILLS.items.length)){el.innerHTML="";return;}
+  var head="<div style=\"display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#1a1a1a;margin:4px 0 2px;\">✨ Suggested for you</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:8px;\">Picked from what you wrote about your project. Tap the ones you have. Everything else is below.</div>";
+  if(AI_SKILLS.loading||!AI_SKILLS.items){
+    el.innerHTML="<div style=\"background:#faf9ff;border:1px solid #e3e0fb;border-radius:12px;padding:12px 14px;margin-bottom:12px;\">"+head+
+      "<div style=\"font-size:12px;color:#888;\"><span class=\"spin\" style=\"display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:6px;\"></span>Reading your description…</div></div>";
+    return;
+  }
+  el.innerHTML="<div style=\"background:#faf9ff;border:1px solid #e3e0fb;border-radius:12px;padding:12px 14px;margin-bottom:12px;\">"+head+
+    "<div class=\"cgrow\" id=\"ai-skill-chips\" style=\"margin-bottom:0;\">"+AI_SKILLS.items.map(function(x){return chipHTML(x.cat,x.name);}).join("")+"</div></div>";
+  wireChipContainer(document.getElementById("ai-skill-chips"));
+}
 var COMPCAT_TO_SKILLCATS={science:["science"],business:["business"],impact:["social"],tech:["coding","engineering"],writing:["writing"],arts:["design","writing"],law:["humanities"]};
 function skillCatsFromProfile(){
   var out=[];
@@ -2841,6 +2930,7 @@ function rSkills(){
     "<div class=\"sub\" style=\"margin-bottom:0.5rem;\">Skills come from classes, hobbies, and everyday experience. Choose the ones you’ve used. They show other students what you’d bring to a team.</div>"+
     "<div style=\"font-size:14px;color:#666;line-height:1.6;margin-bottom:0.75rem;\">Tap a category to explore the options and select all that apply.</div>"+
     "<div style=\"margin-bottom:0.75rem;\"></div>"+
+    "<div id=\"ai-skill-group\"></div>"+
     "<div id=\"active-group\"></div>"+
     "<div id=\"extra-group\"></div>"+
     "<div id=\"math-group\"></div>"+
@@ -2878,6 +2968,7 @@ function rSkills(){
   renderGroup("active-group","Based on your interests",null,activeCats,false);
   renderGroup("extra-group","Select additional skills","Add all the skills you have. It helps you match with more partners and projects.",extraCats,true);
   renderSkillRecap();
+  renderAiSkillSuggestions();
 
   document.getElementById("addskillbtn2").addEventListener("click",addCustomSkill);
   document.getElementById("customskill2").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addCustomSkill();}});
@@ -2991,7 +3082,7 @@ function chipHTML(catId,item){
   // even after the student opens another skill.
   // Levels are off for now: every skill except math courses is one tap
   // to add and one tap to remove. Old saved levels still count as picked.
-  var noLevel=!isMath||NO_LEVEL_ITEMS.has(item);
+  var noLevel=(!isMath&&LEVEL_CATS.indexOf(catId)<0)||NO_LEVEL_ITEMS.has(item);
   var isOpen=openSkillKey===key||(on&&!lv&&!noLevel);
   if(noLevel){
     var notedOn=on;
@@ -3002,12 +3093,12 @@ function chipHTML(catId,item){
       "<div style=\"font-size:13px;font-weight:500;color:#3C3489;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;\">"+esc(item)+
         "<button class=\"skill-chip-remove\" data-key=\""+key+"\" aria-label=\"Remove "+esc(item)+"\" style=\"background:none;border:none;color:#999;cursor:pointer;font-size:14px;padding:0 2px;font-family:inherit;\">\u00d7</button></div>"+
       "<div style=\"display:flex;gap:4px;flex-wrap:wrap;\">"+
-        tagSet.map(function(l){return "<button class=\"rate-btn\" data-key=\""+key+"\" data-lv=\""+l+"\" style=\"font-size:11px;padding:4px 8px;border:1px solid "+(lv===l?"#7F77DD":"#ddd")+";border-radius:6px;background:"+(lv===l?"#EEEDFE":"white")+";color:"+(lv===l?"#3C3489":"#444")+";cursor:pointer;font-family:inherit;\">"+l+"</button>";}).join("")+
+        tagSet.map(function(l){var sel=lvLabel(lv)===l;return "<button class=\"rate-btn\" data-key=\""+key+"\" data-lv=\""+l+"\" style=\"font-size:11px;padding:4px 8px;border:1px solid "+(sel?"#7F77DD":"#ddd")+";border-radius:6px;background:"+(sel?"#EEEDFE":"white")+";color:"+(sel?"#3C3489":"#444")+";cursor:pointer;font-family:inherit;\">"+l+"</button>";}).join("")+
       "</div>"+
-      (lv&&!isMath?"<div style=\"font-size:11px;color:#6b6b6b;margin-top:5px;\">"+LEVEL_DEFS[lv]+"</div>":"")+
+      (lv&&!isMath&&LEVEL_DEFS[lvLabel(lv)]?"<div style=\"font-size:11px;color:#6b6b6b;margin-top:5px;\">"+LEVEL_DEFS[lvLabel(lv)]+"</div>":"")+
     "</div>";
   }
-  var label=on&&lv?item+" · "+lv:item;
+  var label=on&&lv?item+" · "+lvLabel(lv):item;
   if(on&&!lv){
     return "<span class=\"chip skill-chip\" data-key=\""+key+"\" data-item=\""+esc(item)+"\" style=\"border-color:#E24B4A;background:#FCEBEB;color:#A32D2D;display:inline-flex;align-items:center;gap:6px;\">"+esc(label)+"<span class=\"skill-chip-remove\" data-key=\""+key+"\" role=\"button\" aria-label=\"Remove "+esc(item)+"\" style=\"font-weight:700;opacity:0.75;cursor:pointer;\">×</span></span>";
   }
@@ -3100,7 +3191,9 @@ function renderSkillRecap(){
     var name=k.indexOf(":")>=0?k.split(":")[1]:k;
     var lv=S.skillLevels[k];
     var isMathKey=k.indexOf("math:")===0;
-    if(!isMathKey||lv==="noted"){
+    var hasLevel=isMathKey||LEVEL_CATS.indexOf(k.split(":")[0])>=0;
+    if(lv&&lv!=="noted"&&hasLevel)lv=lvLabel(lv);
+    if(!hasLevel||lv==="noted"){
       return "<span style=\"display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#3C3489;background:white;border:1px solid #AFA9EC;border-radius:20px;padding:4px 6px 4px 10px;\">"+esc(name)+
         "<button type=\"button\" class=\"recap-x\" data-key=\""+esc(k)+"\" aria-label=\"Remove "+esc(name)+"\" style=\"background:none;border:none;color:#7F77DD;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;\">×</button></span>";
     }
@@ -3596,17 +3689,15 @@ async function step2(){
 function step3(){
   var valid=true;
   if(!S.track){showSecErr("interest-row","Pick at least one interest so we can find the right partners");valid=false;}
-  var statusSel=getChips("status")[0]||"";
+  var statusSel=getChips("status").join(" · ");
   if(!statusSel){showSecErr("status","Select your current status");valid=false;}
   var idea=document.getElementById("iidea").value.trim();
   if(!idea){showSecErr("iidea","Add a sentence or two about what you want to work on. It helps us find your best match.");valid=false;}
-  var commit=getChips("commit")[0]||"";
-  if(!commit){showSecErr("commit","Select your commitment level");valid=false;}
   if(!S.locationPref){showSecErr("loc-pref","Select who you want to connect with");valid=false;}
   if(!valid){scrollToFirstErr();return;}
   S.status=statusSel;
   S.comps=selComps.map(function(c){return c.n;});
-  S.idea=idea;S.commit=commit;S.location=S.locationPref;
+  S.idea=idea;S.location=S.locationPref;
   if(EDIT_RETURN){saveEditAndReturn("s3");return;}
   saveSignupLead({email:S.email,track:S.track,stage:"interests_goals"});
   goTo("skills");
@@ -3767,6 +3858,7 @@ function parseModelJson(d){
 //     (school → city → state → country → anyone) and say so.
 //  3. The AI ranks the candidates and writes "why you match". If the AI
 //     is unavailable, a simple skill/interest score ranks them instead.
+var NFIT_OPEN=false; // "Not the right fit?" panel open on Matches
 var MATCH_NOTE=""; // e.g. "No one at Viewpoint yet, so here are students in Encino."
 var NO_REAL_MATCHES=false;
 
@@ -3967,13 +4059,22 @@ function openInviteMenu(){
   ov.addEventListener("click",function(e){if(e.target===ov)ov.remove();});
   document.getElementById("inv-close").addEventListener("click",function(){ov.remove();});
   // Email and Text open another app quietly, so say what just happened.
-  var opened={"inv-email":"Your email app opened with the invite ready. Add who to send it to.",
+  var opened={
     "inv-text":"Messages opened with the invite ready. Pick who to send it to.",
     "inv-wa":"WhatsApp opened with the invite ready. Pick who to send it to.",
     "inv-snap":"Snapchat opened with your invite link. Send it to friends or add it to your story."};
   Object.keys(opened).forEach(function(id){
     var a=document.getElementById(id);
     if(a)a.addEventListener("click",function(){setTimeout(function(){ov.remove();showToast(opened[id]);},300);});
+  });
+  // Email: also copy the invite, because if no email app is set up on
+  // this device, tapping Email does nothing at all.
+  var em=document.getElementById("inv-email");
+  if(em)em.addEventListener("click",function(){
+    var text=INVITE_EMAIL_SUBJECT+"\n\n"+INVITE_EMAIL_BODY;
+    var msg="Opening your email app. If it didn't open, the invite is copied. Paste it into whatever email you use.";
+    try{navigator.clipboard.writeText(text).catch(function(){});}catch(ex){}
+    setTimeout(function(){ov.remove();showToast(msg,6000);},300);
   });
   var more=document.getElementById("inv-more");
   if(more)more.addEventListener("click",function(){
@@ -4033,19 +4134,11 @@ function rMatches(){
     "<div id=\"tc\"></div>"
   );
   document.getElementById("wlbtn").addEventListener("click",openWaitlist);
-  var locBar=document.createElement("div");
-  locBar.id="loc-bar";
+  var locBar=document.createElement("div"); // kept for older code paths; not shown
+  locBar.id="loc-bar-old";
   locBar.style.cssText="display:flex;align-items:center;gap:8px;background:#f8f8f6;border-radius:10px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#555;";
   locBar.innerHTML="<span style=\"flex:1;\"><span style=\"color:#888;\">Matching you with:</span> "+esc(S.locationPref||"🌍 Anyone in the world")+"</span><button id=\"loc-change\" style=\"background:none;border:none;cursor:pointer;font-size:12px;color:#7F77DD;font-weight:600;font-family:inherit;padding:0;\">Change who I match with</button>";
-  var rootEl=document.getElementById("ROOT");
-  var navEl=rootEl?rootEl.querySelector(".nav"):null;
-  if(navEl)rootEl.insertBefore(locBar,navEl);
-  document.getElementById("loc-change").addEventListener("click",function(){
-    EDIT_RETURN="matches";EDIT_START_PREF=S.locationPref||"";
-    goTo("track");
-    var lp=document.getElementById("loc-pref");
-    if(lp&&lp.scrollIntoView)setTimeout(function(){lp.scrollIntoView({behavior:"smooth",block:"center"});},50);
-  });
+  // "Matching you with" now sits inside the Matches tab (see mCards).
   ["matches","recruit","search","board","deadlines","conns"].forEach(function(t){
     var b=document.getElementById("nb-"+t);
     if(b)b.addEventListener("click",function(){selectTab(t);});
@@ -4257,10 +4350,22 @@ function mCards(){
     "<div style=\"font-size:13px;color:#6b6b6b;line-height:1.6;margin-bottom:1.25rem;max-width:340px;margin-left:auto;margin-right:auto;\">We'll look through the students on Partnr and pick the best fits for you.</div>"+
     "<button class=\"bp\" id=\"rematch-btn\" style=\"max-width:260px;margin:0 auto;display:block;\">Find my partners \u2192</button>"+
   "</div>";
-  var h="<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;\">"+
-    "<div class=\"slabel\" style=\"margin-top:0;margin-bottom:0;\">Your matches</div>"+
-    "<button id=\"refine-rematch-btn\" style=\"background:none;border:none;cursor:pointer;color:#7F77DD;font-size:12px;font-weight:600;font-family:inherit;padding:0;\">Not the right fit? Refine & try again →</button>"+
-  "</div>";
+  // Matches = students Partnr picks for you. The "Not the right fit?"
+  // panel sits near the top (not under 40 cards): tell the AI what's off
+  // for the next round, or jump to searching yourself.
+  var h="<div style=\"font-size:20px;font-weight:700;margin-bottom:2px;\">Picked for you</div>"+
+    "<div class=\"page-note\">Students whose interests, skills and competitions fit yours.</div>"+
+    "<div class=\"mloc\"><span><span style=\"color:#888;\">Matching you with:</span> "+esc(S.locationPref||"🌍 Anyone in the world")+"</span><button type=\"button\" id=\"loc-change\">Change your profile settings</button></div>"+
+    "<button type=\"button\" id=\"nfit-toggle\" class=\"nfit-toggle\" aria-expanded=\""+(NFIT_OPEN?"true":"false")+"\">Not the right fit? Find other students <span aria-hidden=\"true\">"+(NFIT_OPEN?"▴":"▾")+"</span></button>"+
+    "<div id=\"nfit-panel\" class=\"nfit-panel\" style=\""+(NFIT_OPEN?"":"display:none;")+"\">"+
+      "<div style=\"font-size:13px;color:#555;margin-bottom:6px;\">Tell us what's off and we'll find new matches.</div>"+
+      "<div class=\"cgrow\" id=\"nfit-reasons\" style=\"margin-bottom:8px;\"></div>"+
+      "<textarea id=\"nfit-text\" maxlength=\"300\" placeholder=\"Anything else? e.g. I need someone who knows chemistry\"></textarea>"+
+      "<button type=\"button\" class=\"bp\" id=\"nfit-go\" style=\"margin-top:8px;\">Get new matches →</button>"+
+      "<div class=\"nfit-or\">Or search yourself</div>"+
+      "<div style=\"display:flex;gap:8px;\"><input id=\"nfit-search\" placeholder=\"Search a skill or competition\" style=\"flex:1;\"/><button type=\"button\" id=\"nfit-search-go\" class=\"nfit-sbtn\">Search</button></div>"+
+      "<div style=\"font-size:11px;color:#888;margin-top:4px;\">Opens Find students with your search filled in.</div>"+
+    "</div>";
   if(MATCH_NOTE)h+="<div style=\"font-size:13px;color:#534AB7;background:#EEEDFE;border-radius:8px;padding:8px 12px;margin-bottom:10px;\">"+esc(MATCH_NOTE)+"</div>";
   var activeCount=0;
   MATCHES.forEach(function(m,i){
@@ -4280,7 +4385,6 @@ function mCards(){
       "</div>"+
       "<div class=\"tags\">"+stags+
         "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
-        "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+r.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+r.n+"</span>"+
         (m.stage?getStageChip(m.stage):"")+
       "</div>"+
       "<div class=\"why\"><strong>Why you match:</strong> "+esc(m.why)+"</div>"+
@@ -4324,11 +4428,41 @@ function bindME(){
     goTo("loading");
     doFetch();
   });
-  var refineBtn=document.getElementById("refine-rematch-btn");
-  if(refineBtn)refineBtn.addEventListener("click",function(){
-    rebuildSelCompsFromProfile();
-    openRematchModal();
+  var lc=document.getElementById("loc-change");
+  if(lc)lc.addEventListener("click",function(){
+    EDIT_RETURN="matches";EDIT_START_PREF=S.locationPref||"";
+    goTo("track");
   });
+  var nt=document.getElementById("nfit-toggle");
+  if(nt){
+    mkChips("nfit-reasons",["Wrong skills","Different interests","Too far away","Different competitions","Just want more options"],[],false);
+    nt.addEventListener("click",function(){
+      NFIT_OPEN=!NFIT_OPEN;
+      document.getElementById("nfit-panel").style.display=NFIT_OPEN?"":"none";
+      nt.setAttribute("aria-expanded",NFIT_OPEN?"true":"false");
+      nt.querySelector("span").textContent=NFIT_OPEN?"▴":"▾";
+    });
+    document.getElementById("nfit-go").addEventListener("click",function(){
+      var reasons=getChips("nfit-reasons");
+      var extra=document.getElementById("nfit-text").value.trim().slice(0,300);
+      var parts=[];
+      if(reasons.length)parts.push("The student wants different matches because: "+reasons.join(", ")+".");
+      if(extra)parts.push("In their words: \""+extra+"\".");
+      REMATCH_FEEDBACK=parts.length?parts.join(" ")+" Adjust this round to directly address that.":"";
+      NFIT_OPEN=false;
+      rebuildSelCompsFromProfile();
+      goTo("loading");
+      doFetch();
+    });
+    function goSearch(){
+      var q=document.getElementById("nfit-search").value.trim();
+      selectTab("search");
+      var ss=document.getElementById("ss");
+      if(ss&&q){ss.value=q;ss.dispatchEvent(new Event("input"));ss.focus();}
+    }
+    document.getElementById("nfit-search-go").addEventListener("click",goSearch);
+    document.getElementById("nfit-search").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();goSearch();}});
+  }
   document.querySelectorAll(".cob").forEach(function(b){b.addEventListener("click",function(){connectToMatch(parseInt(this.dataset.idx));});});
   var inv=document.getElementById("invite-btn");if(inv)inv.addEventListener("click",copyInviteLink);
   var gf=document.getElementById("go-find-btn");if(gf)gf.addEventListener("click",function(){var b=document.getElementById("nb-search");if(b)b.click();});
@@ -4807,6 +4941,17 @@ async function rManagePosting(projectId){
       var studentsRes=await sba.from("students_public").select("id,name,school,city,country").in("id",applicantIds);
       (studentsRes.data||[]).forEach(function(s){applicantsById[s.id]=s;});
     }
+    // For accepted applicants, find the chat so the owner can message
+    // them right from here.
+    var connByApplicant={};
+    var acceptedIds=apps.filter(function(a){return a.status==="accepted";}).map(function(a){return a.applicant_id;});
+    if(acceptedIds.length){
+      var meS=await getSession();var myId=meS&&meS.user?meS.user.id:null;
+      if(myId){
+        var cRes=await sba.from("connections").select("id,student_a_id,student_b_id").eq("status","accepted").or("student_a_id.eq."+myId+",student_b_id.eq."+myId);
+        (cRes.data||[]).forEach(function(c){var other=c.student_a_id===myId?c.student_b_id:c.student_a_id;if(acceptedIds.indexOf(other)>=0)connByApplicant[other]=c.id;});
+      }
+    }
     var h="<button id=\"mp-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back</button>"+
       "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:0.5rem;flex-wrap:wrap;\">"+
         "<div style=\"font-size:18px;font-weight:700;\">"+esc(projectTitle)+"</div>"+
@@ -4824,7 +4969,11 @@ async function rManagePosting(projectId){
           (a.message?"<div class=\"why\" style=\"margin-bottom:10px;\">"+esc(a.message)+"</div>":"")+
           (a.status==="pending"?
             "<div style=\"display:flex;gap:8px;\"><button class=\"bc app-accept\" data-id=\""+esc(a.id)+"\" data-applicant=\""+esc(a.applicant_id)+"\" style=\"flex:1;background:#3B6D11;\">Accept</button><button class=\"bo app-decline\" data-id=\""+esc(a.id)+"\">Decline</button></div>":
-            "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:"+(a.status==="accepted"?"#EAF3DE":"#F1EFE8")+";color:"+(a.status==="accepted"?"#3B6D11":"#5F5E5A")+";\">"+(a.status==="accepted"?"Accepted! Check your Inbox for chat & workspace":"Declined")+"</span>")+
+            (a.status==="accepted"?
+              "<div style=\"display:flex;align-items:center;gap:10px;flex-wrap:wrap;\"><span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#EAF3DE;color:#3B6D11;\">Accepted</span>"+
+              (connByApplicant[a.applicant_id]?"<button class=\"bc app-chat\" data-conn=\""+esc(connByApplicant[a.applicant_id])+"\" data-name=\""+esc(applicant?applicant.name:"")+"\" style=\"background:#7F77DD;flex:1;min-width:160px;\"><i class=\"ti ti-message\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;\"></i>Message "+esc(displayName(applicant?applicant.name:"them"))+"</button>":"")+
+              "</div>":
+              "<span style=\"font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#F1EFE8;color:#5F5E5A;\">Declined</span>"))+
         "</div>";
       });
     }
@@ -4839,6 +4988,9 @@ async function rManagePosting(projectId){
         showToast("Accepted! Chat and workspace are now open in your Inbox");
         rManagePosting(projectId);
       });
+    });
+    document.querySelectorAll(".app-chat").forEach(function(b){
+      b.addEventListener("click",function(){rChat(this.dataset.conn,this.dataset.name);});
     });
     document.querySelectorAll(".app-decline").forEach(function(b){
       b.addEventListener("click",async function(){
@@ -5135,7 +5287,10 @@ function meTab(){
   function skillTagHTML(k,small){
     var parts=k.split(":");var skill=parts.length>1?parts[1]:k;var lv=S.skillLevels[k];
     var sizeStyle=small?"font-size:11px;padding:3px 9px;":"";
-    if(lv==="studied"||lv==="noted"||LEVELS.indexOf(lv)>=0)return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
+    var toolLevel=LEVEL_CATS.indexOf(parts[0])>=0&&lv&&lv!=="noted"&&lv!=="studied";
+    if(!toolLevel&&parts[0]!=="math")return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
+    if(lv==="studied"||lv==="noted")return "<span class=\"tag\" style=\""+sizeStyle+"\">"+skill+"</span>";
+    if(toolLevel)lv=lvLabel(lv);
     return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";"+sizeStyle+"\">"+skill+" · "+lv+"</span>";
   }
   var mathTagsHTML=mathKeysForView.map(function(k){return skillTagHTML(k,true);}).join("");
@@ -5154,13 +5309,15 @@ function meTab(){
   var linksViewHTML=(S.links||[]).length?"<div class=\"slabel\" style=\"margin-top:1rem;\">Links</div>"+
     S.links.map(function(l){return "<a href=\""+safeUrl(l.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#534AB7;text-decoration:none;\"><i class=\"ti ti-external-link\" style=\"font-size:13px;\"></i>"+esc(l.url)+"</a>";}).join(""):"";
   return "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My profile</div>"+
-    "<div class=\"page-note\">This is what other students see. <i class=\"ti ti-lock\" style=\"font-size:12px;vertical-align:-1px;\"></i> Your school name only shows to students at your school and partners you've connected with.</div>"+
+    "<div class=\"page-note\">This is what other students see.</div>"+
     "<div class=\"card\">"+
     "<div class=\"me-head\" style=\"display:flex;align-items:center;gap:12px;margin-bottom:10px;\">"+
       "<div class=\"av\" style=\"width:46px;height:46px;font-size:16px;background:#EEEDFE;color:#534AB7;\">"+inits+"</div>"+
       "<div style=\"flex:1;\">"+
         "<div style=\"font-size:15px;font-weight:700;color:#1a1a1a;\">"+esc(S.name)+"</div>"+
-        "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc(S.school)+", "+esc(S.country)+" · "+esc(S.grade)+"</div>"+
+        "<div style=\"font-size:12px;color:#6b6b6b;\">"+esc([S.city,S.state&&S.country==="United States"?S.state:S.country].filter(Boolean).join(", "))+" · "+esc(S.grade)+"</div>"+
+        // Most students never see the school name, so show it apart, with a lock.
+        "<div style=\"font-size:12px;color:#6b6b6b;margin-top:2px;\"><i class=\"ti ti-lock\" style=\"font-size:12px;vertical-align:-1px;\"></i> "+esc(S.school)+" <span style=\"color:#999;\">· only students at your school and partners you connect with see this</span></div>"+
         "<div style=\"margin-top:3px;\">"+(S.schoolVerification==="verified"?
           "<span style=\"font-size:11px;font-weight:600;color:#1D9E75;\"><i class=\"ti ti-circle-check\" style=\"font-size:12px;\"></i> School email verified</span>":
           S.schoolVerification==="likely_verified"?
@@ -5876,11 +6033,11 @@ function renderSR(results,skill,isDemo){
           "<span style=\"font-size:11px;padding:2px 8px;border-radius:20px;background:"+(sbgs[sk]||"#F1EFE8")+";color:"+(stcs[sk]||"#666")+";font-weight:500;\">"+esc(r.status)+"</span>"+
         "</div>"+
         "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:5px;\">"+locationLine(r.school,r.city,r.country,sharesSchoolRequiredComp(r.competitions))+" · "+esc(r.grade)+"</div>"+
-        "<div style=\"font-size:12px;color:#666;margin-bottom:8px;line-height:1.5;\">"+esc(r.bio)+"</div>"+
+        // Their project idea (if they wrote one), in their words.
+        (r.bio?"<div style=\"font-size:12px;color:#555;margin-bottom:8px;line-height:1.5;font-style:italic;\">\u201c"+esc(r.bio)+"\u201d</div>":"")+
         "<div class=\"tags\" style=\"margin-bottom:8px;\">"+
-          "<span class=\"tag\" style=\"background:"+(LB[r.keyLevel]||"#EEEDFE")+";color:"+(LT[r.keyLevel]||"#3C3489")+";font-weight:600;\">"+esc(r.keySkill)+" · "+esc(r.keyLevel)+"</span>"+
+          "<span class=\"tag\" style=\"background:#EEEDFE;color:#3C3489;font-weight:600;\">"+esc(r.keySkill)+(showLv(r.keyLevel)?" · "+esc(lvLabel(r.keyLevel)):"")+"</span>"+
           others+
-          "<span class=\"tag\" style=\"background:#EEEDFE;color:#534AB7;\"><i class=\"ti "+ro.i+"\" style=\"font-size:11px;vertical-align:-1px;margin-right:2px;\"></i>"+ro.n+"</span>"+
           "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+t.n+"</span>"+
         "</div>"+
         portfolioLine+
@@ -5985,12 +6142,12 @@ function showErrorToast(msg){
   document.body.appendChild(t);
   setTimeout(function(){t.remove();},5000);
 }
-function showToast(msg){
+function showToast(msg,ms){
   var t=document.createElement("div");
   t.textContent=msg;
   t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;padding:10px 18px;border-radius:20px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);";
   document.body.appendChild(t);
-  setTimeout(function(){t.remove();},2500);
+  setTimeout(function(){t.remove();},ms||2500);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -6193,10 +6350,14 @@ async function renderTodos(){
     {key:"work",t:"Work on it together",done:!!(workRow&&workRow.done),manual:true,acts:[["todo-go-inbox","Open your inbox"]]},
     {key:"share",t:"Share how it went",done:st.outcomes>0,acts:[["todo-share",st.outcomes>0?"Share another result":"Tell us how it turned out"]]}
   ];
-  var doneCount=steps.filter(function(x){return x.done;}).length;
+  // Preset steps a student hid with × (stored as builtin "hide:<step>").
+  var hiddenKeys=st.todos.filter(function(t){return t.builtin&&t.builtin.indexOf("hide:")===0;}).map(function(t){return t.builtin.slice(5);});
+  steps=steps.filter(function(x){return hiddenKeys.indexOf(x.key)<0;});
+  var doneCount=steps.filter(function(x){return x.done;}).length+mine.filter(function(t){return t.done;}).length;
+  var totalCount=steps.length+mine.length;
   var nextKey=(steps.find(function(x){return !x.done;})||{}).key;
   var h="<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\">"+
-      "<div class=\"slabel\" style=\"margin:0;\">To-do <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+steps.length+" done</span></div>"+
+      "<div class=\"slabel\" style=\"margin:0;\">To-do <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+totalCount+" done</span></div>"+
     "</div>"+
     "<div class=\"todo-card\">";
   steps.forEach(function(x){
@@ -6209,23 +6370,23 @@ async function renderTodos(){
       "<div style=\"flex:1;min-width:0;\"><div class=\"todo-t\">"+esc(x.t)+(x.manual||x.done||x.key==="share"?"":" <span class=\"todo-hint\">checks itself</span>")+"</div>"+
       (showActs?"<div class=\"todo-acts\">"+x.acts.map(function(a){return "<button type=\"button\" class=\"todo-act\" id=\""+a[0]+"\">"+esc(a[1])+" →</button>";}).join("")+"</div>":"")+
       (x.key==="share"?"<div id=\"outcome-form\"></div>":"")+
-      "</div></div>";
+      "</div>"+
+      "<button type=\"button\" class=\"bremove step-hide\" data-k=\""+x.key+"\" aria-label=\"Hide this step\" title=\"Hide this step\" style=\"position:static;\">×</button>"+
+      "</div>";
   });
-  h+="</div>";
-  // The student's own to-dos
-  h+="<div class=\"todo-card\" style=\"margin-top:10px;\">"+
-    "<div style=\"font-size:12px;font-weight:600;color:#6b6b6b;margin-bottom:6px;\">Your own to-dos</div>"+
-    mine.map(function(t){
+  // The student's own to-dos sit in the same list, under the steps.
+  h+=mine.map(function(t){
       return "<div class=\"todo-row"+(t.done?" done":"")+"\" data-id=\""+t.id+"\">"+
         "<input type=\"checkbox\" class=\"todo-box my-todo-box\" data-id=\""+t.id+"\""+(t.done?" checked":"")+" aria-label=\"Mark done\"/>"+
         "<div class=\"todo-t my-todo-t\" data-id=\""+t.id+"\" role=\"button\" tabindex=\"0\" title=\"Tap to edit\" style=\"flex:1;cursor:text;\">"+esc(t.title)+"</div>"+
         "<button type=\"button\" class=\"bremove my-todo-del\" data-id=\""+t.id+"\" aria-label=\"Delete to-do\" style=\"position:static;\">×</button>"+
       "</div>";
     }).join("")+
-    "<div style=\"display:flex;gap:8px;margin-top:6px;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a to-do, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+    "<div style=\"display:flex;gap:8px;padding:10px 0 8px;border-top:1px solid #f0efeb;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a to-do, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
     "<button type=\"button\" id=\"todo-add\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
     "<div id=\"todo-err\"></div>"+
-  "</div>";
+  "</div>"+
+  (hiddenKeys.length?"<button type=\"button\" id=\"todo-unhide\" class=\"todo-act\" style=\"margin-top:6px;\">Show hidden steps ("+hiddenKeys.length+")</button>":"");
   wrap.innerHTML=h;
   bindTodos(st,workRow);
 }
@@ -6236,6 +6397,18 @@ function bindTodos(st,workRow){
   on("todo-go-matches",function(){selectTab("matches");});
   on("todo-go-inbox",function(){selectTab("conns");});
   on("todo-share",function(){openOutcomeForm();});
+  document.querySelectorAll(".step-hide").forEach(function(b){
+    b.addEventListener("click",async function(){
+      var res=await sba.from("student_todos").insert({title:"Hidden step",builtin:"hide:"+this.dataset.k,done:true});
+      if(res.error){showInlineError(document.getElementById("todo-err"),"Couldn't hide. Please try again.");return;}
+      renderTodos();
+    });
+  });
+  on("todo-unhide",async function(){
+    var ids=st.todos.filter(function(t){return t.builtin&&t.builtin.indexOf("hide:")===0;}).map(function(t){return t.id;});
+    if(ids.length){var res=await sba.from("student_todos").delete().in("id",ids);if(res.error){showInlineError(document.getElementById("todo-err"),"Couldn't show them. Please try again.");return;}}
+    renderTodos();
+  });
   var wb=document.getElementById("todo-work");
   if(wb)wb.addEventListener("change",async function(){
     var done=this.checked;
@@ -6311,9 +6484,9 @@ function openOutcomeForm(){
     "<div><input id=\"oc-link\" maxlength=\"300\" placeholder=\"Link (optional): website, video, paper, GitHub\"/></div>"+
     "<textarea id=\"oc-notes\" maxlength=\"600\" placeholder=\"Anything else you want to tell us? (optional)\"></textarea>"+
     "<label style=\"display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#333;font-weight:400;cursor:pointer;\"><input type=\"checkbox\" id=\"oc-feature\" style=\"width:18px;height:18px;flex-shrink:0;margin:1px 0 0;padding:0;accent-color:#534AB7;\"/><span>Partnr can feature this, for example on our website or social media.</span></label>"+
-    "<div style=\"font-size:12px;color:#6b6b6b;\">We'll also add it to your profile under Experience. You can remove it anytime.</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;border-top:1px solid #eee;padding-top:10px;margin-top:4px;\">We'll also add it to your profile under Experience. You can remove it anytime.</div>"+
     "<div id=\"oc-err\"></div>"+
-    "<button class=\"bp\" id=\"oc-save\" style=\"margin-top:0;\">Share it</button></div>";
+    "<button class=\"bp\" id=\"oc-save\" style=\"margin-top:10px;\">Share it</button></div>";
   f.querySelectorAll(".oc-chip").forEach(function(c){
     c.addEventListener("click",function(){
       picked=this.dataset.r;
@@ -6647,11 +6820,13 @@ function fsQuickChips(){
   return chips;
 }
 function sTab(){
-  var whereOpts=[["school","🏫 "+(S.school||"My school")],["city","📍 "+(S.city||"My city")],["country","🗺️ "+(S.country||"My country")],["anyone","🌍 Anyone"]];
-  return "<div style=\"position:relative;margin-bottom:4px;\">"+
+  var whereOpts=[["school","🏫 "+(S.school||"My school")],["city","📍 Near me"],["country","🗺️ "+(S.country||"My country")],["anyone","🌍 Anyone"]];
+  return "<div style=\"font-size:20px;font-weight:700;margin-bottom:2px;\">Find students</div>"+
+    "<div class=\"page-note\">Search for a student with a specific skill or competition.</div>"+
+    "<div style=\"position:relative;margin-bottom:4px;\">"+
       "<label for=\"ss\" class=\"sr-only\" style=\"position:absolute;left:-9999px;\">Search</label>"+
       "<i class=\"ti ti-search\" style=\"position:absolute;left:13px;top:13px;font-size:16px;color:#999;\"></i>"+
-      "<input id=\"ss\" placeholder=\"Search a skill, competition, or name\" autocomplete=\"off\" style=\"width:100%;padding:12px 14px 12px 38px;border:1px solid #ddd;border-radius:10px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
+      "<input id=\"ss\" placeholder=\"Search a skill or competition\" autocomplete=\"off\" style=\"width:100%;padding:12px 14px 12px 38px;border:1px solid #ddd;border-radius:10px;font-size:14px;font-family:inherit;color:#1a1a1a;background:white;\"/>"+
       "<div id=\"skill-suggest\" style=\"display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.08);z-index:20;overflow:hidden;\"></div>"+
     "</div>"+
     "<div class=\"slabel\">Looking for</div>"+
@@ -6710,7 +6885,7 @@ function fsRun(){
   var what=[FS.skill,fsCompLabel(FS.comp)].filter(Boolean);
   var whatEl=document.getElementById("fs-what");if(whatEl)whatEl.textContent=what.length?what.join(" + "):"everyone";
   var whEl=document.getElementById("fs-wh");
-  if(whEl)whEl.textContent=FS.where==="city"?("In "+(S.city||"my city")):FS.where==="school"?("At "+(S.school||"my school")):FS.where==="country"?("In "+(S.country||"my country")):"Anyone";
+  if(whEl)whEl.textContent=FS.where==="city"?("Within 25 miles of "+(S.city||"you")):FS.where==="school"?("At "+(S.school||"my school")):FS.where==="country"?("In "+(S.country||"my country")):"Anyone";
   document.querySelectorAll("#fs-where div").forEach(function(d){d.classList.toggle("on",d.dataset.v===FS.where);});
   var comp=FS.comp,category="",subcat="";
   if(comp.indexOf("cat:")===0){category=comp.slice(4);comp="";}
