@@ -128,8 +128,18 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .bgoals .bpin{background:#EEEDFE;border-color:#d9d6fb;padding:13px 76px 13px 14px;display:flex;align-items:center;gap:10px;}
 .bgoals .bpin .ti{color:#534AB7;font-size:19px;flex-shrink:0;}
 .bgoals .bt{font-size:15px;color:#2A1745;margin:0;}
-.bgoals .bremove,.bgoals .bgrip{top:50%;transform:translateY(-50%);}
-.bgoals .bgrip{right:36px;height:32px;}
+.bgoals .bpin{align-items:flex-start;}
+.bgoals .bremove{top:6px;}
+.bgoals .bgrip{top:6px;right:36px;height:32px;}
+.gmeta{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 4px;}
+.gmeta span{font-size:11px;padding:2px 8px;border-radius:20px;background:white;color:#555;}
+.gline{font-size:12px;font-weight:600;margin-top:3px;}
+.gline button,.gmake{background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:0;}
+.gsug-wrap{margin-top:4px;}
+.gsug-l{font-size:12px;color:#6b6b6b;margin-bottom:6px;}
+.gsug{font-size:13px;padding:6px 12px;border-radius:20px;border:1px dashed #AFA9EC;color:#534AB7;background:white;font-weight:600;cursor:pointer;font-family:inherit;margin:0 6px 6px 0;}
+.todo-why{font-size:12px;color:#999;margin-top:1px;}
+.todo-done-fold{background:none;border:none;color:#7F77DD;font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;padding:10px 0 4px;}
 .bk{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:5px;}
 .bt{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.3;}
 .bmeta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
@@ -280,7 +290,9 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 // ── State ──────────────────────────────────
 var S={name:"",email:"",school:"",country:"",city:"",zip:"",grade:"",languages:[],track:"",role:"",secondary:[],status:"",skillLevels:{},availability:"",github:"",stage:"",comps:[],idea:"",commit:"",location:"",locationPref:"",links:[],proofOfWork:[],savedIds:[],schoolVerification:"self_reported",skillsNeeded:"",dob:"",funFact:"",emailPrefs:{},termsVersion:""};
 var MATCHES=[],PROJECTS=[],COMPS_DATA=[],CONNS=[],selComps=[],exploreOpen=false,notSureActiveTab="browse",activeCats=[],modalTarget=null;
-var MATCHES_ARE_DEMO=false; // true while the example profiles from fallback() are on screen
+var MATCHES_ARE_DEMO=false;
+var OPEN_PROFILE_IDX=-1;
+var TODO_SHOW_DONE=false; // My board: finished to-do steps folded by default // which match's full profile is open // true while the example profiles from fallback() are on screen
 // Remembers the last real Skill Search (query/filters), so backing out
 // of a Report/Block flow can return to the actual results the student
 // was looking at instead of a reset, blank browse-by-category screen.
@@ -669,13 +681,28 @@ async function saveProfile(){
   }
   return {error:null};
 }
+// Status can hold more than one choice ("A · B"). Older wording of the
+// first option is renamed without dropping the others.
+function normStatus(st){
+  return String(st||"").split(" · ").map(function(x){return x.indexOf("I have a project")===0?"I have a project and need partners":x;}).filter(Boolean).join(" · ");
+}
+// Save the time zone from this device's clock, so partners see the right
+// one (exact for split states and big countries). Only saved when it changes.
+async function saveDeviceTimeZone(uid,current){
+  try{
+    var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";
+    if(!tz||tz===current||!/^[A-Za-z_]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(tz))return;
+    await sba.from("students").update({time_zone:tz}).eq("id",uid);
+  }catch(ex){/* time zone is a nice-to-have */}
+}
 async function loadProfileIntoState(uid){
   var pRes=await sba.from("students").select("*").eq("id",uid).maybeSingle();
   if(pRes.error||!pRes.data)return null;
   var p=pRes.data;
+  saveDeviceTimeZone(uid,p.time_zone);
   S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
-  S.secondary=p.secondary||[];S.status=(p.status||"").replace(/^I have a project.*$/,"I have a project and need partners");S.idea=p.idea||"";S.availability=p.availability||"";
+  S.secondary=p.secondary||[];S.status=normStatus(p.status);S.idea=p.idea||"";S.availability=p.availability||"";
   S.commit=p.commit||"";S.github=p.github||"";S.location=p.location||"";S.locationPref=(p.location_pref||"").replace("🏣","🏫");
   S.links=p.links||[];S.proofOfWork=(p.proof_of_work||[]).map(function(it){if(it&&it.link){var l=normalizeHandleLink(it.link);if(l!==it.link)it.link=l;}return it;});S.savedIds=p.saved_profiles||[];S.stage=p.stage||"";
   S.schoolVerification=p.school_verification||"self_reported";
@@ -917,7 +944,7 @@ async function fetchSavedStudents(){
   var studentsRes=await sba.from("students_public").select("id,name,school,city,country,grade,track,role,availability,status,idea,proof_of_work,links").in("id",S.savedIds);
   if(studentsRes.error)throw studentsRes.error;
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
-  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
+  students.forEach(function(s){s.status=normStatus(s.status);});
   if(!students.length)return [];
   var finalIds=students.map(function(s){return s.id;});
   var allSkillsRes=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",finalIds);
@@ -1063,7 +1090,7 @@ async function searchRealStudents(opts,excludeId){
   // too keeps the UI consistent immediately after a block, before any
   // refetch happens.
   var students=(studentsRes.data||[]).filter(function(s){return !BLOCKED_IDS[s.id];});
-  students.forEach(function(s){if(s.status&&s.status.indexOf("I have a project")===0)s.status="I have a project and need partners";});
+  students.forEach(function(s){s.status=normStatus(s.status);});
   // Nearest first: same school, city, state, country, then everyone else.
   // "My school": only your own school (the school name is hidden for
   // everyone else anyway). Same spelling rules as the database.
@@ -3878,11 +3905,37 @@ var NFIT_OPEN=false; // "Not the right fit?" panel open on Matches
 var MATCH_NOTE=""; // e.g. "No one at Viewpoint yet, so here are students in Encino."
 var NO_REAL_MATCHES=false;
 
+// Time zone from country (and US state). No exact location is used.
+// Countries with several time zones are only labeled when we know the
+// US state; otherwise nothing is shown rather than a guess.
+var TZ_US_STATE={AL:"America/Chicago",AK:"America/Anchorage",AZ:"America/Phoenix",AR:"America/Chicago",CA:"America/Los_Angeles",CO:"America/Denver",CT:"America/New_York",DE:"America/New_York",DC:"America/New_York",FL:"America/New_York",GA:"America/New_York",HI:"Pacific/Honolulu",ID:"America/Boise",IL:"America/Chicago",IN:"America/New_York",IA:"America/Chicago",KS:"America/Chicago",KY:"America/New_York",LA:"America/Chicago",ME:"America/New_York",MD:"America/New_York",MA:"America/New_York",MI:"America/New_York",MN:"America/Chicago",MS:"America/Chicago",MO:"America/Chicago",MT:"America/Denver",NE:"America/Chicago",NV:"America/Los_Angeles",NH:"America/New_York",NJ:"America/New_York",NM:"America/Denver",NY:"America/New_York",NC:"America/New_York",ND:"America/Chicago",OH:"America/New_York",OK:"America/Chicago",OR:"America/Los_Angeles",PA:"America/New_York",RI:"America/New_York",SC:"America/New_York",SD:"America/Chicago",TN:"America/Chicago",TX:"America/Chicago",UT:"America/Denver",VT:"America/New_York",VA:"America/New_York",WA:"America/Los_Angeles",WV:"America/New_York",WI:"America/Chicago",WY:"America/Denver",PR:"America/Puerto_Rico"};
+var TZ_COUNTRY={"united kingdom":"Europe/London","ireland":"Europe/Dublin","france":"Europe/Paris","germany":"Europe/Berlin","spain":"Europe/Madrid","italy":"Europe/Rome","netherlands":"Europe/Amsterdam","belgium":"Europe/Brussels","switzerland":"Europe/Zurich","austria":"Europe/Vienna","sweden":"Europe/Stockholm","norway":"Europe/Oslo","denmark":"Europe/Copenhagen","finland":"Europe/Helsinki","poland":"Europe/Warsaw","portugal":"Europe/Lisbon","greece":"Europe/Athens","turkey":"Europe/Istanbul","ukraine":"Europe/Kyiv","romania":"Europe/Bucharest","czech republic":"Europe/Prague","hungary":"Europe/Budapest","israel":"Asia/Jerusalem","india":"Asia/Kolkata","pakistan":"Asia/Karachi","bangladesh":"Asia/Dhaka","sri lanka":"Asia/Colombo","nepal":"Asia/Kathmandu","china":"Asia/Shanghai","hong kong":"Asia/Hong_Kong","taiwan":"Asia/Taipei","japan":"Asia/Tokyo","south korea":"Asia/Seoul","singapore":"Asia/Singapore","malaysia":"Asia/Kuala_Lumpur","philippines":"Asia/Manila","thailand":"Asia/Bangkok","vietnam":"Asia/Ho_Chi_Minh","united arab emirates":"Asia/Dubai","uae":"Asia/Dubai","saudi arabia":"Asia/Riyadh","qatar":"Asia/Qatar","kuwait":"Asia/Kuwait","bahrain":"Asia/Bahrain","oman":"Asia/Muscat","jordan":"Asia/Amman","lebanon":"Asia/Beirut","iran":"Asia/Tehran","new zealand":"Pacific/Auckland","nigeria":"Africa/Lagos","ghana":"Africa/Accra","kenya":"Africa/Nairobi","ethiopia":"Africa/Addis_Ababa","uganda":"Africa/Kampala","tanzania":"Africa/Dar_es_Salaam","rwanda":"Africa/Kigali","south africa":"Africa/Johannesburg","egypt":"Africa/Cairo","morocco":"Africa/Casablanca","senegal":"Africa/Dakar","cameroon":"Africa/Douala","zimbabwe":"Africa/Harare","zambia":"Africa/Lusaka","somalia":"Africa/Mogadishu","eritrea":"Africa/Asmara","sudan":"Africa/Khartoum","tunisia":"Africa/Tunis","algeria":"Africa/Algiers","colombia":"America/Bogota","peru":"America/Lima","chile":"America/Santiago","argentina":"America/Argentina/Buenos_Aires","venezuela":"America/Caracas","ecuador":"America/Guayaquil","jamaica":"America/Jamaica","guatemala":"America/Guatemala","costa rica":"America/Costa_Rica","panama":"America/Panama","dominican republic":"America/Santo_Domingo","el salvador":"America/El_Salvador","honduras":"America/Tegucigalpa"};
+function zoneLabel(zone){
+  try{
+    var parts=new Intl.DateTimeFormat("en-US",{timeZone:zone,timeZoneName:"long"}).formatToParts(new Date());
+    var n=(parts.find(function(x){return x.type==="timeZoneName";})||{}).value||"";
+    if(/^GMT[+-]/.test(n))return "";
+    return n.replace(/ (Standard|Daylight|Summer)/," ").replace(/\s+/g," ").trim();
+  }catch(ex){return "";}
+}
+function timeZoneLabel(country,state,zone){
+  if(zone){var z=zoneLabel(zone);if(z)return z;}
+  try{
+    var c=(country||"").toString().trim().toLowerCase(),zone="";
+    if(c==="united states"||c==="usa"||c==="us")zone=TZ_US_STATE[(state||"").toString().trim().toUpperCase()]||"";
+    else zone=TZ_COUNTRY[c]||"";
+    if(!zone)return "";
+    var parts=new Intl.DateTimeFormat("en-US",{timeZone:zone,timeZoneName:"long"}).formatToParts(new Date());
+    var n=(parts.find(function(x){return x.type==="timeZoneName";})||{}).value||"";
+    // "Pacific Daylight Time" -> "Pacific Time"
+    return n.replace(/ (Standard|Daylight|Summer)/," ").replace(/\s+/g," ").trim();
+  }catch(ex){return "";}
+}
 function normLoc(x){return (x||"").toString().trim().toLowerCase();}
 // Same rule as the database: "Oak Park High School." = "Oak Park High".
 function normSchool(x){return normLoc(x).replace(/[^a-z0-9 ]+/g," ").replace(/\b(the|school|senior|sr|hs)\b/g," ").replace(/\s+/g," ").trim();}
 async function loadMatchCandidates(myId){
-  var res=await sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links,skills_needed,fun_fact,near_me").eq("onboarded",true).neq("id",myId).limit(300);
+  var res=await sba.from("students_public").select("id,name,school,city,state,country,grade,track,role,availability,status,idea,proof_of_work,links,skills_needed,fun_fact,near_me,time_zone").eq("onboarded",true).neq("id",myId).limit(300);
   if(res.error)throw res.error;
   var shownReal={};MATCHES.forEach(function(m){if(m.realId)shownReal[m.realId]=true;});
   var people=(res.data||[]).filter(function(s){return !BLOCKED_IDS[s.id]&&!shownReal[s.id];});
@@ -3890,10 +3943,12 @@ async function loadMatchCandidates(myId){
   var ids=people.map(function(s){return s.id;});
   var sk=await sba.from("skills").select("student_id,category,skill_name,level").in("student_id",ids);
   var cp=await sba.from("competitions").select("student_id,competition_name").in("student_id",ids);
-  var skillsBy={},compsBy={};
+  var lg=await sba.from("languages").select("student_id,language_name").in("student_id",ids);
+  var skillsBy={},compsBy={},langsBy={};
+  (lg.data||[]).forEach(function(r){(langsBy[r.student_id]=langsBy[r.student_id]||[]).push(r.language_name);});
   (sk.data||[]).forEach(function(r){(skillsBy[r.student_id]=skillsBy[r.student_id]||[]).push(r);});
   (cp.data||[]).forEach(function(r){(compsBy[r.student_id]=compsBy[r.student_id]||[]).push(r.competition_name);});
-  people.forEach(function(s){s._skills=skillsBy[s.id]||[];s._comps=compsBy[s.id]||[];});
+  people.forEach(function(s){s._skills=skillsBy[s.id]||[];s._comps=compsBy[s.id]||[];s._langs=langsBy[s.id]||[];});
   return people;
 }
 // Same school, then city, then same state, then same country, then anyone.
@@ -3935,14 +3990,14 @@ function localMatchScore(s){
   return score;
 }
 function realToMatch(s,score,why){
-  var swl={};s._skills.slice(0,8).forEach(function(r){swl[r.skill_name]=r.level||"Intermediate";});
+  var swl={};s._skills.slice(0,8).forEach(function(r){swl[r.skill_name]=r.level||"";});
   var place=[s.city,s.state&&normLoc(s.country)==="united states"?s.state:""].filter(Boolean).join(", ");
   return {
     realId:s.id,name:s.name,school:s.school||"",city:place||s.city||"",country:s.country||"",grade:s.grade||"",
     avatar:initialsFor(s.name),avatarColor:colorForId(s.id),track:s.track||"",role:s.role||"",
     skillsWithLevels:swl,competitions:s._comps.slice(0,5),matchScore:score,why:why||"",
-    availability:s.availability||"Not specified",commitment:"",timezone:"",stage:"",
-    bio:s.idea||"",status:s.status||"",lookingFor:s.skills_needed||"",funFact:s.fun_fact||"",languages:[],awards:[],
+    availability:s.availability||"Not specified",commitment:"",timezone:timeZoneLabel(s.country,s.state,s.time_zone),stage:"",
+    bio:s.idea||"",status:s.status||"",lookingFor:s.skills_needed||"",funFact:s.fun_fact||"",languages:s._langs||[],awards:[],
     experience:(s.proof_of_work||[]).filter(function(p){return p&&p.type!=="Award";}).slice(0,3).map(function(p){return {title:p.title||"",desc:p.desc||p.role||""};}),
     portfolio:null
   };
@@ -3990,7 +4045,8 @@ async function doFetch(){
       "\n\nCANDIDATES (id | first name | location | track | role | skills | competitions | wants | looking for):\n"+list+
       "\n\nRULES: Prefer complementary skills and roles (a researcher with a builder, an idea person with someone technical), shared target competitions, and shared interests. "+
       "Candidates are already ordered nearest first; when two are similar, prefer the nearer one. Only use ids from the list. Never invent people or facts.\n"+
-      "Pick up to 5. For each give matchScore (50-98, honest) and why: one or two specific sentences about how they complement this student, using only facts from the list.\n"+
+      "Pick up to 5. For each give matchScore (50-98, honest) and why: one or two short, specific sentences about how they complement this student, using only facts from the list. "+
+      "Write \"why\" TO the student, in second person (you, your), and call the candidate by first name. Example: \"Maya knows chemistry, which your iodine filter needs, and she is also entering the Conrad Challenge.\" Never write \"the student\".\n"+
       "Return ONLY valid JSON: {\"matches\":[{\"id\":\"candidate id\",\"matchScore\":80,\"why\":\"...\"}]}";
     var picks=null;
     var res=await fetch(SUPABASE_URL+"/functions/v1/match-students",{
@@ -4592,11 +4648,31 @@ function bindME(){
 
 function openProfile(i){
   var m=MATCHES[i];if(!m)return;
+  // Saved matches are snapshots, so refresh languages and time zone once
+  // from the student's current profile, then redraw this page.
+  if(m.realId&&!m._fresh){
+    m._fresh=true;
+    Promise.all([
+      sba.from("students_public").select("country,state,time_zone").eq("id",m.realId).maybeSingle(),
+      sba.from("languages").select("language_name").eq("student_id",m.realId)
+    ]).then(function(r){
+      var row=r[0]&&r[0].data;
+      if(row)m.timezone=timeZoneLabel(row.country,row.state,row.time_zone)||m.timezone||"";
+      var langs=((r[1]&&r[1].data)||[]).map(function(x){return x.language_name;});
+      if(langs.length)m.languages=langs;
+      if(document.getElementById("pbk")&&OPEN_PROFILE_IDX===i)openProfile(i);
+    }).catch(function(){});
+  }
+  OPEN_PROFILE_IDX=i;
   var cm=CM[m.avatarColor]||CM.purple;var t=TR[m.track]||TR.research;var r=RO[m.role]||{n:m.role||"Partner",i:"ti-user"};
   var sw=m.skillsWithLevels||{};
-  var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+sk+" · "+lv+"</span>";}).join("");
+  // Only real levels show (Beginner / Experienced). Hidden labels like "noted" never appear.
+  var stags=Object.keys(sw).map(function(sk){var lv=sw[sk];
+    if(!showLv(lv))return "<span class=\"tag\">"+esc(sk)+"</span>";
+    lv=lvLabel(lv);
+    return "<span class=\"tag\" style=\"background:"+(LB[lv]||"#F1EFE8")+";color:"+(LT[lv]||"#666")+";\">"+esc(sk)+" · "+esc(lv)+"</span>";}).join("");
   var ctags=(m.competitions||[]).map(function(c){return "<span class=\"tag\" style=\"background:"+t.bg+";color:"+t.tc+";\">"+c+"</span>";}).join("");
-  var ltags=(m.languages||[]).map(function(l){return "<span class=\"tag\">"+l+"</span>";}).join("");
+  var ltags=(m.languages||[]).map(function(l){return "<span class=\"tag\">"+esc(l)+"</span>";}).join("");
   var exp=(m.experience||[]).map(function(e){return "<div class=\"ei\"><div style=\"font-size:13px;font-weight:600;color:#1a1a1a;\">"+esc(e.title)+"</div><div style=\"font-size:12px;color:#666;margin-top:2px;line-height:1.5;\">"+esc(e.desc)+"</div></div>";}).join("");
   var awds=(m.awards||[]).map(function(a){return "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;color:#666;\"><i class=\"ti ti-award\" style=\"font-size:14px;color:"+t.c+";\"></i>"+a+"</div>";}).join("");
   var conn=CONNS.some(function(c){return c.name===m.name;});
@@ -4621,13 +4697,13 @@ function openProfile(i){
         "<div style=\"font-size:13px;color:#666;line-height:1.6;\">"+esc(m.bio)+"</div>"+
       "</div>"+
       "<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:8px;\">Availability & details</div>"+
+        // Only boxes that have something in them are shown.
         "<div class=\"ag\">"+
-          "<div class=\"ac\"><div class=\"al2\">Weekly hours</div><div class=\"av2\">"+m.availability+"</div></div>"+
-          "<div class=\"ac\"><div class=\"al2\">Timezone</div><div class=\"av2\">"+m.timezone+"</div></div>"+
-          "<div class=\"ac\"><div class=\"al2\">Commitment</div><div class=\"av2\">"+m.commitment+"</div></div>"+
-          "<div class=\"ac\"><div class=\"al2\">Stage</div><div class=\"av2\">"+m.stage+"</div></div>"+
+          [["Weekly hours",m.availability],["Time zone",m.timezone],["Commitment",m.commitment],["Stage",m.stage]].filter(function(x){return x[1];}).map(function(x){
+            return "<div class=\"ac\"><div class=\"al2\">"+x[0]+"</div><div class=\"av2\">"+esc(x[1])+"</div></div>";
+          }).join("")+
         "</div>"+
-        "<div style=\"margin-top:8px;\"><div class=\"al2\" style=\"margin-bottom:4px;\">Languages</div><div class=\"tags\">"+ltags+"</div></div>"+
+        (ltags?"<div style=\"margin-top:8px;\"><div class=\"al2\" style=\"margin-bottom:4px;\">Languages</div><div class=\"tags\">"+ltags+"</div></div>":"")+
       "</div>"+
       (m.portfolio?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:6px;\">Portfolio</div><a href=\"https://"+m.portfolio+"\" style=\"font-size:13px;color:"+t.c+";text-decoration:none;\" target=\"_blank\"><i class=\"ti ti-external-link\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;\"></i>"+m.portfolio+"</a></div>":"")+
       (exp?"<div class=\"ps\"><div class=\"slabel\" style=\"margin-top:0;margin-bottom:4px;\">Experience</div>"+exp+"</div>":"")+
@@ -6410,7 +6486,11 @@ async function removeBoardPin(id){
   renderBoard();
   try{var res=await sba.from("board_pins").delete().eq("id",id);if(res.error)throw res.error;}
   catch(ex){console.error("[Partnr] removing pin failed:",ex);if(pin)BOARD_PINS.push(pin);renderBoard();showErrorToast("Couldn't remove that. Please try again.");return;}
-  if(pin)showUndoToast("Removed from your board.",async function(){var again=await addBoardPin(pin.kind,pin.title,pin.data);if(again)renderBoard();});
+  var cn=pin&&pin.kind==="goal"&&pin.data&&pin.data.competition;
+  if(cn&&!BOARD_PINS.some(function(p){return p.kind==="competition"&&p.data&&p.data.name===cn;})){
+    if(await addBoardPin("competition",cn,{name:cn}))renderBoard();
+  }
+  if(pin)showUndoToast(cn?"Goal removed. "+cn+" is still under Competitions to explore.":"Removed from your board.",async function(){var again=await addBoardPin(pin.kind,pin.title,pin.data);if(again)renderBoard();});
 }
 async function updatePinData(pin){
   try{var res=await sba.from("board_pins").update({data:pin.data}).eq("id",pin.id);if(res.error)throw res.error;}
@@ -6449,16 +6529,17 @@ var OUTCOME_RESULTS=["Submitted","Placed","Won","Launched","Still going"];
 async function loadTodoState(){
   var session=await getSession();if(!session)return null;
   var me=session.user.id;
-  var st={me:me,todos:[],posted:0,joined:0,partners:0,outcomes:0};
+  var st={me:me,todos:[],posted:0,joined:0,partners:0,outcomes:0,applied:0};
   try{
     var r=await Promise.all([
       sba.from("student_todos").select("id,title,done,builtin,position,created_at").order("position",{ascending:true}).order("id",{ascending:true}),
       sba.from("projects").select("id",{count:"exact",head:true}).eq("student_id",me),
       sba.from("project_applications").select("id",{count:"exact",head:true}).eq("applicant_id",me).eq("status","accepted"),
       sba.from("connections").select("id",{count:"exact",head:true}).eq("status","accepted").or("student_a_id.eq."+me+",student_b_id.eq."+me),
-      sba.from("project_outcomes").select("id",{count:"exact",head:true})
+      sba.from("project_outcomes").select("id",{count:"exact",head:true}),
+      sba.from("project_applications").select("id",{count:"exact",head:true}).eq("applicant_id",me)
     ]);
-    st.todos=(r[0].data||[]);st.posted=r[1].count||0;st.joined=r[2].count||0;st.partners=r[3].count||0;st.outcomes=r[4].count||0;
+    st.todos=(r[0].data||[]);st.posted=r[1].count||0;st.joined=r[2].count||0;st.partners=r[3].count||0;st.outcomes=r[4].count||0;st.applied=r[5].count||0;
   }catch(ex){console.error("[Partnr] loading to-dos failed:",ex);}
   return st;
 }
@@ -6483,14 +6564,21 @@ async function renderTodos(){
   wrap=document.getElementById("todo-wrap");if(!wrap||!st)return;
   var workRow=st.todos.find(function(t){return t.builtin==="work";});
   var mine=st.todos.filter(function(t){return !t.builtin;});
+  // Each step checks off on its own when the student does it. "Post your
+  // project" and "Apply to join" only show for students they apply to.
+  var stat=S.status||"";
+  var hasProject=stat.indexOf("I have a project")>=0,joining=stat.indexOf("Open to joining")>=0;
+  var pinned=(BOARD_PINS||[]).some(function(p){return p.kind==="competition"||(p.kind==="goal"&&p.data&&p.data.competition);});
   var steps=[
-    {key:"profile",t:"Finish your profile",done:true},
-    {key:"start",t:"Pick a competition, post a project, or join one",done:(S.comps||[]).length>0||(BOARD_PINS||[]).some(function(p){return p.kind==="competition";})||st.posted>0||st.joined>0,
-      acts:[["todo-go-comp","Pick a competition"],["todo-go-projects","Browse projects"]]},
-    {key:"partner",t:"Find a partner",done:st.partners>0,acts:[["todo-go-matches","See your matches"]]},
-    {key:"work",t:"Work on it together",done:!!(workRow&&workRow.done),manual:true,acts:[["todo-go-inbox","Open your inbox"]]},
+    {key:"profile",t:"Finish your profile",done:true,acts:[["todo-go-edit","Edit profile"]]},
+    {key:"decide",t:"Decide on a project or competition",why:"Checks itself when you pick a competition, post a project, or apply to one",
+      done:(S.comps||[]).length>0||pinned||st.posted>0||st.applied>0,acts:[["todo-go-comp","Browse competitions"],["todo-go-projects","Open projects"]]},
+    {key:"post",t:"Post your project",why:"Checks itself when you post",done:st.posted>0,show:hasProject,acts:[["todo-go-post","Post a project"]]},
+    {key:"apply",t:"Apply to join a project",why:"Checks itself when you apply",done:st.applied>0,show:joining,acts:[["todo-go-projects2","See open projects"]]},
+    {key:"partner",t:"Find a partner",why:"Checks itself when someone accepts your request",done:st.partners>0,acts:[["todo-go-matches","See your matches"],["todo-go-find","Find students"]]},
+    {key:"work",t:"Work on it together",why:"Check this yourself",done:!!(workRow&&workRow.done),manual:true,acts:[["todo-go-inbox","Open your inbox"]]},
     {key:"share",t:"Share how it went",done:st.outcomes>0,acts:[["todo-share",st.outcomes>0?"Share another result":"Tell us how it turned out"]]}
-  ];
+  ].filter(function(x){return x.show!==false;});
   // Preset steps a student hid with × (stored as builtin "hide:<step>").
   var hiddenKeys=st.todos.filter(function(t){return t.builtin&&t.builtin.indexOf("hide:")===0;}).map(function(t){return t.builtin.slice(5);});
   steps=steps.filter(function(x){return hiddenKeys.indexOf(x.key)<0;});
@@ -6501,28 +6589,38 @@ async function renderTodos(){
       "<div class=\"slabel\" style=\"margin:0;\">To-do: steps to reach your goals <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+totalCount+" done</span></div>"+
     "</div>"+
     "<div class=\"todo-card\">";
-  steps.forEach(function(x){
-    // Shortcuts show on the next step to do, on "Work on it together"
-    // until it's checked, and always on "Share how it went".
-    var showActs=!!x.acts&&(x.key==="share"||(!x.done&&(x.key===nextKey||x.key==="work")));
-    h+="<div class=\"todo-row"+(x.done?" done":"")+(x.key===nextKey?" next":"")+"\">"+
+  function stepRow(x){
+    var showActs=!!x.acts&&(!x.done||x.key==="share");
+    return "<div class=\"todo-row"+(x.done?" done":"")+(x.key===nextKey?" next":"")+"\">"+
       (x.manual?"<input type=\"checkbox\" id=\"todo-work\" class=\"todo-box\""+(x.done?" checked":"")+" aria-label=\"Mark done\"/>":
         "<span class=\"todo-auto\" aria-hidden=\"true\">"+(x.done?"✓":"")+"</span>")+
-      "<div style=\"flex:1;min-width:0;\"><div class=\"todo-t\">"+esc(x.t)+(x.manual||x.done||x.key==="share"?"":" <span class=\"todo-hint\">checks itself</span>")+"</div>"+
+      "<div style=\"flex:1;min-width:0;\"><div class=\"todo-t\">"+esc(x.t)+"</div>"+
+      (x.why&&!x.done?"<div class=\"todo-why\">"+esc(x.why)+"</div>":"")+
       (showActs?"<div class=\"todo-acts\">"+x.acts.map(function(a){return "<button type=\"button\" class=\"todo-act\" id=\""+a[0]+"\">"+esc(a[1])+" →</button>";}).join("")+"</div>":"")+
       (x.key==="share"?"<div id=\"outcome-form\"></div>":"")+
       "</div>"+
       "<button type=\"button\" class=\"bremove step-hide\" data-k=\""+x.key+"\" aria-label=\"Hide this step\" title=\"Hide this step\" style=\"position:static;\">×</button>"+
       "</div>";
-  });
+  }
+  // Steps still to do show first. Finished ones fold into one line.
+  h+=steps.filter(function(x){return !x.done||x.key==="share";}).map(stepRow).join("");
+  var doneSteps=steps.filter(function(x){return x.done&&x.key!=="share";});
   // The student's own to-dos sit in the same list, under the steps.
-  h+=mine.map(function(t){
+  function myRow(t){
       return "<div class=\"todo-row"+(t.done?" done":"")+"\" data-id=\""+t.id+"\">"+
         "<input type=\"checkbox\" class=\"todo-box my-todo-box\" data-id=\""+t.id+"\""+(t.done?" checked":"")+" aria-label=\"Mark done\"/>"+
         "<div class=\"todo-t my-todo-t\" data-id=\""+t.id+"\" role=\"button\" tabindex=\"0\" title=\"Tap to edit\" style=\"flex:1;cursor:text;\">"+esc(t.title)+"</div>"+
         "<button type=\"button\" class=\"bremove my-todo-del\" data-id=\""+t.id+"\" aria-label=\"Delete to-do\" style=\"position:static;\">×</button>"+
       "</div>";
-    }).join("")+
+  }
+  var myDone=mine.filter(function(t){return t.done;});
+  h+=mine.filter(function(t){return !t.done;}).map(myRow).join("");
+  var foldN=doneSteps.length+myDone.length;
+  if(foldN){
+    h+="<button type=\"button\" id=\"todo-fold\" class=\"todo-done-fold\">✓ "+foldN+" done · "+(TODO_SHOW_DONE?"Hide":"Show")+"</button>";
+    if(TODO_SHOW_DONE)h+=doneSteps.map(stepRow).join("")+myDone.map(myRow).join("");
+  }
+  h+=
     "<div style=\"display:flex;gap:8px;padding:10px 0 8px;border-top:1px solid #f0efeb;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a step, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
     "<button type=\"button\" id=\"todo-add\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
     "<div id=\"todo-err\"></div>"+
@@ -6535,6 +6633,11 @@ function bindTodos(st,workRow){
   function on(id,fn){var b=document.getElementById(id);if(b)b.addEventListener("click",fn);}
   on("todo-go-comp",function(){openCompPicker(function(name){pinCompetition(name).then(renderBoard);});});
   on("todo-go-projects",function(){selectTab("recruit");});
+  on("todo-go-projects2",function(){selectTab("recruit");});
+  on("todo-go-post",function(){selectTab("recruit");rPostProject();});
+  on("todo-go-edit",function(){selectTab("me");openEditHub();});
+  on("todo-go-find",function(){selectTab("search");});
+  on("todo-fold",function(){TODO_SHOW_DONE=!TODO_SHOW_DONE;renderTodos();});
   on("todo-go-matches",function(){selectTab("matches");});
   on("todo-go-inbox",function(){selectTab("conns");});
   on("todo-share",function(){openOutcomeForm();});
@@ -6684,24 +6787,50 @@ function pinShell(key,inner,extraStyle){
 // competition pins, and what they wrote on page 1 becomes their first goal
 // with three starter steps. Runs once per account (a flag is kept in the
 // goal's data) and only when the board is completely empty.
+// "Enter the Conrad Challenge" / "Enter Regeneron ISEF"
+function goalTitleFor(name){
+  var n=String(name||"");
+  var useThe=/^(?!the )/i.test(n)&&/(Challenge|Prize|Competition|Olympiad|Symposium|Contest|Fair|Bowl|Cup)\b/.test(n)&&!/^[A-Z]{2,}\b/.test(n);
+  return "Enter "+(useThe?"the ":"")+n;
+}
+// Goal ideas from the student's interests and status. They only appear
+// as tap-to-add suggestions, never added on their own.
+function goalSuggestions(){
+  var st=S.status||"",out=[];
+  var hasProject=st.indexOf("I have a project")>=0,joining=st.indexOf("Open to joining")>=0,exploring=st.indexOf("Just exploring")>=0;
+  var keys=[];if(S.track)keys.push(S.track);
+  (S.secondary||[]).forEach(function(name){var k=Object.keys(TR).find(function(kk){return TR[kk].n===name;});if(k&&keys.indexOf(k)<0)keys.push(k);});
+  var BY={impact:"Start my nonprofit or club",business:"Launch my business",research:"Complete my research project",tech:"Build and launch my project",arts:"Create and share my work"};
+  if(hasProject)keys.forEach(function(k){if(BY[k])out.push(BY[k]);});
+  if(joining&&!hasProject)out.push("Join a project team");
+  if(exploring&&!hasProject&&!joining)out.push("Find a project I care about");
+  var have=(BOARD_PINS||[]).filter(function(p){return p.kind==="goal";}).map(function(p){return (p.title||"").toLowerCase();});
+  return out.filter(function(t,i){return out.indexOf(t)===i&&have.indexOf(t.toLowerCase())<0;});
+}
 async function seedBoardIfNew(){
-  if(!BOARD_PINS||BOARD_PINS.length)return;
-  var flagKey="partnr_board_seeded_"+(S.email||"me");
-  try{if(localStorage.getItem(flagKey))return;localStorage.setItem(flagKey,"1");}catch(ex){}
-  var idea=""; // The To-do list replaces the old auto-made goal.
-  if(idea){
-    var title=idea.length>120?idea.slice(0,120).replace(/\s+\S*$/,"")+"…":idea;
-    // Only suggest a competition step to students who picked one.
-    // Someone starting a business or nonprofit gets a milestone instead.
-    var hasComps=(S.comps||[]).length>0;
-    await addBoardPin("goal",title,{fromProfile:true,steps:[
-      {t:"Find a partner on Partnr",done:false},
-      {t:hasComps?"Pick the competition to aim for first":"Pick your first milestone",done:false},
-      {t:"Make a plan together",done:false}
-    ]});
+  if(!BOARD_PINS)return;
+  var session=await getSession();if(!session)return;
+  var uid=session.user.id,names=(S.comps||[]).slice(0,10);
+  if(!names.length)return;
+  // Remembered per account (not per email), so every new account is set up.
+  var k1="partnr_board_seeded_"+uid,k2="partnr_comp_goals_"+uid,f1=false,f2=false;
+  try{f1=!!localStorage.getItem(k1);f2=!!localStorage.getItem(k2);}catch(ex){}
+  if(!f1){
+    try{localStorage.setItem(k1,"1");}catch(ex){}
+    for(var i=0;i<names.length;i++){
+      var n=names[i];
+      if(!BOARD_PINS.some(function(p){return p.kind==="competition"&&p.data&&p.data.name===n;}))await addBoardPin("competition",n,{name:n,fromProfile:true});
+    }
   }
-  var names=(S.comps||[]).slice(0,10);
-  for(var i=0;i<names.length;i++){await addBoardPin("competition",names[i],{name:names[i],fromProfile:true});}
+  // Each competition picked at signup becomes a goal. Added once; if the
+  // student removes one, it isn't added back.
+  if(!f2){
+    try{localStorage.setItem(k2,"1");}catch(ex){}
+    for(var j=0;j<names.length;j++){
+      var m=names[j];
+      if(!BOARD_PINS.some(function(p){return p.kind==="goal"&&p.data&&p.data.competition===m;}))await addBoardPin("goal",goalTitleFor(m),{competition:m,fromProfile:true});
+    }
+  }
 }
 async function renderBoard(){
   var el=document.getElementById("tc");if(!el)return;
@@ -6724,13 +6853,25 @@ async function renderBoard(){
     };
     comps=comps.map(function(p,i){return {p:p,i:i};}).sort(function(a,b){return dl(a.p)-dl(b.p)||a.i-b.i;}).map(function(x){return x.p;});
   }
+  // A competition that is already a goal shows only in My goals.
+  var goalComps=goals.map(function(p){return p.data&&p.data.competition;}).filter(Boolean);
+  comps=comps.filter(function(p){return goalComps.indexOf((p.data&&p.data.name)||p.title)<0;});
   var ideas=BOARD_PINS.filter(function(p){return p.kind==="idea"||p.kind==="link";});
 
   // Goals are the big picture, one line each. The steps to get there
   // live in the To-do list, so there's only one checklist on the board.
   var goalHtml=goals.map(function(p){
+    var cn=p.data&&p.data.competition,c=cn?COMPS.find(function(x){return x.n===cn;}):null,meta="";
+    if(cn){
+      var xs=c?getCrossStyle(c.cross):null;
+      var d=DEADLINE_DATA[cn],dl="";
+      if(d&&d.status==="confirmed"&&d.deadline_date){var dd=daysUntilISODate(d.deadline_date);if(dd>=0)dl="<span style=\"color:#B8456E;\">Deadline in "+dd+" day"+(dd===1?"":"s")+"</span> · ";}
+      if(!dl)dl="<span style=\"color:#999;font-weight:400;\">Deadline not confirmed yet</span> · ";
+      meta=(c?"<div class=\"gmeta\"><span>"+esc(xs.lbl)+"</span><span>"+esc(c.team)+"</span><span>"+esc(c.eli)+"</span></div>":"")+
+        "<div class=\"gline\">"+dl+"<button type=\"button\" class=\"gdetail\" data-name=\""+esc(cn)+"\">Details →</button></div>";
+    }
     return pinShell("pin:"+p.id,
-      "<i class=\"ti ti-target-arrow\"></i><div class=\"bt\">"+esc(p.title)+"</div>");
+      "<i class=\"ti ti-target-arrow\"></i><div style=\"flex:1;min-width:0;\"><div class=\"bt\">"+esc(p.title)+"</div>"+meta+"</div>");
   }).join("");
 
   var compHtml=comps.map(function(p){
@@ -6742,7 +6883,8 @@ async function renderBoard(){
       "<div class=\"bk\" style=\"color:"+cm.c+";\">"+esc(cm.n||"Competition")+"</div>"+
       "<div class=\"bt bcomp\" data-name=\""+esc(name)+"\" style=\"cursor:pointer;\">"+esc(name)+"</div>"+
       (c?"<div class=\"bmeta\"><span>"+esc(xs.lbl)+"</span><span>"+esc(c.team)+"</span><span>"+esc(c.eli)+"</span></div>":"")+
-      competitionDeadlineLine(name));
+      competitionDeadlineLine(name)+
+      "<button type=\"button\" class=\"gmake\" data-name=\""+esc(name)+"\" style=\"margin-top:6px;\">+ Make it a goal</button>");
   }).join("");
 
   // Saved partners: AI matches saved with ♥, plus real students starred in Find students.
@@ -6782,9 +6924,15 @@ async function renderBoard(){
     "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My board</div>"+
     "<div class=\"page-note\">Your private place to plan. Only you can see this. Drag the ⋮⋮ handle to reorder.</div>"+
     // Goals first (the big picture), then the to-do list of steps to get there.
-    boardSection("goals","My goals",goals.length,"+ Add a goal","add-goal",goalHtml,"What's your big goal? e.g. Win DECA states, or Publish research by spring.").replace("class=\"bgrid\"","class=\"bgrid bgoals\"")+
+    (function(){
+      var g=boardSection("goals","My goals",goals.length,"+ Add a goal","add-goal",goalHtml,"What's your big goal? e.g. Win DECA states, or Publish research by spring.").replace("class=\"bgrid\"","class=\"bgrid bgoals\"");
+      var sug=goalSuggestions();
+      if(!sug.length)return g;
+      return g.slice(0,-6)+"<div class=\"gsug-wrap\"><div class=\"gsug-l\">Suggested for you, tap to add:</div>"+
+        sug.map(function(t){return "<button type=\"button\" class=\"gsug\" data-t=\""+esc(t)+"\">+ "+esc(t)+"</button>";}).join("")+"</div></div>";
+    })()+
     "<div id=\"todo-wrap\" style=\"margin-bottom:1.5rem;\"></div>"+
-    boardSection("comps","Competitions",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here.")+
+    boardSection("comps","Competitions to explore",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here. Competitions you're entering show in My goals.")+
     boardSection("partners","Saved partners",partnerItems.length,"+ Find students","add-partner",partnerHtml,"Tap ♥ on a match or ★ in Find students to save partners here.")+
     boardSection("ideas","Ideas & links",ideas.length,"+ Add an idea or link","add-idea",ideaHtml,"Pin an open project, or add an idea, article, video or doc.");
 
@@ -6833,6 +6981,21 @@ function bindBoard(partnerItems){
     cb.addEventListener("change",function(){
       var pin=BOARD_PINS.find(function(p){return p.id===parseInt(cb.dataset.id);});if(!pin)return;
       pin.data.steps[parseInt(cb.dataset.i)].done=cb.checked;updatePinData(pin);renderBoard();
+    });
+  });
+  document.querySelectorAll(".gdetail").forEach(function(t){
+    t.addEventListener("click",function(){var c=COMPS.find(function(x){return x.n===t.dataset.name;});if(c)openCompDetail(c,false,true);});
+  });
+  document.querySelectorAll(".gmake").forEach(function(b){
+    b.addEventListener("click",async function(){
+      this.disabled=true;var n=this.dataset.name;
+      if(await addBoardPin("goal",goalTitleFor(n),{competition:n}))renderBoard();else this.disabled=false;
+    });
+  });
+  document.querySelectorAll(".gsug").forEach(function(b){
+    b.addEventListener("click",async function(){
+      this.disabled=true;
+      if(await addBoardPin("goal",this.dataset.t,{suggested:true}))renderBoard();else this.disabled=false;
     });
   });
   document.querySelectorAll(".bcomp").forEach(function(t){
