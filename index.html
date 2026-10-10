@@ -2008,6 +2008,7 @@ var NO_LEVEL_ITEMS=new Set([
   "Civic Engagement","Education / Tutoring","Event Planning"
 ]);
 var accordionOpen={};
+var accordionSeeded={}; // suggested categories open once by default; the student can still close them
 var powTypePicked="Project";
 // Each interest pulls full, uncurated skill categories - not a
 // hand-picked subset. A student's suggested list is the union of every
@@ -2931,7 +2932,6 @@ function rSkills(){
     "<div class=\"sub\" style=\"margin-bottom:0.5rem;\">Skills come from classes, hobbies, and everyday experience. Choose the ones you’ve used. They show other students what you’d bring to a team.</div>"+
     "<div style=\"font-size:14px;color:#666;line-height:1.6;margin-bottom:0.75rem;\">Tap a category to explore the options and select all that apply.</div>"+
     "<div style=\"margin-bottom:0.75rem;\"></div>"+
-    "<div id=\"ai-skill-group\"></div>"+
     "<div id=\"active-group\"></div>"+
     "<div id=\"extra-group\"></div>"+
     "<div id=\"math-group\"></div>"+
@@ -2966,10 +2966,12 @@ function rSkills(){
   document.querySelectorAll("#avail-when .chip").forEach(function(c){c.addEventListener("click",function(){pendingWhen=getChips("avail-when")[0]||"";});});
 
   renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Research, engineering, and business projects often need math too, not just math competitions.",[mathCat],false);
-  renderGroup("active-group","Based on your interests",null,activeCats,false);
+  // Suggested categories start open (once), so students see every chip in them.
+  // We suggest categories only, never specific skills, and nothing is pre-selected.
+  activeCats.forEach(function(c){if(!accordionSeeded[c.id]){accordionSeeded[c.id]=true;accordionOpen[c.id]=true;}});
+  renderGroup("active-group","Suggested for you","Based on your interests, project and competitions. Tap the skills you have.",activeCats,false,true);
   renderGroup("extra-group","Select additional skills","Add all the skills you have. It helps you match with more partners and projects.",extraCats,true);
   renderSkillRecap();
-  renderAiSkillSuggestions();
 
   document.getElementById("addskillbtn2").addEventListener("click",addCustomSkill);
   document.getElementById("customskill2").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addCustomSkill();}});
@@ -3145,11 +3147,16 @@ function wireChipContainer(container){
 // Interest categories and "everything else" render the same way: a
 // collapsed accordion header naming the category and its real count,
 // expanding to plain horizontal chips.
-function renderGroup(containerId,groupLabel,groupSub,cats,subAccent){
+function renderGroup(containerId,groupLabel,groupSub,cats,subAccent,featured){
   var container=document.getElementById(containerId);if(!container)return;
   if(!cats.length){container.innerHTML="";return;}
   var subStyle=subAccent?"font-size:12px;color:#534AB7;font-weight:600;margin-bottom:8px;":"font-size:12px;color:#6b6b6b;margin-bottom:8px;";
-  var h="<div style=\"margin-bottom:1.2rem;\">"+
+  // featured = the light purple "✨ Suggested for you" box
+  var h=featured?
+    "<div style=\"background:#faf9ff;border:1px solid #e3e0fb;border-radius:12px;padding:12px 14px 6px;margin-bottom:1.2rem;\">"+
+    "<div style=\"display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#1a1a1a;margin:4px 0 2px;\">✨ "+groupLabel+"</div>"+
+    "<div style=\"font-size:12px;color:#6b6b6b;margin-bottom:10px;\">"+(groupSub||"")+"</div>"
+  :"<div style=\"margin-bottom:1.2rem;\">"+
     "<div class=\"slabel\" style=\"margin:0 0 4px;\">"+groupLabel+"</div>"+
     (groupSub?"<div style=\""+subStyle+"\">"+groupSub+"</div>":"<div style=\"margin-bottom:6px;\"></div>");
   cats.forEach(function(cat){
@@ -3457,7 +3464,7 @@ async function runInlineSuggestions(){
         S.track=result.primaryCategory;
         // Second category (e.g. Research for a cancer-prevention club that
         // wants to write a paper) becomes the secondary interest, which
-        // also moves it into "Based on your interests" on the Skills page.
+        // also moves it into "Suggested for you" on the Skills page.
         S.secondary=(result.categories||[]).slice(1).map(function(k){return TR[k].n;});
         renderInterestChips();
       }
