@@ -646,7 +646,10 @@ async function saveProfile(){
     idea:S.idea,availability:S.availability,commit:S.commit,github:S.github,location:S.location,
     location_pref:S.locationPref,links:S.links||[],proof_of_work:S.proofOfWork||[],
     stage:S.stage,school_verification:verification.tier,onboarded:true,skills_needed:S.skillsNeeded||"",dob:S.dob||null,fun_fact:(S.funFact||"").trim().slice(0,150)||null,
-    terms_version:S.termsVersion||undefined // the database stamps the time
+    terms_version:S.termsVersion||undefined, // the database stamps the time
+    // Who invited them. The database only accepts it once, before the
+    // profile is finished, and ignores a student's own code.
+    referred_by_code:storedRefCode()||undefined
   });
   if(upsertRes.error)return upsertRes;
   // The database decides the school badge (and may correct the school
@@ -700,6 +703,7 @@ async function loadProfileIntoState(uid){
   if(pRes.error||!pRes.data)return null;
   var p=pRes.data;
   saveDeviceTimeZone(uid,p.time_zone);
+  S.refCode=p.ref_code||"";
   S.name=p.name||"";S.email=p.email||"";S.school=p.school||"";S.country=p.country||"";
   S.city=p.city||"";S.zip=p.zip||"";S.grade=p.grade||"";S.track=p.track||"";S.role=p.role||"";
   S.secondary=p.secondary||[];S.status=normStatus(p.status);S.idea=p.idea||"";S.availability=p.availability||"";
@@ -4091,6 +4095,24 @@ async function doFetch(){
 // built-in share sheet: Messages, Mail, Instagram, WhatsApp and more.
 // Where that isn't available, it shows a small menu instead.
 var INVITE_URL="https://projectpartnr.com";
+// Each student's invite link carries their own code (?ref=K7M2QX), so we
+// know who brought each new student in. Nothing about it shows on screen.
+function inviteUrl(){return INVITE_URL+(S.refCode?"/?ref="+encodeURIComponent(S.refCode):"");}
+// Remember an invite code from the link this visitor opened, for 30 days,
+// so it still counts if they finish signing up later on this device.
+(function(){
+  try{
+    var m=/[?&]ref=([A-Za-z0-9]{3,20})/.exec(location.search);
+    if(m)localStorage.setItem("partnr_ref",JSON.stringify({c:m[1].toUpperCase(),t:Date.now()}));
+  }catch(ex){}
+})();
+function storedRefCode(){
+  try{
+    var r=JSON.parse(localStorage.getItem("partnr_ref")||"null");
+    if(r&&r.c&&Date.now()-r.t<30*24*3600*1000)return r.c;
+  }catch(ex){}
+  return "";
+}
 // Short invite: Text, WhatsApp and the device share menu.
 var INVITE_TEXT="I'm on Partnr, a free app where high school students team up on research, startups, nonprofits and competitions. It's a free way to build great extracurriculars on your own time and pace. Join me!";
 // Longer invite for Email, which has room for more.
@@ -4098,7 +4120,7 @@ var INVITE_EMAIL_SUBJECT="Join me on Partnr (it's free)";
 var INVITE_EMAIL_BODY="Hey!\n\n"+
   "I'm on Partnr, an app where high school students find partners for research, startups, nonprofits and competitions. You can team up with students near you or anywhere in the world, matched by your skills and what you want to build.\n\n"+
   "It's completely free. Programs that help students build projects or prepare for competitions often cost thousands of dollars. Partnr is a free way to build great extracurriculars on your own time and pace: start your own project, enter a competition, or join someone else's idea.\n\n"+
-  "I think you'd be a great partner. Join me here: "+INVITE_URL+"\n\n"+
+  "I think you'd be a great partner. Join me here: {LINK}\n\n"+
   "See you there!";
 // Same Invite menu on every device: Email, Text, WhatsApp, Copy link.
 // Where the device has its own share menu (iPhone, Android, Mac Safari),
@@ -4106,7 +4128,8 @@ var INVITE_EMAIL_BODY="Hey!\n\n"+
 function copyInviteLink(){openInviteMenu();}
 function openInviteMenu(){
   var old=document.getElementById("invite-menu");if(old)old.remove();
-  var body=encodeURIComponent(INVITE_TEXT+" "+INVITE_URL);
+  var link=inviteUrl(),emailBody=INVITE_EMAIL_BODY.replace("{LINK}",link);
+  var body=encodeURIComponent(INVITE_TEXT+" "+link);
   var ov=document.createElement("div");ov.id="invite-menu";
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:220;display:flex;align-items:center;justify-content:center;padding:1rem;";
   var opt=function(id,icon,label,href){
@@ -4119,8 +4142,8 @@ function openInviteMenu(){
     "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:14px;\">The more students join, the better everyone's matches get.</div>"+
     "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;\">"+
       opt("inv-text","💬","Text","sms:?&body="+body)+
-      opt("inv-email","✉️","Email","mailto:?subject="+encodeURIComponent(INVITE_EMAIL_SUBJECT)+"&body="+encodeURIComponent(INVITE_EMAIL_BODY))+
-      opt("inv-snap","👻","Snapchat","https://www.snapchat.com/share?link="+encodeURIComponent(INVITE_URL))+
+      opt("inv-email","✉️","Email","mailto:?subject="+encodeURIComponent(INVITE_EMAIL_SUBJECT)+"&body="+encodeURIComponent(emailBody))+
+      opt("inv-snap","👻","Snapchat","https://www.snapchat.com/share?link="+encodeURIComponent(link))+
       opt("inv-wa","🟢","WhatsApp","https://wa.me/?text="+body)+
       opt("inv-copy","🔗","Copy link","")+
       (navigator.share?opt("inv-more","\u22ef","More options",""):"")+
@@ -4143,7 +4166,7 @@ function openInviteMenu(){
   // this device, tapping Email does nothing at all.
   var em=document.getElementById("inv-email");
   if(em)em.addEventListener("click",function(){
-    var text=INVITE_EMAIL_SUBJECT+"\n\n"+INVITE_EMAIL_BODY;
+    var text=INVITE_EMAIL_SUBJECT+"\n\n"+emailBody;
     var msg="Opening your email app. If it didn't open, the invite is copied. Paste it into whatever email you use.";
     try{navigator.clipboard.writeText(text).catch(function(){});}catch(ex){}
     setTimeout(function(){ov.remove();showToast(msg,6000);},300);
@@ -4151,12 +4174,12 @@ function openInviteMenu(){
   var more=document.getElementById("inv-more");
   if(more)more.addEventListener("click",function(){
     ov.remove();
-    navigator.share({title:"Join me on Partnr",text:INVITE_TEXT,url:INVITE_URL}).catch(function(){});
+    navigator.share({title:"Join me on Partnr",text:INVITE_TEXT,url:link}).catch(function(){});
   });
   document.getElementById("inv-copy").addEventListener("click",function(){
-    var done=function(){showToast("Link copied: "+INVITE_URL);ov.remove();};
-    try{navigator.clipboard.writeText(INVITE_URL).then(done,function(){showToast("Share this link: "+INVITE_URL);});}
-    catch(ex){showToast("Share this link: "+INVITE_URL);}
+    var done=function(){showToast("Link copied: "+link);ov.remove();};
+    try{navigator.clipboard.writeText(link).then(done,function(){showToast("Share this link: "+link);});}
+    catch(ex){showToast("Share this link: "+link);}
   });
 }
 
