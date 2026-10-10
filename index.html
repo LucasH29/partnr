@@ -123,6 +123,13 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 .bgrip{position:absolute;top:34px;right:2px;width:36px;height:40px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;letter-spacing:-1px;cursor:grab;touch-action:none;user-select:none;}
 .bremove{position:absolute;top:2px;right:2px;width:36px;height:32px;background:none;border:none;color:#bbb;font-size:16px;cursor:pointer;line-height:1;padding:0;font-family:inherit;}
 .bremove:hover{color:#C53030;}
+/* Goals sit at the top of My board as full-width bars */
+.bgoals{grid-template-columns:1fr;}
+.bgoals .bpin{background:#EEEDFE;border-color:#d9d6fb;padding:13px 76px 13px 14px;display:flex;align-items:center;gap:10px;}
+.bgoals .bpin .ti{color:#534AB7;font-size:19px;flex-shrink:0;}
+.bgoals .bt{font-size:15px;color:#2A1745;margin:0;}
+.bgoals .bremove,.bgoals .bgrip{top:50%;transform:translateY(-50%);}
+.bgoals .bgrip{right:36px;height:32px;}
 .bk{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:5px;}
 .bt{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.3;}
 .bmeta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
@@ -1105,7 +1112,7 @@ function rCheckEmail(){
       "<i class=\"ti ti-mail-opened check-email-icon\"></i>"+
       "<h2 style=\"margin-bottom:0.5rem;\">Check your email</h2>"+
       "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue, and you'll come right back here.</div>"+
-      "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely. If it still doesn't show up after a few minutes, try signing up again with a personal email instead.</div>"+
+      "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely. If it still doesn't show up after a few minutes, try signing up again with a personal email instead.<div style=\"margin-top:6px;\">Still stuck? See the <a href=\"Partnr_Student_Guide.pdf\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;font-weight:600;\">student guide</a> or email <a href=\"mailto:hello@projectpartnr.com\" style=\"color:#534AB7;font-weight:600;\">hello@projectpartnr.com</a>.</div></div>"+
       "<button class=\"bkbtn\" id=\"backToSignup\" style=\"margin-top:1rem;\">← Use a different email</button>"+
     "</div>"
   );
@@ -2274,7 +2281,8 @@ function rWelcome(){
     "<div style=\"text-align:center;font-size:12px;color:#1a1a1a;margin-bottom:1.5rem;\">Tap a category to explore "+COMPS.length+"+ real competitions. No account needed.</div>"+
     "<button class=\"bp\" id=\"gs\">Join Partnr</button>"+
     "<button class=\"bkbtn\" id=\"toSignin\" style=\"color:#1a1a1a;\">Already on Partnr? Sign in</button>"+
-    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#1a1a1a;\">Free to join · Currently in beta</div>"
+    "<div style=\"text-align:center;margin-top:12px;font-size:12px;color:#1a1a1a;\">Free to join · Currently in beta</div>"+
+    "<div style=\"text-align:center;margin-top:6px;font-size:12px;color:#1a1a1a;\">Need help getting started? <a href=\"Partnr_Student_Guide.pdf\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;font-weight:600;\">Read the student guide</a></div>"
   );
   document.getElementById("gs").addEventListener("click",function(){goTo("signup");});
   document.getElementById("toSignin").addEventListener("click",function(){goTo("signin");});
@@ -4213,6 +4221,7 @@ function rMatches(){
           "<button class=\"pm-it\" data-act=\"blocked\">Blocked students</button>"+
           "<div class=\"pm-hr\"></div>"+
           "<button class=\"pm-it\" data-act=\"rate\">Tell us what you think</button>"+
+          "<a class=\"pm-it\" href=\"Partnr_Student_Guide.pdf\" target=\"_blank\" rel=\"noopener\" style=\"display:block;text-decoration:none;color:inherit;\">Student guide</a>"+
           "<button class=\"pm-it\" data-act=\"feedback\">Report a problem</button>"+
           "<button class=\"pm-it\" data-act=\"signout\">Sign out</button>"+
         "</div>"+
@@ -4844,6 +4853,18 @@ function rPostProject(existing){
     "<div id=\"pp-err\"></div>"+
     "<button class=\"bp\" id=\"pp-submit\">"+(editing?"Save changes":"Post project →")+"</button>"+
     (editing?"<button class=\"bkbtn\" id=\"pp-close\" style=\"color:#A32D2D;\">"+(ex.status==="open"?"Close this project (stop taking applications)":"Reopen this project")+"</button>":"")+
+    // Delete: a second tap on a confirm box, so nobody deletes by accident.
+    (editing?"<button class=\"bkbtn\" id=\"pp-del\" style=\"color:#A32D2D;\"><i class=\"ti ti-trash\" style=\"font-size:14px;vertical-align:-2px;margin-right:4px;\"></i>Delete this project</button>"+
+      "<div id=\"pp-del-confirm\" style=\"display:none;background:#FDF1F1;border:1px solid #f1c4c4;border-radius:10px;padding:12px 14px;margin-top:8px;font-size:13px;color:#7a2020;line-height:1.5;\">"+
+        "<div style=\"font-weight:700;\">Delete \""+esc(ex.title||"this project")+"\"?</div>"+
+        "<div>It will be removed from Open projects and all its applications will be deleted. This can't be undone.</div>"+
+        "<div style=\"font-size:12px;color:#8a4a4a;margin-top:2px;\">Just want to pause it? Close it instead.</div>"+
+        "<div style=\"display:flex;gap:8px;margin-top:10px;\">"+
+          "<button id=\"pp-del-yes\" style=\"flex:1;padding:10px;background:#A32D2D;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Delete project</button>"+
+          "<button id=\"pp-del-no\" style=\"flex:1;padding:10px;background:white;border:1px solid #ddd;border-radius:8px;font-size:14px;color:#444;cursor:pointer;font-family:inherit;\">Keep it</button>"+
+        "</div>"+
+        "<div id=\"pp-del-err\"></div>"+
+      "</div>":"")+
     "<button class=\"bkbtn\" id=\"pp-cancel\">Cancel</button>";
 
   function allSkills(){var out=[];SKILL_CATS.forEach(function(c){c.items.forEach(function(i){if(out.indexOf(i)<0)out.push(i);});});return out;}
@@ -4919,6 +4940,25 @@ function rPostProject(existing){
     showToast(newStatus==="closed"?"Project closed. It no longer shows in Open projects.":"Project reopened.");
     backTo();
   });
+  var delBtn=document.getElementById("pp-del");
+  if(delBtn){
+    var delBox=document.getElementById("pp-del-confirm");
+    delBtn.addEventListener("click",function(){delBox.style.display=delBox.style.display==="none"?"block":"none";});
+    document.getElementById("pp-del-no").addEventListener("click",function(){delBox.style.display="none";});
+    document.getElementById("pp-del-yes").addEventListener("click",async function(){
+      var btn=this;btn.disabled=true;btn.textContent="Deleting…";
+      // Applications are removed by the database along with the project.
+      var r=await sba.from("projects").delete().eq("id",ex.id).select("id");
+      if(r.error||!r.data||!r.data.length){
+        btn.disabled=false;btn.textContent="Delete project";
+        document.getElementById("pp-del-err").innerHTML="<div class=\"sec-err\" style=\"margin-top:8px;\">Couldn't delete the project. Please try again.</div>";
+        return;
+      }
+      PROJECTS=(PROJECTS||[]).filter(function(x){return x.id!==ex.id;});
+      showToast("Project deleted.");
+      backTo();
+    });
+  }
   document.getElementById("pp-submit").addEventListener("click",async function(){
     var errBox=document.getElementById("pp-err");errBox.innerHTML="";
     var title=document.getElementById("pp-title").value.trim();
@@ -5139,7 +5179,8 @@ function dCards(){
     return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No confirmed upcoming deadlines right now. Check back as we verify new cycles.</div>";
   }
 
-  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>";
+  var h="<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div>"+
+    "<div style=\"display:flex;gap:7px;align-items:flex-start;background:#F4F3FB;border-radius:8px;padding:8px 10px;font-size:12px;color:#555;line-height:1.45;margin:0 0 12px;\"><i class=\"ti ti-info-circle\" style=\"font-size:14px;color:#534AB7;flex-shrink:0;margin-top:1px;\"></i><span>We check these dates, but competitions can change them. Always confirm the deadline and rules on the official site before you submit.</span></div>";
 
   upcoming.forEach(function(item){
     var c=item.comp;
@@ -5463,6 +5504,7 @@ async function rWorkspace(connectionId,otherName){
     "<button id=\"ws-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:1rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
     "<h2 style=\"margin-bottom:0.25rem;\">Workspace with "+esc(otherName)+"</h2>"+
     "<div class=\"sub\">Share links and documents for your project. No photos yet. That's coming once we've built real screening for it.</div>"+
+    "<div style=\"display:flex;gap:7px;align-items:flex-start;background:#F4F3FB;border-radius:8px;padding:8px 10px;font-size:12px;color:#555;line-height:1.45;margin:0 0 12px;\"><i class=\"ti ti-shield-check\" style=\"font-size:14px;color:#534AB7;flex-shrink:0;margin-top:1px;\"></i><span>Only share files about your project. Don't upload anything with personal info like your address or phone number.</span></div>"+
     "<div id=\"ws-list\" style=\"margin:1rem 0;\"><div style=\"text-align:center;padding:1.5rem;\"><div class=\"spin\" style=\"margin:0 auto 0.5rem;\"></div></div></div>"+
     "<div class=\"slabel\" style=\"margin-top:0;\">Add a link</div>"+
     "<div style=\"display:flex;gap:8px;margin-bottom:0.5rem;\">"+
@@ -5623,7 +5665,8 @@ async function rChat(connectionId,otherName){
   R(logo()+
     "<button id=\"chat-back\" style=\"display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6b6b6b;cursor:pointer;background:none;border:none;margin-bottom:0.5rem;padding:0;font-family:inherit;\"><i class=\"ti ti-arrow-left\" style=\"font-size:15px;\"></i> Back to Inbox</button>"+
     "<h2 style=\"margin-bottom:2px;\">Chat with "+esc(otherName)+"</h2>"+
-    "<div style=\"font-size:11px;color:#6b6b6b;margin-bottom:1rem;\"><i class=\"ti ti-shield-check\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;color:#3B6D11;\"></i>Text only. For files and links, use your Workspace.</div>"+
+    "<div style=\"font-size:11px;color:#6b6b6b;margin-bottom:6px;\"><i class=\"ti ti-shield-check\" style=\"font-size:11px;vertical-align:-1px;margin-right:3px;color:#3B6D11;\"></i>Text only. For files and links, use your Workspace.</div>"+
+    "<div style=\"display:flex;gap:7px;align-items:flex-start;background:#F4F3FB;border-radius:8px;padding:8px 10px;font-size:12px;color:#555;line-height:1.45;margin:0 0 12px;\"><i class=\"ti ti-shield-check\" style=\"font-size:14px;color:#534AB7;flex-shrink:0;margin-top:1px;\"></i><span>Keep it about your project. Don't share personal info like your phone number, home address or passwords.</span></div>"+
     "<div id=\"chat-messages\" style=\"background:#f8f8f6;border-radius:12px;padding:12px;height:340px;overflow-y:auto;margin-bottom:0.75rem;display:flex;flex-direction:column;gap:8px;\"><div style=\"text-align:center;padding:1rem;\"><div class=\"spin\" style=\"margin:0 auto;\"></div></div></div>"+
     "<div id=\"chat-warning\" style=\"display:none;font-size:12px;color:#854F0B;background:#FAEEDA;border-radius:8px;padding:8px 12px;margin-bottom:8px;\">Sharing contact info off Partnr means this conversation can't be reviewed if something goes wrong. Send anyway?</div>"+
     "<div id=\"chat-selfharm-card\" style=\"display:none;font-size:13px;color:#1a1a1a;background:#EEEDFE;border-radius:10px;padding:12px 14px;margin-bottom:8px;line-height:1.5;\">"+
@@ -6455,7 +6498,7 @@ async function renderTodos(){
   var totalCount=steps.length+mine.length;
   var nextKey=(steps.find(function(x){return !x.done;})||{}).key;
   var h="<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\">"+
-      "<div class=\"slabel\" style=\"margin:0;\">To-do <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+totalCount+" done</span></div>"+
+      "<div class=\"slabel\" style=\"margin:0;\">To-do: steps to reach your goals <span style=\"font-weight:400;color:#999;text-transform:none;letter-spacing:0;\">"+doneCount+" of "+totalCount+" done</span></div>"+
     "</div>"+
     "<div class=\"todo-card\">";
   steps.forEach(function(x){
@@ -6480,7 +6523,7 @@ async function renderTodos(){
         "<button type=\"button\" class=\"bremove my-todo-del\" data-id=\""+t.id+"\" aria-label=\"Delete to-do\" style=\"position:static;\">×</button>"+
       "</div>";
     }).join("")+
-    "<div style=\"display:flex;gap:8px;padding:10px 0 8px;border-top:1px solid #f0efeb;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a to-do, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
+    "<div style=\"display:flex;gap:8px;padding:10px 0 8px;border-top:1px solid #f0efeb;\"><input id=\"todo-new\" maxlength=\"140\" placeholder=\"Add a step, e.g. Find a mentor\" style=\"flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;\"/>"+
     "<button type=\"button\" id=\"todo-add\" style=\"padding:8px 14px;background:#EEEDFE;color:#534AB7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;\">Add</button></div>"+
     "<div id=\"todo-err\"></div>"+
   "</div>"+
@@ -6687,8 +6730,7 @@ async function renderBoard(){
   // live in the To-do list, so there's only one checklist on the board.
   var goalHtml=goals.map(function(p){
     return pinShell("pin:"+p.id,
-      "<div class=\"bk\" style=\"color:#534AB7;\">Goal</div><div class=\"bt\">"+esc(p.title)+"</div>",
-      "background:#EEEDFE;border-color:#d9d6fb;");
+      "<i class=\"ti ti-target-arrow\"></i><div class=\"bt\">"+esc(p.title)+"</div>");
   }).join("");
 
   var compHtml=comps.map(function(p){
@@ -6739,8 +6781,9 @@ async function renderBoard(){
   el.innerHTML=
     "<div style=\"font-size:20px;font-weight:700;margin-bottom:4px;\">My board</div>"+
     "<div class=\"page-note\">Your private place to plan. Only you can see this. Drag the ⋮⋮ handle to reorder.</div>"+
+    // Goals first (the big picture), then the to-do list of steps to get there.
+    boardSection("goals","My goals",goals.length,"+ Add a goal","add-goal",goalHtml,"What's your big goal? e.g. Win DECA states, or Publish research by spring.").replace("class=\"bgrid\"","class=\"bgrid bgoals\"")+
     "<div id=\"todo-wrap\" style=\"margin-bottom:1.5rem;\"></div>"+
-    boardSection("goals","Goals",goals.length,"+ Add a goal","add-goal",goalHtml,"Your big goals, like \"Publish research by spring\" or \"Win DECA states.\" The steps go in your to-do list above.")+
     boardSection("comps","Competitions",comps.length,"+ Pin a competition","add-comp",compHtml,"Tap 📌 Pin on any competition to save it here.")+
     boardSection("partners","Saved partners",partnerItems.length,"+ Find students","add-partner",partnerHtml,"Tap ♥ on a match or ★ in Find students to save partners here.")+
     boardSection("ideas","Ideas & links",ideas.length,"+ Add an idea or link","add-idea",ideaHtml,"Pin an open project, or add an idea, article, video or doc.");
