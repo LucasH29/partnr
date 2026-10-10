@@ -1143,6 +1143,7 @@ function rCheckEmail(){
       "<i class=\"ti ti-mail-opened check-email-icon\"></i>"+
       "<h2 style=\"margin-bottom:0.5rem;\">Check your email</h2>"+
       "<div class=\"sub\">We sent a login link to <strong>"+esc(S.email)+"</strong>. Click it to continue, and you'll come right back here.</div>"+
+      "<div style=\"font-size:13px;color:#3C3489;background:#EEEDFE;border-radius:8px;padding:10px 12px;margin-top:0.75rem;line-height:1.5;\"><i class=\"ti ti-browser\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;\"></i>The link may open in a different browser. Finish signing up there.</div>"+
       "<div style=\"text-align:left;font-size:12px;color:#6b6b6b;background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-top:0.5rem;line-height:1.5;\"><i class=\"ti ti-info-circle\" style=\"font-size:12px;vertical-align:-1px;margin-right:4px;\"></i>Didn't get it? Check spam first. Some school email systems block or filter automated messages entirely. If it still doesn't show up after a few minutes, try signing up again with a personal email instead.<div style=\"margin-top:6px;\">Still stuck? See the <a href=\"Partnr_Student_Guide.pdf\" target=\"_blank\" rel=\"noopener\" style=\"color:#534AB7;font-weight:600;\">student guide</a> or email <a href=\"mailto:hello@projectpartnr.com\" style=\"color:#534AB7;font-weight:600;\">hello@projectpartnr.com</a>.</div></div>"+
       "<button class=\"bkbtn\" id=\"backToSignup\" style=\"margin-top:1rem;\">← Use a different email</button>"+
     "</div>"
@@ -1276,6 +1277,49 @@ function readPendingSignup(){
 }
 function clearPendingSignup(){try{localStorage.removeItem(PENDING_KEY);}catch(ex){}}
 
+// Sign-up drafts on the server. The Interests and Skills answers are saved
+// to signup_drafts (private to the student) as they go, not only at the
+// very end. So a student who opens the email link in a different browser
+// (Instagram's built-in browser vs Chrome/Safari), switches to a laptop,
+// or leaves halfway picks up exactly where they stopped.
+var DRAFT_KEYS=["track","secondary","status","idea","commit","locationPref","location","comps","skillLevels","availability","skillsNeeded","proofOfWork","links","github"];
+var DRAFT_TIMER=null;
+function draftSnapshot(){
+  var d={};
+  DRAFT_KEYS.forEach(function(k){d[k]=S[k];});
+  d._savedAt=Date.now();
+  return d;
+}
+function saveDraftSoon(step){
+  if(EDIT_RETURN)return;
+  clearTimeout(DRAFT_TIMER);
+  DRAFT_TIMER=setTimeout(function(){saveDraftNow(step);},1500);
+}
+async function saveDraftNow(step){
+  if(EDIT_RETURN)return;
+  clearTimeout(DRAFT_TIMER);
+  try{
+    var session=await getSession();
+    if(!session)return; // not signed in yet (before the email link): browser copy only
+    await sba.from("signup_drafts").upsert({
+      student_id:session.user.id,data:draftSnapshot(),
+      step:step||CURRENT_PAGE||"track",updated_at:new Date().toISOString()
+    });
+  }catch(ex){/* a draft is a convenience; never block sign-up on it */}
+}
+async function loadServerDraft(){
+  try{
+    var r=await sba.from("signup_drafts").select("data,step").maybeSingle();
+    return r.data||null;
+  }catch(ex){return null;}
+}
+async function markDraftDone(){
+  try{
+    var session=await getSession();
+    if(session)await sba.from("signup_drafts").update({step:"done",updated_at:new Date().toISOString()}).eq("student_id",session.user.id);
+  }catch(ex){}
+}
+
 // Opens the page an email button pointed to, once the student is signed in.
 var OPEN_KEY="partnr_open_after_login";
 function waitFor(test,ms){
@@ -1372,9 +1416,19 @@ async function boot(){
         var earlier=readPendingSignup();
         if(earlier&&earlier.email&&S.email&&earlier.email.toLowerCase()===S.email.toLowerCase()){
           ["track","secondary","status","idea","commit","locationPref","comps"].forEach(function(k){if(earlier[k]&&(!Array.isArray(earlier[k])||earlier[k].length))S[k]=earlier[k];});
-          if(typeof rebuildSelCompsFromProfile==="function")rebuildSelCompsFromProfile();
+        }else{earlier=null;}
+        // Answers saved on the server (from any browser or device) win
+        // when they're newer than this browser's copy.
+        var srv=await loadServerDraft();
+        var useSrv=!!(srv&&srv.data&&srv.step!=="done"&&(!earlier||!earlier._savedAt||(srv.data._savedAt||0)>=earlier._savedAt));
+        if(useSrv){
+          DRAFT_KEYS.forEach(function(k){
+            var v=srv.data[k];
+            if(v!==undefined&&v!==null&&v!==""&&(!Array.isArray(v)||v.length))S[k]=v;
+          });
         }
-        goTo("track");
+        if(typeof rebuildSelCompsFromProfile==="function")rebuildSelCompsFromProfile();
+        goTo(useSrv&&srv.step==="skills"&&S.track?"skills":"track");
         return;
       }
       // Fallback: local browser storage, in case metadata wasn't set
@@ -1731,7 +1785,7 @@ var COMPS=[
   {n:"AMC / AIME",cat:"math",team:"Prep partner",eli:"US + international",tier:1,cross:"prep",desc:"AMC to AIME to USAMO pathway - individual rounds but top competitors prep in pairs",why:"Find a study partner from any school at your exact level",url:"https://maa.org/math-competitions/"},
   {n:"DECA ICDC",cat:"business",team:"Same-school chapter",eli:"Global",tier:2,cross:false,desc:"International business and marketing - 230k+ students - chapter based",why:"Same-school chapter required - find teammates at your school",url:"https://www.deca.org/"},
   {n:"Blue Ocean Competition",cat:"business",team:"Teams of 1-5",eli:"Global - 135 countries",tier:2,cross:true,desc:"World's largest virtual entrepreneurship pitch - $1,000 prize",why:"Fully virtual and cross-school - pitch needs business, tech, and design",url:"https://blueoceancompetition.org/"},
-  {n:"Diamond Challenge",cat:"impact",team:"2-4 students",eli:"Global ages 14-18",tier:1,cross:true,desc:"University of Delaware - two co-equal tracks: Business Innovation and Social Innovation",why:"Cross-school teams allowed - pick either track, ideal pairing is a builder with a researcher or writer",url:"https://diamondchallenge.org/"},
+  {n:"Diamond Challenge: Business Innovation",cat:"business",team:"2-4 students",eli:"Global ages 14-18",tier:1,cross:true,desc:"University of Delaware - business innovation track: pitch a for-profit startup idea",why:"Cross-school teams allowed - ideal pairing is a builder with someone strong in business or pitching",url:"https://diamondchallenge.org/"},
   {n:"FBLA Competitive Events",cat:"business",team:"Same-school chapter",eli:"US + intl chapters",tier:2,cross:false,desc:"Future Business Leaders - chapter based, same school required",why:"Same school required - find teammates at your school",url:"https://www.fbla.org/"},
   {n:"Wharton Investment Competition",cat:"business",team:"Teams of 3-5",eli:"Global",tier:2,cross:true,desc:"Free global investment strategy competition - 6,000+ students",why:"Cross-school teams welcome - needs finance, research, and presentation",url:"https://globalyouth.wharton.upenn.edu/investment-competition/"},
   {n:"SAGE World Cup",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Sustainable entrepreneurship - state, national, and world finals",why:"Cross-school teams allowed - social enterprise needs business and research",url:"https://sageglobal.org/"},
@@ -1950,7 +2004,7 @@ var COMPS=[
   {n:"International Physics Olympiad (IPhO)",cat:"science",team:"Prep partner",eli:"Global - top national performers",tier:1,cross:"prep",desc:"The most prestigious physics competition for high schoolers - theoretical and experimental exams",why:"Individual entry - find a partner from any school to work through problem sets with",url:"https://www.ipho-new.org/"},
   {n:"World Scholar's Cup",cat:"impact",team:"Teams of 3",eli:"Global, ages up to 18",tier:2,cross:true,desc:"Interdisciplinary team competition across science, history, literature, and the arts",why:"Mixed-school teams allowed - needs debate, writing, and broad academic range",url:"https://scholarscup.org/"},
   {n:"Citizen Entrepreneurship",cat:"impact",team:"Teams",eli:"Global",tier:2,cross:true,desc:"Social business tied to UN SDGs - three-phase process",why:"Cross-school and international teams encouraged",url:"https://entrepreneurship.de/en/competition"},
-  {n:"Diamond Challenge Social",cat:"impact",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Social innovation track at University of Delaware",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/"},
+  {n:"Diamond Challenge: Social Innovation",cat:"impact",team:"2-4 students",eli:"Global ages 14-18",tier:1,cross:true,desc:"University of Delaware - social innovation track: pitch an idea that solves a social or environmental problem",why:"Cross-school teams allowed - mission-driven co-founders with complementary skills",url:"https://diamondchallenge.org/"},
   {n:"Hackathon MLH",cat:"tech",team:"2-4 students",eli:"Global",tier:2,cross:true,desc:"Weekend coding sprints - build and ship in 24-36 hours",why:"Cross-school and cross-country is standard - coder plus designer plus product",url:"https://mlh.io/",subcat:"coding"},
   {n:"FIRST Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Premier high school robotics - school-based teams, regional and world championships",why:"Same school required - find teammates with programming, mechanical, and strategy skills",url:"https://www.firstinspires.org/",subcat:"robotics"},
   {n:"VEX Robotics",cat:"tech",team:"Same-school team",eli:"Global",tier:2,cross:false,desc:"Global robotics with regional and world championship - school-based teams",why:"Same school required - find teammates with programming and engineering skills",url:"https://www.roboticseducation.org/",subcat:"robotics"},
@@ -2244,7 +2298,18 @@ function rememberInterestsPage(){
   var cm=getChips("commit")[0];if(cm)S.commit=cm;
   if(typeof selComps!=="undefined")S.comps=selComps.map(function(c){return c.n;});
   savePendingSignup();
+  saveDraftSoon("track");
 }
+// Same for the Skills page: skill taps update S.skillLevels directly.
+function rememberSkillsPage(){
+  if(typeof CURRENT_PAGE==="undefined"||CURRENT_PAGE!=="skills"||EDIT_RETURN)return;
+  var h=getChips("avail-hours")[0]||"",w=getChips("avail-when")[0]||"";
+  if(h&&w)S.availability=h+" · "+w;
+  savePendingSignup();
+  saveDraftSoon("skills");
+}
+document.addEventListener("input",function(){setTimeout(rememberSkillsPage,0);});
+document.addEventListener("click",function(){setTimeout(rememberSkillsPage,50);});
 document.addEventListener("input",function(){setTimeout(rememberInterestsPage,0);});
 document.addEventListener("click",function(){setTimeout(rememberInterestsPage,50);});
 function scrollToFirstErr(){
@@ -3747,6 +3812,8 @@ function step3(){
   S.idea=idea;S.location=S.locationPref;
   if(EDIT_RETURN){saveEditAndReturn("s3");return;}
   saveSignupLead({email:S.email,track:S.track,stage:"interests_goals"});
+  savePendingSignup();
+  saveDraftNow("skills");
   goTo("skills");
 }
 function step4(){
@@ -3775,6 +3842,7 @@ function step4(){
     }
     saveSignupLead({email:S.email,stage:"completed",converted:true});
     clearPendingSignup();
+    markDraftDone();
     doFetch();
   }).catch(function(e){
     showSaveError(e);
@@ -5998,10 +6066,46 @@ function bindMeTab(){
           attemptsN++;
         }
         if(!code){throw new Error("Could not generate a unique code");}
-        inputBox.innerHTML="Send an email from <strong>"+esc(typedEmail)+"</strong> to <strong>verify@projectpartnr.com</strong> with this code anywhere in the subject line:"+
-          "<div style=\"font-size:18px;font-weight:700;letter-spacing:2px;margin:8px 0;color:#534AB7;\">"+code+"</div>"+
+        // The inbound checker (verify-school-email-inbound) only receives mail
+        // sent to the "mail." subdomain. Plain verify@projectpartnr.com goes
+        // to Google Workspace and bounces, so never show that address.
+        var VERIFY_TO="verify@mail.projectpartnr.com";
+        var enc=encodeURIComponent;
+        // Gmail link opens as the student's SCHOOL account (authuser), not
+        // whatever personal account is active, with To + Subject filled in.
+        var gmailHref="https://mail.google.com/mail/?authuser="+enc(typedEmail)+"&view=cm&fs=1&to="+enc(VERIFY_TO)+"&su="+enc(code);
+        var outlookHref="https://outlook.office.com/mail/deeplink/compose?to="+enc(VERIFY_TO)+"&subject="+enc(code);
+        var mailtoHref="mailto:"+VERIFY_TO+"?subject="+enc(code);
+        var vBtnStyle="font-size:12px;font-weight:600;color:#534AB7;background:#EEEDFE;border:1px solid #D9D5FB;border-radius:6px;padding:5px 10px;cursor:pointer;text-decoration:none;display:inline-block;";
+        inputBox.innerHTML="<div style=\"width:100%;\">Send an email from <strong>"+esc(typedEmail)+"</strong> to "+
+            "<a href=\""+esc(mailtoHref)+"\" style=\"font-weight:700;color:#534AB7;\">"+VERIFY_TO+"</a> "+
+            "<button type=\"button\" class=\"vCopyBtn\" data-copy=\""+esc(VERIFY_TO)+"\" style=\""+vBtnStyle+"padding:2px 8px;\">Copy</button>"+
+            " with this code anywhere in the subject line:</div>"+
+          "<div style=\"display:flex;align-items:center;gap:8px;margin:8px 0;width:100%;\">"+
+            "<span style=\"font-size:18px;font-weight:700;letter-spacing:2px;color:#534AB7;\">"+code+"</span>"+
+            "<button type=\"button\" class=\"vCopyBtn\" data-copy=\""+esc(code)+"\" style=\""+vBtnStyle+"\">Copy code</button>"+
+          "</div>"+
+          "<div style=\"display:flex;gap:6px;flex-wrap:wrap;width:100%;margin-bottom:6px;\">"+
+            "<a href=\""+esc(gmailHref)+"\" target=\"_blank\" rel=\"noopener\" style=\""+vBtnStyle+"\">Open my school Gmail</a>"+
+            "<a href=\""+esc(outlookHref)+"\" target=\"_blank\" rel=\"noopener\" style=\""+vBtnStyle+"\">Open Outlook</a>"+
+            "<a href=\""+esc(mailtoHref)+"\" style=\""+vBtnStyle+"\">Other email app</a>"+
+          "</div>"+
+          "<div style=\"font-size:12px;color:#6b6b6b;width:100%;margin-bottom:8px;\">Make sure it sends from your school email. If Gmail asks you to sign in, use your school account.</div>"+
           "<button id=\"checkVerifyStatus\" style=\"font-size:12px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;\">I've sent it - check now</button>"+
-          "<div id=\"verifyStatusMsg\" style=\"margin-top:6px;\"></div>";
+          "<div id=\"verifyStatusMsg\" style=\"margin-top:6px;width:100%;\"></div>";
+        // Copy buttons: copy the address or code, show "Copied" briefly.
+        Array.prototype.forEach.call(inputBox.querySelectorAll(".vCopyBtn"),function(cb){
+          cb.addEventListener("click",function(){
+            var text=cb.getAttribute("data-copy");
+            var label=cb.textContent;
+            function done(){cb.textContent="Copied";setTimeout(function(){cb.textContent=label;},1500);}
+            try{
+              if(navigator.clipboard&&navigator.clipboard.writeText){
+                navigator.clipboard.writeText(text).then(done,function(){cb.textContent=text;});
+              }else{cb.textContent=text;}
+            }catch(ex){cb.textContent=text;}
+          });
+        });
         document.getElementById("checkVerifyStatus").addEventListener("click",async function(){
           var btn=this;btn.disabled=true;btn.textContent="Checking…";
           try{
@@ -7346,6 +7450,39 @@ function resetAll(){
   goTo("welcome");
 }
 
+// In-app browsers (Instagram, Snapchat, TikTok, Facebook) keep Partnr inside
+// their own app, but the sign-in email opens in Safari or Chrome. That splits
+// sign-up across two browsers, so suggest switching before they start.
+function isInAppBrowser(){
+  var ua=navigator.userAgent||"";
+  return /Instagram|FBAN|FBAV|Snapchat|TikTok|BytedanceWebview|musical_ly/i.test(ua);
+}
+function showInAppBanner(){
+  if(!isInAppBrowser())return;
+  try{if(sessionStorage.getItem("partnr_iab_dismissed"))return;}catch(ex){}
+  if(document.getElementById("iab-banner"))return;
+  var link="https://projectpartnr.com/";
+  var b=document.createElement("div");
+  b.id="iab-banner";b.setAttribute("role","note");
+  b.style.cssText="position:sticky;top:0;z-index:1000;background:#EEEDFE;color:#3C3489;border-bottom:1px solid #D9D5FB;padding:10px 14px;font-size:14px;line-height:1.4;display:flex;align-items:center;gap:10px;flex-wrap:wrap;";
+  b.innerHTML="<span style=\"flex:1;min-width:180px;font-weight:600;\">For the best experience, open Partnr in Safari or Chrome.</span>"+
+    "<button type=\"button\" id=\"iab-copy\" style=\"font-size:13px;font-weight:600;color:#fff;background:#534AB7;border:none;border-radius:6px;padding:8px 12px;cursor:pointer;\">Copy link</button>"+
+    "<button type=\"button\" id=\"iab-close\" aria-label=\"Dismiss\" style=\"font-size:18px;line-height:1;color:#534AB7;background:none;border:none;padding:6px;cursor:pointer;\">\u00d7</button>";
+  document.body.insertBefore(b,document.body.firstChild);
+  var copyBtn=document.getElementById("iab-copy");
+  copyBtn.addEventListener("click",function(){
+    function done(){copyBtn.textContent="Copied. Paste it in Safari or Chrome";}
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(link).then(done,function(){copyBtn.textContent=link;});
+      else copyBtn.textContent=link;
+    }catch(ex){copyBtn.textContent=link;}
+  });
+  document.getElementById("iab-close").addEventListener("click",function(){
+    b.remove();
+    try{sessionStorage.setItem("partnr_iab_dismissed","1");}catch(ex){}
+  });
+}
+showInAppBanner();
 boot();
 </script>
 </body>
