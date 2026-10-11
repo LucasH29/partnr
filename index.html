@@ -266,7 +266,7 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
   async function loadDeadlineData(){
     try{
       var res=await sba.from("competition_deadlines")
-        .select("competition_name,deadline_date,cycle_end_date,typical_reopen_period,status");
+        .select("competition_name,deadline_date,cycle_end_date,typical_reopen_period,status,student_note");
       if(res.error){DEADLINE_DATA_LOADED=true;return;}
       (res.data||[]).forEach(function(row){
         DEADLINE_DATA[row.competition_name]=row;
@@ -284,7 +284,7 @@ input.sw:focus-visible{outline:2px solid #534AB7;outline-offset:2px;}
 </head>
 <body>
 <div id="ROOT" class="app"></div>
-<div class="app-foot"><div class="foot-links"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="guidelines.html" target="_blank" rel="noopener">Community Guidelines</a> · <a href="parents.html" target="_blank" rel="noopener">For Parents</a></div><button id="fb-link" type="button">Report a problem or send feedback</button></div>
+<div class="app-foot"><div class="foot-links"><a href="Partnr_Student_Guide.pdf" target="_blank" rel="noopener">Student guide</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="guidelines.html" target="_blank" rel="noopener">Community Guidelines</a> · <a href="parents.html" target="_blank" rel="noopener">For Parents</a></div><button id="fb-link" type="button">Report a problem or send feedback</button></div>
 <script>
 
 // ── State ──────────────────────────────────
@@ -2061,7 +2061,7 @@ var SKILL_CATS=[
   {id:"design",label:"Design & Creative Tools",question:"What design tools and creative skills do you use?",icon:"ti-palette",type:"level",hint:"List tools you actually open and use regularly",
    items:["Figma / UI Design","Adobe Photoshop","Adobe Illustrator","Adobe Premiere / Video Editing","After Effects / Motion Graphics","DaVinci Resolve","Blender / 3D Modeling","Procreate / Digital Art","Photography","Canva","Brand Identity / Logos","Illustration / Drawing","Animation","Game Art / Pixel Art","Architecture Design"]},
   {id:"business",label:"Business & Finance",question:"What business skills do you know?",icon:"ti-trending-up",type:"level",hint:"Skills from class, a club, a competition, or a real business - all count",
-   items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Fundraising","Hospitality Management","Economics","Product Management","Project Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
+   items:["Business Strategy","Business Plan Writing","Market Research","User Research / Customer Discovery","Financial Modeling","Excel / Google Sheets","Pitching / Demo Day","Case Analysis","Sales","Hospitality Management","Economics","Product Management","Project Management","Social Media Marketing","Email / Content Marketing","Accounting Basics"]},
   {id:"writing",label:"Writing & Communication",question:"What writing and communication skills do you have?",icon:"ti-pencil",type:"level",hint:"Select skills you actively and regularly use",
    items:["Research & Academic Writing","Essay Writing","Journalism / Reporting","Creative Writing","Technical Writing","Grant Writing","Screenwriting / Scripts","Poetry","Public Speaking","Debate","Social Media Content"]},
   {id:"humanities",label:"Humanities & Social Sciences",question:"What humanities disciplines do you know?",icon:"ti-book",type:"level",hint:"Key for John Locke Essay, Model UN, Mock Trial, and policy competitions",
@@ -3070,10 +3070,11 @@ function rSkills(){
   document.querySelectorAll("#avail-when .chip").forEach(function(c){c.addEventListener("click",function(){pendingWhen=getChips("avail-when")[0]||"";});});
 
   renderGroup("math-group","Math courses","Select every course you've completed or are currently taking, if any (optional). Research, engineering, and business projects often need math too, not just math competitions.",[mathCat],false);
-  // Suggested categories start open (once), so students see every chip in them.
   // We suggest categories only, never specific skills, and nothing is pre-selected.
-  activeCats.forEach(function(c){if(!accordionSeeded[c.id]){accordionSeeded[c.id]=true;accordionOpen[c.id]=true;}});
-  renderGroup("active-group","Suggested for you","Based on your interests, project and competitions. Tap the skills you have.",activeCats,false,true);
+  // Suggested categories are listed first but start closed: opening them all
+  // at once was overwhelming. Students tap the ones they want.
+  activeCats.forEach(function(c){if(!accordionSeeded[c.id]){accordionSeeded[c.id]=true;}});
+  renderGroup("active-group","Suggested for you","Based on your interests, project and competitions. Tap a category to see its skills.",activeCats,false,true);
   renderGroup("extra-group","Select additional skills","Add all the skills you have. It helps you match with more partners and projects.",extraCats,true);
   renderSkillRecap();
 
@@ -4359,6 +4360,7 @@ function rMatches(){
   }
   R("<div class=\"topbar\">"+logo()+
       "<div class=\"tb-right\">"+
+        "<a class=\"nb tb-icon\" id=\"nb-help\" href=\"Partnr_Student_Guide.pdf\" target=\"_blank\" rel=\"noopener\" aria-label=\"Student guide\" title=\"Student guide: how to use Partnr\" style=\"text-decoration:none;color:inherit;\"><i class=\"ti ti-help-circle\"></i></a>"+
         "<button class=\"nb tb-icon\" id=\"nb-conns\" aria-label=\"Inbox\" title=\"Inbox\"><i class=\"ti ti-mail\"></i><span id=\"conn-badge\"></span></button>"+
         "<button class=\"tb-av\" id=\"nb-avatar\" aria-label=\"Your profile menu\" aria-haspopup=\"true\">"+esc(myInits)+"</button>"+
         "<div class=\"pmenu\" id=\"pmenu\" style=\"display:none;\">"+
@@ -4825,7 +4827,7 @@ function openModal(idx){
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
         "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro. Tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you, and you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>Once they accept, you can chat and share files from your Inbox. Until then, neither of you can message the other.</div>"+
         "<textarea id=\"mmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"sbtn\" style=\"flex:1;padding:10px;background:"+t.c+";color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
@@ -4844,7 +4846,7 @@ function sendConn(){
   var name=m?m.name:"Partner";
   if(m&&!CONNS.some(function(c){return c.name===name;}))
     CONNS.push({name:name,school:m.school,country:m.country,avatar:m.avatar,avatarColor:m.avatarColor,role:m.role,track:m.track,msg:msg,status:"pending"});
-  R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(displayName(name))+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"dbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button></div></div>");
+  R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(displayName(name))+"</strong>. Once they accept, you can chat and share files in your Inbox.</div><button id=\"dbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to matches</button></div></div>");
   document.getElementById("dbn").addEventListener("click",function(){goTo("matches");});
 }
 
@@ -5344,7 +5346,7 @@ function dCards(){
   });
   running.sort(function(a,b){return parseISODate(a.cycle_end_date)-parseISODate(b.cycle_end_date);});
 
-  if(!upcoming.length&&!running.length){
+  if(!upcoming.length&&!running.length&&!COMPS.length){
     return "<div class=\"slabel\" style=\"margin-top:0;\">Competition calendar</div><div style=\"text-align:center;padding:2rem;color:#6b6b6b;\">No confirmed upcoming deadlines right now. Check back as we verify new cycles.</div>";
   }
 
@@ -5404,6 +5406,56 @@ function dCards(){
         "</div>"+
       "</div>";
     });
+  }
+
+  // Third section: every other competition. Their next deadline isn't
+  // announced (or couldn't be verified) yet, so no date is shown - just a
+  // link to check the official site. When the deadline checker confirms a
+  // date, the competition moves up into the main list on its own.
+  var myCompNames=(S.comps||[]).map(function(x){return (x&&x.name)?x.name:x;});
+  var notYet=COMPS.filter(function(c){
+    var d=DEADLINE_DATA[c.n];
+    if(!d)return true;
+    if(d.status==="confirmed")return !(d.deadline_date&&daysUntilISODate(d.deadline_date)>=0);
+    if(d.status==="cycle_active")return !d.cycle_end_date;
+    return true;
+  }).map(function(c){
+    var mine=myCompNames.indexOf(c.n)>=0, forYou=myCats.indexOf(c.cat)>=0;
+    return {comp:c,mine:mine,forYou:forYou,rank:mine?0:forYou?1:2};
+  });
+  notYet.sort(function(a,b){return a.rank-b.rank||a.comp.n.localeCompare(b.comp.n);});
+  if(notYet.length){
+    h+="<div class=\"slabel\">Dates not announced yet ("+notYet.length+")</div>"+
+      "<div class=\"page-note\" style=\"margin-bottom:10px;\">These competitions haven't posted their next deadline. Check the official site.</div>";
+    var nyCard=function(item){
+      var c=item.comp,d=DEADLINE_DATA[c.n]||{};
+      var cm=CM2[c.cat]||{c:"#7F77DD",bg:"#EEEDFE",tc:"#3C3489"};
+      var team=c.cross===true?"\ud83c\udf0d Cross-school ok":c.cross==="prep"?"\ud83d\udc64 Prep partner":"\ud83c\udfeb Same school";
+      var label=item.mine?"Your competition":item.forYou?"For you":"";
+      return "<div class=\"dl\" style=\""+(item.mine||item.forYou?"border-color:"+cm.c+";border-width:2px;":"")+"\">"+
+        "<div style=\"flex:1;\">"+
+          "<div style=\"display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap;\">"+
+            "<div style=\"font-size:14px;font-weight:600;color:#1a1a1a;\">"+esc(c.n)+"</div>"+
+            (label?"<span style=\"font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:"+cm.bg+";color:"+cm.tc+";\">"+label+"</span>":"")+
+          "</div>"+
+          "<div style=\"display:flex;flex-wrap:wrap;gap:5px;align-items:center;\">"+
+            "<span class=\"tag\" style=\"background:"+cm.bg+";color:"+cm.tc+";\">"+cm.n+"</span>"+
+            "<span style=\"font-size:11px;color:#6b6b6b;\">"+team+"</span>"+
+            "<span style=\"font-size:11px;color:#6b6b6b;margin-left:auto;\">"+(d.typical_reopen_period?esc(d.typical_reopen_period):"Next date not announced")+"</span>"+
+          "</div>"+
+          (d.student_note?"<div style=\"font-size:12px;color:#444;line-height:1.45;background:#F4F3FB;border-radius:6px;padding:6px 8px;margin-top:6px;\">"+esc(d.student_note)+"</div>":"")+
+          (c.url?"<a href=\""+safeUrl(c.url)+"\" target=\"_blank\" rel=\"noopener\" style=\"font-size:11px;color:#6b6b6b;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:5px;\"><i class=\"ti ti-external-link\" style=\"font-size:11px;\"></i>Official site</a>":"")+
+        "</div>"+
+      "</div>";
+    };
+    var mineCount=notYet.filter(function(x){return x.rank===0;}).length;
+    var forYouCount=notYet.filter(function(x){return x.rank===1;}).length;
+    var firstCount=Math.max(8,mineCount+Math.min(8,forYouCount)); // your own, then a few "for you"; the rest behind Show all
+    notYet.slice(0,firstCount).forEach(function(item){h+=nyCard(item);});
+    if(notYet.length>firstCount){
+      h+="<details class=\"ny-more\"><summary style=\"cursor:pointer;font-size:13px;font-weight:600;color:#534AB7;padding:8px 0;\">Show all "+notYet.length+"</summary>"+
+        notYet.slice(firstCount).map(nyCard).join("")+"</details>";
+    }
   }
   return h;
 }
@@ -6433,7 +6485,7 @@ function openSearchConnectModal(realId,name,backFn){
       "<div style=\"background:white;border-radius:16px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.15);\">"+
         "<div style=\"font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px;\">Connect with "+esc(name)+"</div>"+
         "<div style=\"font-size:13px;color:#6b6b6b;margin-bottom:1rem;\">Write a short intro. Tell them why you want to collaborate.</div>"+
-        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>This introduces you, and you'll both see the connection in your Inbox once accepted. Full messaging and parent visibility are still being built.</div>"+
+        "<div style=\"background:#f8f8f6;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#666;\"><i class=\"ti ti-shield-check\" style=\"font-size:13px;vertical-align:-1px;margin-right:4px;color:#3B6D11;\"></i>Once they accept, you can chat and share files from your Inbox. Until then, neither of you can message the other.</div>"+
         "<textarea id=\"srmsg\" placeholder=\"Hi! I saw your profile and think we would work great together...\" style=\"width:100%;height:90px;resize:none;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:white;margin-bottom:1rem;\"></textarea>"+
         "<div style=\"display:flex;gap:8px;\">"+
           "<button id=\"srsbtn\" style=\"flex:1;padding:10px;background:#7F77DD;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;\">Send request →</button>"+
@@ -6455,7 +6507,7 @@ function openSearchConnectModal(realId,name,backFn){
         showInlineError(btn,limitHit?"You can send up to 20 connection requests a day. Try again tomorrow.":"Couldn't send the request. Please try again.");
         return;
       }
-      R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. You'll both get a shared project board when they accept.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
+      R(logo()+"<div style=\"min-height:280px;display:flex;align-items:center;justify-content:center;\"><div style=\"text-align:center;padding:2rem;\"><i class=\"ti ti-circle-check\" style=\"font-size:52px;color:#1D9E75;\"></i><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin:12px 0 6px;\">Request sent!</div><div style=\"font-size:14px;color:#6b6b6b;margin-bottom:1.5rem;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5;\">We notified <strong>"+esc(name)+"</strong>. Once they accept, you can chat and share files in your Inbox.</div><button id=\"srdbn\" class=\"bp\" style=\"max-width:240px;margin:0 auto;display:block;\">Back to search</button></div></div>");
       document.getElementById("srdbn").addEventListener("click",back);
     }catch(ex){
       console.error("Search connect failed",ex);
@@ -7366,7 +7418,12 @@ function bindSE(){
   fsRun();
 }
 // After a Report/Block flow, go back to the same search.
-function returnToSkillSearch(){showTab("search");}
+// The connect pop-up and the "Request sent" page replace the whole app,
+// so the tab bar has to be rebuilt before the Find students tab opens.
+function returnToSkillSearch(){
+  if(document.getElementById("tc"))showTab("search");
+  else backToTab("search");
+}
 
 
 // ── Report a problem / send feedback ─────────
