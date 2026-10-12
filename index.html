@@ -1240,11 +1240,13 @@ function rUnsubscribe(token,cat){
 
 // Links from emails: ?unsubscribe=TOKEN&c=messages and ?settings=email.
 var OPEN_EMAIL_SETTINGS=false;
+var OPEN_SIGNIN=false; // ?signin=1 (from the "almost done" email): show Sign in instead of the home page
 function readEmailLinkParams(){
   try{
     var q=new URLSearchParams(window.location.search);
     var tok=q.get("unsubscribe");
     if(q.get("settings")==="email")OPEN_EMAIL_SETTINGS=true;
+    if(q.get("signin")==="1")OPEN_SIGNIN=true;
     // Email buttons say where to land: ?open=inbox, ?open=chat&c=<connection>,
     // ?open=applications&p=<project>, ?open=projects, ?open=matches.
     // Kept in this browser so it still works if they have to sign in first.
@@ -1252,7 +1254,7 @@ function readEmailLinkParams(){
     if(openView){
       try{localStorage.setItem(OPEN_KEY,JSON.stringify({v:openView,c:q.get("c")||"",p:q.get("p")||"",t:Date.now()}));}catch(ex){}
     }
-    if(tok||OPEN_EMAIL_SETTINGS||openView){
+    if(tok||OPEN_EMAIL_SETTINGS||openView||OPEN_SIGNIN){
       // Tidy the address bar so a refresh or shared link doesn't repeat it.
       history.replaceState(null,"",window.location.pathname+window.location.hash);
     }
@@ -1454,7 +1456,7 @@ async function boot(){
   }catch(e){
     console.error("Supabase session check failed",e);
   }
-  goTo("welcome");
+  goTo(OPEN_SIGNIN?"signin":"welcome");
 }
 
 // ── Countries WITHOUT zip/postal codes ─────
